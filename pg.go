@@ -27,7 +27,7 @@ const (
 	LockTimeoutQuery      = "SET lock_timeout TO 2000"
 	DeadlockTimeoutQuery  = "SET deadlock_timeout TO 1000"
 
-	DbListQuery = "SELECT datname FROM pg_database WHERE NOT datistemplate"
+	DbListQuery = "SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn"
 )
 
 // Assembles libpq connection string, connect to Postgres and returns 'connection' object
