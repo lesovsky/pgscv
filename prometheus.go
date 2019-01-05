@@ -306,7 +306,6 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 	}
 
 	// теперь нужно пройтись по всем базам и собрать стату
-	var statData []MetricData
 	var target = STAT_ALL			// при первой попытке сбора пытаемся собрать всю имеющуюся стату
 
 	for _, dbname := range dblist {
@@ -329,21 +328,8 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		}
 
 		// собираем стату
-		statData = e.getPgStat(conn, instance.InstanceType, target)
+		e.getPgStat(conn, ch, instance.InstanceType, target)
 		conn.Close()		// закрываем соединение
-
-		for _, datum := range statData { // итерируемся по всем структуркам которые собраны в нашем мегамассиве
-			for _, metricdata := range datum.RawDataMap { // берем одну структурку и итерируемся в её хэше который содержит непосредственно значения+метки и Desc создаваемой метрики
-				v, _ := strconv.ParseFloat(metricdata.Value, 64) // преобразуем string в подходящий для прометеуса float
-				ch <- prometheus.MustNewConstMetric(
-					datum.MetricDesc, // *prometheus.Desc который также участвует в Describe методе
-					datum.MetricType, // тип метрики
-					v,                // значение метрики
-					metricdata.LabelValues..., // массив меток
-				)
-				cnt += 1
-			}
-		}
 
 		target = STAT_PRIVATE	// как только шаредная стата собрана, не имеет смысла ее собирать еще раз, далее собираем только приватную стату.
 	}
@@ -355,11 +341,9 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 // Шаредная стата описывает кластер целиком, приватная относится к конкретной базе и описывает таблицы/индексы/функции которые принадлежат этой базе
 // Для сбора статы обходим все имеющиеся источники и пропускаем ненужные. Далее выполняем запрос ассоциированный с источником и делаем его в подключение.
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
-func (e *Exporter) getPgStat(conn *sql.DB, itype int, target int) []MetricData {
-	var allMetrics []MetricData = make([]MetricData, 0, 100) // 100 это дефолтное капасити -- сразу делаем хранилище для 100 уникальных метрик, чтобы не расширять его после каждого append()
-	var s stat.PGresult                                      // хранилище для результата запроса
-
-	for _, desc := range statdesc { // обходим по всем источникам
+func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, target int) {
+	// обходим по всем источникам
+	for _, desc := range statdesc {
 		if desc.Stype == itype {
 			switch target {
 			case STAT_SHARED:
@@ -374,46 +358,65 @@ func (e *Exporter) getPgStat(conn *sql.DB, itype int, target int) []MetricData {
 				// ничего не пропускаем, т.к. надо собрать и приватную и шаредную статы
 			}
 
-			if err := s.GetPgstatSample(conn, desc.Query); err != nil { // делаем запрос
+			rows, err := conn.Query(desc.Query)
+			// Errors aren't critical for us, remember and show them to the user. Return after the error, because
+			// there is no reason to continue.
+			if err != nil {
 				log.Warnf("Failed to execute query: %s\n%s", err, desc.Query)
 				continue // если произошла ошибка, то пропускаем этот конкретный шаг сбора статы
 			}
-			//var size = s.Ncols - len(desc.labelNames)	// вычисляем размер для массива на основе количество колонок без учета колонок-меток
-			var size = len(desc.ValueNames)                           // вычисляем размер для массива на основе количества имен для метрик
-			var metricsSubset []MetricData = make([]MetricData, size) // строим массив на основе всех колонок (и меток в том числе)
 
-			for i := 0; i < size; i++ { // делаем хранилище под значения из запроса
-				metricsSubset[i].RawDataMap = make(map[int]RawMetricDatum)
-			}
+			var container []sql.NullString
+			var pointers []interface{}
 
-			for row := 0; row < s.Nrows; row++ {
-				for col, idx := 0, 0; col < s.Ncols; col++ {
-					var colname string = s.Cols[col]
+			colnames, _ := rows.Columns()
+			ncols := len(colnames)
+
+			for rows.Next() {
+				pointers = make([]interface{}, ncols)
+				container = make([]sql.NullString, ncols)
+
+				for i := range pointers {
+					pointers[i] = &container[i]
+				}
+
+				err := rows.Scan(pointers...)
+				if err != nil {
+					log.Warnf("Failed to scan query result: %s\n%s", err, desc.Query)
+					continue // если произошла ошибка, то пропускаем эту строку и переходим к следующей
+				}
+
+				for c, colname := range colnames {
 					// Если колонки нет в списке меток, то генерим метрику на основе значения [row][column]. Если имя колонки входит в список меток, то пропускаем ее -- нам не нужно генерить из нее метрику, т.к. она как метка+значение сама будет частью метрики
 					if !Contains(desc.LabelNames, colname) {
 						var labelValues = make([]string, len(desc.LabelNames))
 						// итерируемся по именам меток, нужно собрать из результата-ответа от базы, значения для соотв. меток
 						for i, lname := range desc.LabelNames {
 							// определяем номер (индекс) колонки в PGresult, который соотв. названию метки -- по этому индексу возьмем значение для метки из PGresult (таким образом мы не привязываемся к порядку полей в запросе)
-							for idx, cname := range s.Cols {
+							for idx, cname := range colnames {
 								if cname == lname {
-									labelValues[i] = s.Result[row][idx].String
+									labelValues[i] = container[idx].String
 								}
 							}
 						}
-						var metricValue string = s.Result[row][col].String
-						metricsSubset[idx].RawDataMap[row+col] = RawMetricDatum{metricValue, labelValues} //row+col это искусственный ключ, потенциально обеспечивающий уникальность
-						metricsSubset[idx].MetricDesc = e.AllDesc[desc.Name+"_"+colname]                  // определяем саму "метрику"
-						metricsSubset[idx].MetricType = prometheus.CounterValue                           // для любой метрики используем тип Counter -- это не совсем правильно, но пока так
-						idx++
+
+						var metricValue string = container[c].String
+						v, err := strconv.ParseFloat(metricValue, 64) // преобразуем string в подходящий для прометеуса float
+						if err != nil {
+							//log.Warnf("WARNING: can't convert to float: %s\n", err)	// TODO: включить варнинг и найти места где не получается распарсить во флоат
+							continue
+						}
+
+						ch <- prometheus.MustNewConstMetric(
+							e.AllDesc[desc.Name+"_"+colname],	// *prometheus.Desc который также участвует в Describe методе
+							prometheus.CounterValue,			// тип метрики
+							v,                					// значение метрики
+							labelValues...,						// массив меток
+						)
 					}
 				}
 			}
-
-			// добавляем собранный набор метрик в хранилище всех метрик
-			allMetrics = append(allMetrics, metricsSubset...)
+			rows.Close()
 		}
 	}
-
-	return allMetrics
 }

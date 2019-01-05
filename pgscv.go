@@ -21,10 +21,10 @@ const (
 )
 
 var (
-	promPushGw = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").OverrideDefaultFromEnvar("PROM_PUSHGATEWAY").String()
-	promPushInterval = kingpin.Flag("prom.pushinterval", "Interval between pushes").Default("10s").OverrideDefaultFromEnvar("PROM_PUSHINTERVAL").Duration()
+	promPushGw = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").Envar("PROM_PUSHGATEWAY").String()
+	promPushInterval = kingpin.Flag("prom.pushinterval", "Interval between pushes").Default("10s").Envar("PROM_PUSHINTERVAL").Duration()
 
-	cfId = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").OverrideDefaultFromEnvar("PGSCV_CFID").String()
+	cfId = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").Envar("PGSCV_CFID").String()
 
 	err    error		// TODO: может таки от нее можно избавиться?
 	wg sync.WaitGroup
