@@ -119,6 +119,8 @@ var (
 		"pg_stat_current_temp_oldest_file_age_seconds_max": "Total time when oldest temp file is created, in seconds",
 		// pg_class
 		// pg_locks
+		// pg_settings
+		"pg_settings_guc": "Postgres configuration settings",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
 		// node /proc/diskstats metrics
@@ -160,6 +162,8 @@ var (
 		// node filesystems
 		"node_filesystem_bytes": "Node filesystem usage, in bytes",
 		"node_filesystem_inodes": "Node filesystem usage, in inodes",
+		// node various settings
+		"node_settings_sysctl": "Node sysctl variables",
 		// pgbouncer
 		"pgbouncer_pool_cl_active": "Client connections that are linked to server connection and can process queries",
 		"pgbouncer_pool_cl_waiting": "Client connections have sent queries but have not yet got a server connection",

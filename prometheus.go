@@ -77,6 +77,10 @@ var (
 	pgbouncerPoolsVN                = []string{"cl_active", "cl_waiting", "sv_active", "sv_idle", "sv_used", "sv_tested", "sv_login", "maxwait", "maxwait_us"}
 	pgbouncerStatsVN                = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
 
+	sysctlList = []string{"kernel.sched_migration_cost_ns", "kernel.sched_autogroup_enabled",
+	"vm.dirty_background_bytes", "vm.dirty_bytes", "vm.overcommit_memory", "vm.overcommit_ratio", "vm.swappiness", "vm.min_free_kbytes",
+	"vm.zone_reclaim_mode", "kernel.numa_balancing",}
+
 	statdesc = []*StatDesc{
 		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
 		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, Private: true, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
@@ -92,12 +96,14 @@ var (
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
+		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{ "guc" }, LabelNames: []string{ "name", "unit", "secondary" }},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: STYPE_SYSTEM, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
 		{Name: "node_netdev", Stype: STYPE_SYSTEM, ValueNames: netdevValueNames, LabelNames: []string{"interface"}},
 		{Name: "node_memory", Stype: STYPE_SYSTEM, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
 		{Name: "node_filesystem", Stype: STYPE_SYSTEM, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
+		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}},
 		// pgbouncer metrics
 		{Name: "pgbouncer_pool", Stype: STYPE_PGBOUNCER, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: STYPE_PGBOUNCER, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
@@ -169,6 +175,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				metricsCnt += e.collectDiskstatsMetrics(ch)
 				metricsCnt += e.collectNetdevMetrics(ch)
 				metricsCnt += e.collectFsMetrics(ch)
+				metricsCnt += e.collectSysctlMetrics(ch)
 			}
 		}
 	}
@@ -263,6 +270,20 @@ func (e *Exporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_filesystem_inodes"], prometheus.CounterValue, float64(fs.SingleStat(usage)), usage, fs.Device, fs.Mountpoint, fs.Mountflags)
 			cnt += 1
 		}
+	}
+
+	return cnt
+}
+
+// Read sysctl variables and translate them to metrics
+func (e *Exporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
+	for _, sysctl := range sysctlList {
+		value, err := stat.GetSysctl(sysctl)
+		if err != nil {
+			log.Errorf("failed to obtain sysctl: err", err)
+		}
+		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
+		cnt += 1
 	}
 
 	return cnt

@@ -93,4 +93,12 @@ var (
 
 	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`
 	pgStatWalSizeQuery = `SELECT sum(size) AS size_bytes FROM pg_ls_waldir()`
+
+	pgSettingsGucQuery = `SELECT name, unit,
+CASE WHEN vartype = 'bool' THEN setting::bool::int::text
+	WHEN vartype IN ('string', 'enum') THEN '-1000'::text
+	ELSE setting
+END AS guc,
+CASE WHEN vartype IN ('string', 'enum', 'bool') THEN setting END AS secondary
+FROM pg_show_all_settings()`
 )
