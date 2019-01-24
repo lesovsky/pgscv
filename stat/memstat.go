@@ -5,14 +5,17 @@ package stat
 import (
 	"bufio"
 	"bytes"
-		"io"
+	"fmt"
+	"io"
 	"io/ioutil"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
 
 const (
-	PROC_MEMINFO       = "/proc/meminfo"
+	PROC_MEMINFO            = "/proc/meminfo"
+	SYSFS_NUMA_NODE_PATTERN = "/sys/devices/system/node/node*"
 )
 
 // Conatiner for memory/swap usage stats
@@ -81,18 +84,40 @@ func (m *Meminfo) ReadLocal() {
 // Function returns value of particular memory/swap stat
 func (m Meminfo) SingleStat(stat string) (value uint64) {
 	switch stat {
-	case "mem_total": value = m.MemTotal
-	case "mem_free": value = m.MemFree
-	case "mem_used": value = m.MemUsed
-	case "swap_total": value = m.SwapTotal
-	case "swap_free": value = m.SwapFree
-	case "swap_used": value = m.SwapUsed
-	case "mem_cached": value = m.MemCached
-	case "mem_dirty": value = m.MemDirty
-	case "mem_writeback": value = m.MemWriteback
-	case "mem_buffers": value = m.MemBuffers
-	case "mem_slab": value = m.MemSlab
-	default: value = 0
+	case "mem_total":
+		value = m.MemTotal
+	case "mem_free":
+		value = m.MemFree
+	case "mem_used":
+		value = m.MemUsed
+	case "swap_total":
+		value = m.SwapTotal
+	case "swap_free":
+		value = m.SwapFree
+	case "swap_used":
+		value = m.SwapUsed
+	case "mem_cached":
+		value = m.MemCached
+	case "mem_dirty":
+		value = m.MemDirty
+	case "mem_writeback":
+		value = m.MemWriteback
+	case "mem_buffers":
+		value = m.MemBuffers
+	case "mem_slab":
+		value = m.MemSlab
+	default:
+		value = 0
 	}
 	return value
+}
+
+// Counts NUMA nodes
+func CountNumaNodes() (n int, err error) {
+	d, err := filepath.Glob(SYSFS_NUMA_NODE_PATTERN)
+	if err != nil {
+		return 0, fmt.Errorf("failed counting NUMA nodes, malformed pattern: %s", err)
+	}
+
+	return len(d), nil
 }

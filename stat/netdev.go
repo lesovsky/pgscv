@@ -5,7 +5,7 @@ package stat
 import (
 	"bufio"
 	"bytes"
-		"fmt"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -49,7 +49,7 @@ type Netdev struct {
 type Netdevs []Netdev
 
 const (
-	PROC_NETDEV             = "/proc/net/dev"
+	PROC_NETDEV = "/proc/net/dev"
 )
 
 // Read stats from local procfile source
@@ -101,27 +101,48 @@ func (c Netdevs) ReadLocal() error {
 // Function returns value of particular stat of an interface
 func (c Netdev) SingleStat(stat string) (value float64) {
 	switch stat {
-	case "rbytes": value = c.Rbytes
-	case "rpackets": value = c.Rpackets
-	case "rerrs": value = c.Rerrs
-	case "rdrop": value = c.Rdrop
-	case "rfifo": value = c.Rfifo
-	case "rframe": value = c.Rframe
-	case "rcompressed": value = c.Rcompressed
-	case "rmulticast": value = c.Rmulticast
-	case "tbytes": value = c.Tbytes
-	case "tpackets": value = c.Tpackets
-	case "terrs": value = c.Terrs
-	case "tdrop": value = c.Tdrop
-	case "tfifo": value = c.Tfifo
-	case "tcolls": value = c.Tcolls
-	case "tcarrier": value = c.Tcarrier
-	case "tcompressed": value = c.Tcompressed
-	case "saturation": value = c.Saturation
-	case "uptime": value = c.Uptime
-	case "speed": value = float64(c.Speed)
-	case "duplex": value = float64(c.Duplex)
-	default: value = 0
+	case "rbytes":
+		value = c.Rbytes
+	case "rpackets":
+		value = c.Rpackets
+	case "rerrs":
+		value = c.Rerrs
+	case "rdrop":
+		value = c.Rdrop
+	case "rfifo":
+		value = c.Rfifo
+	case "rframe":
+		value = c.Rframe
+	case "rcompressed":
+		value = c.Rcompressed
+	case "rmulticast":
+		value = c.Rmulticast
+	case "tbytes":
+		value = c.Tbytes
+	case "tpackets":
+		value = c.Tpackets
+	case "terrs":
+		value = c.Terrs
+	case "tdrop":
+		value = c.Tdrop
+	case "tfifo":
+		value = c.Tfifo
+	case "tcolls":
+		value = c.Tcolls
+	case "tcarrier":
+		value = c.Tcarrier
+	case "tcompressed":
+		value = c.Tcompressed
+	case "saturation":
+		value = c.Saturation
+	case "uptime":
+		value = c.Uptime
+	case "speed":
+		value = float64(c.Speed)
+	case "duplex":
+		value = float64(c.Duplex)
+	default:
+		value = 0
 	}
 	return value
 }

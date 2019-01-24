@@ -175,7 +175,7 @@ func PQdb(c *sql.DB) (s string, err error) {
 }
 
 // Returns connections status
-func PQstatus(c *sql.DB, itype int) (error) {
+func PQstatus(c *sql.DB, itype int) error {
 	var q string
 
 	switch itype {

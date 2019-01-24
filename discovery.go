@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
 	"github.com/shirou/gopsutil/process"
 	"io"
@@ -12,13 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"github.com/prometheus/client_golang/prometheus"
 )
 
 // Container for service Instance - connection settings to service, connection pointer, info, prometheus worker, etc...
 type Instance struct {
-	Pid			int32		// process identificator
-	InstanceType int // "postgres" or "pgbouncer"
+	Pid          int32 // process identificator
+	InstanceType int   // "postgres" or "pgbouncer"
 	Host         string
 	Port         int
 	User         string
@@ -34,7 +34,7 @@ var (
 	// хэш карта для дискавери, в нее затаскиваются все обнаруженные инстансы постгресов и баунсеров
 	Instances = make(map[int32]Instance)
 
-	remove_instance = make(chan int32)	// канал для удаления инстансов
+	remove_instance                 = make(chan int32) // канал для удаления инстансов
 	discoveryInterval time.Duration = 60 * time.Second
 )
 
@@ -56,7 +56,7 @@ func discoveryLoop() {
 	defer wg.Done()
 
 	log.Debugln("auto-discovery: initial discovery complete")
-	start_listen <-1
+	start_listen <- 1
 
 	for {
 		select {
@@ -75,7 +75,7 @@ func discoveryLoop() {
 	}
 }
 
-func lookupInstances() (error) {
+func lookupInstances() error {
 	allPids, err := process.Pids()
 	if err != nil {
 		return err
@@ -98,7 +98,7 @@ func lookupInstances() (error) {
 		name, err := proc.Name()
 		if err != nil {
 			log.Warnf("auto-discovery: failed to obtain process name for pid %d: %s... skip", pid, err)
-			continue		// пропускаем пиды с пустым именем
+			continue // пропускаем пиды с пустым именем
 		}
 
 		switch name {
@@ -118,7 +118,7 @@ func lookupInstances() (error) {
 			}
 			Instances[pid] = pgbinfo // добавляем параметры подключения в карту
 		default:
-			continue	// остальное нас не интересует
+			continue // остальное нас не интересует
 		}
 	}
 
@@ -126,7 +126,7 @@ func lookupInstances() (error) {
 }
 
 //
-func setupInstances() (error) {
+func setupInstances() error {
 	for i := range Instances {
 		if Instances[i].Worker == nil {
 			var tmp = Instances[i]
@@ -203,7 +203,7 @@ func discoverPgbouncer(proc *process.Process) (Instance, error) {
 			}
 			switch strings.Trim(pname, " ") {
 			case "listen_addr":
-				laddr = strings.Trim(pvalue, " ")     // remove all spaces
+				laddr = strings.Trim(pvalue, " ")    // remove all spaces
 				laddr = strings.Split(laddr, ",")[0] // take first address
 				if laddr == "*" {
 					laddr = "127.0.0.1"

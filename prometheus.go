@@ -38,9 +38,9 @@ type MetricData struct { // эту структуру должна возвра�
 
 // источник статистики - имя, запрос, список полей-значений и полей-меток
 type StatDesc struct {
-	Name       string // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
-	Stype      int    // тип источника статы - постгрес, баунсер, система и т.п.
-	Private		bool	// является ли стата личной для конкретной базы? например стата для таблиц/индексов/функций -- применимо только к постгресовой стате
+	Name       string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
+	Stype      int                             // тип источника статы - постгрес, баунсер, система и т.п.
+	Private    bool                            // является ли стата личной для конкретной базы? например стата для таблиц/индексов/функций -- применимо только к постгресовой стате
 	Query      string                          // запрос с помощью которого вытягивается стата из источника
 	ValueNames []string                        // названия полей которые будут использованы как значения метрик
 	ValueTypes map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
@@ -78,8 +78,8 @@ var (
 	pgbouncerStatsVN                = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
 
 	sysctlList = []string{"kernel.sched_migration_cost_ns", "kernel.sched_autogroup_enabled",
-	"vm.dirty_background_bytes", "vm.dirty_bytes", "vm.overcommit_memory", "vm.overcommit_ratio", "vm.swappiness", "vm.min_free_kbytes",
-	"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
+		"vm.dirty_background_bytes", "vm.dirty_bytes", "vm.overcommit_memory", "vm.overcommit_ratio", "vm.swappiness", "vm.min_free_kbytes",
+		"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
 
 	statdesc = []*StatDesc{
 		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
@@ -96,7 +96,7 @@ var (
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
-		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{ "guc" }, LabelNames: []string{ "name", "unit", "secondary" }},
+		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: STYPE_SYSTEM, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
@@ -104,6 +104,8 @@ var (
 		{Name: "node_memory", Stype: STYPE_SYSTEM, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
 		{Name: "node_filesystem", Stype: STYPE_SYSTEM, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
 		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}},
+		{Name: "node_hardware_cores", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"state"}},
+		{Name: "node_hardware_numa", Stype: STYPE_SYSTEM, ValueNames: []string{"nodes"}},
 		// pgbouncer metrics
 		{Name: "pgbouncer_pool", Stype: STYPE_PGBOUNCER, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: STYPE_PGBOUNCER, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
@@ -176,6 +178,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 				metricsCnt += e.collectNetdevMetrics(ch)
 				metricsCnt += e.collectFsMetrics(ch)
 				metricsCnt += e.collectSysctlMetrics(ch)
+				metricsCnt += e.collectHardwareMetrics(ch)
 			}
 		}
 	}
@@ -211,7 +214,7 @@ func (e *Exporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric) (cnt int
 	bdev_cnt, err := stat.CountLinesLocal(stat.PROC_DISKSTATS)
 	if err == nil {
 		diskUtilStat = make(stat.Diskstats, bdev_cnt)
-		diskUtilStat.ReadLocal()
+		diskUtilStat.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
 		for _, s := range diskUtilStat {
 			if s.Rcompleted == 0 && s.Wcompleted == 0 {
 				continue // skip devices which never doing IOs
@@ -232,7 +235,7 @@ func (e *Exporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	ifs_cnt, err := stat.CountLinesLocal(stat.PROC_NETDEV)
 	if err == nil {
 		netdevUtil = make(stat.Netdevs, ifs_cnt)
-		netdevUtil.ReadLocal()
+		netdevUtil.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
 		for _, s := range netdevUtil {
 			if s.Rpackets == 0 && s.Tpackets == 0 {
 				continue // skip interfaces which never seen packets
@@ -256,10 +259,10 @@ func (e *Exporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	return cnt
 }
 
-//
+// Collects metrics about mounted filesystems
 func (e *Exporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var fsStats = make(stat.FsStats, 0, 10)
-	fsStats.ReadLocal()
+	fsStats.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
 	for _, fs := range fsStats {
 		for _, usage := range []string{"total_bytes", "free_bytes", "available_bytes", "used_bytes", "reserved_bytes", "reserved_pct"} {
 			// TODO: добавить fstype
@@ -281,12 +284,40 @@ func (e *Exporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
 		value, err := stat.GetSysctl(sysctl)
 		if err != nil {
 			log.Errorf("failed to obtain sysctl: err", err)
+			continue
 		}
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
 		cnt += 1
 	}
 
 	return cnt
+}
+
+// Collects metrics about running system - hardware configuration
+func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int) {
+	// Collect total number of CPU cores
+	online, offline, err := stat.CountCpu()
+	if err != nil {
+		log.Errorf("failed counting CPUs: err", err)
+		return 0
+	}
+	total := online + offline
+	for state, v := range map[string]int{"all": total, "online": online, "offline": offline} {
+		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_cores_total"], prometheus.CounterValue, float64(v), state)
+		cnt++
+	}
+
+	// Collect total number of NUMA nodes
+	numa, err := stat.CountNumaNodes()
+	if err != nil {
+		log.Errorf("failed counting NUMA nodes: err", err)
+		return cnt
+	}
+	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_numa_nodes"], prometheus.CounterValue, float64(numa))
+	cnt++
+
+	return cnt
+
 }
 
 // Собираем стату постгреса или баунсера.
@@ -311,14 +342,14 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		}
 		if err := PQstatus(conn, instance.InstanceType); err != nil {
 			log.Warnf("Failed to check status: %s, skip", err.Error())
-			remove_instance <- instance.Pid		// удаляем инстанс их хэш карты
+			remove_instance <- instance.Pid // удаляем инстанс их хэш карты
 			return 0
 		}
 
 		dblist, err = getDBList(conn)
 		if err != nil {
 			log.Warnf("Failed to get list of databases: %s. Use default database name: %s", err, instance.Dbname)
-			dblist = []string{ instance.Dbname }
+			dblist = []string{instance.Dbname}
 		}
 
 		conn.Close()
@@ -327,12 +358,12 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 	}
 
 	// теперь нужно пройтись по всем базам и собрать стату
-	var target = STAT_ALL			// при первой попытке сбора пытаемся собрать всю имеющуюся стату
+	var target = STAT_ALL // при первой попытке сбора пытаемся собрать всю имеющуюся стату
 
 	for _, dbname := range dblist {
 		instance.Dbname = dbname
 
-		conn, err := CreateConn(&instance)		// открываем коннект к базе
+		conn, err := CreateConn(&instance) // открываем коннект к базе
 		if err != nil {
 			log.Warnf("Failed to connect: %s, skip", err.Error())
 			return 0
@@ -350,9 +381,9 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 
 		// собираем стату
 		e.getPgStat(conn, ch, instance.InstanceType, target)
-		conn.Close()		// закрываем соединение
+		conn.Close() // закрываем соединение
 
-		target = STAT_PRIVATE	// как только шаредная стата собрана, не имеет смысла ее собирать еще раз, далее собираем только приватную стату.
+		target = STAT_PRIVATE // как только шаредная стата собрана, не имеет смысла ее собирать еще раз, далее собираем только приватную стату.
 	}
 
 	return cnt
@@ -369,11 +400,11 @@ func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 			switch target {
 			case STAT_SHARED:
 				if desc.Private {
-					continue	// нам нужно собрать шаредную стату, соотв. пропускаем всю приватную
+					continue // нам нужно собрать шаредную стату, соотв. пропускаем всю приватную
 				}
 			case STAT_PRIVATE:
-				if ! desc.Private {
-					continue	// нам нужно собрать приватную стату, соотв. пропускаем всю шаредную
+				if !desc.Private {
+					continue // нам нужно собрать приватную стату, соотв. пропускаем всю шаредную
 				}
 			case STAT_ALL:
 				// ничего не пропускаем, т.к. надо собрать и приватную и шаредную статы
@@ -429,10 +460,10 @@ func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 						}
 
 						ch <- prometheus.MustNewConstMetric(
-							e.AllDesc[desc.Name+"_"+colname],	// *prometheus.Desc который также участвует в Describe методе
-							prometheus.CounterValue,			// тип метрики
-							v,                					// значение метрики
-							labelValues...,						// массив меток
+							e.AllDesc[desc.Name+"_"+colname], // *prometheus.Desc который также участвует в Describe методе
+							prometheus.CounterValue,          // тип метрики
+							v,                                // значение метрики
+							labelValues...,                   // массив меток
 						)
 					}
 				}

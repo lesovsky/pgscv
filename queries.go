@@ -3,14 +3,14 @@ package main
 
 var (
 	pgVersionNumQuery = "SELECT current_setting('server_version_num')"
-	pgGetSysIdQuery = "SELECT system_identifier FROM pg_control_system()"
+	pgGetSysIdQuery   = "SELECT system_identifier FROM pg_control_system()"
 
-	pgStatDatabaseQuery = "SELECT datid, datname, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as db_size FROM pg_stat_database"
-	pgStatUserTablesQuery = "SELECT current_database() AS datname, schemaname, relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, n_mod_since_analyze, vacuum_count, autovacuum_count, analyze_count, autoanalyze_count FROM pg_stat_user_tables"
-	pgStatioUserTablesQuery = "SELECT current_database() AS datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_statio_user_tables"
-	pgStatUserIndexesQuery = "SELECT current_database() AS datname, schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch FROM pg_stat_user_indexes"
+	pgStatDatabaseQuery      = "SELECT datid, datname, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as db_size FROM pg_stat_database"
+	pgStatUserTablesQuery    = "SELECT current_database() AS datname, schemaname, relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, n_mod_since_analyze, vacuum_count, autovacuum_count, analyze_count, autoanalyze_count FROM pg_stat_user_tables"
+	pgStatioUserTablesQuery  = "SELECT current_database() AS datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_statio_user_tables"
+	pgStatUserIndexesQuery   = "SELECT current_database() AS datname, schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch FROM pg_stat_user_indexes"
 	pgStatioUserIndexesQuery = "SELECT current_database() AS datname, schemaname, relname, indexrelname, idx_blks_read, idx_blks_hit FROM pg_statio_user_indexes"
-	pgStatBgwriterQuery = "select checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time, buffers_checkpoint, buffers_clean, maxwritten_clean, buffers_backend, buffers_backend_fsync, buffers_alloc from pg_stat_bgwriter"
+	pgStatBgwriterQuery      = "select checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time, buffers_checkpoint, buffers_clean, maxwritten_clean, buffers_backend, buffers_backend_fsync, buffers_alloc from pg_stat_bgwriter"
 	pgStatUserFunctionsQuery = "SELECT funcid, current_database() AS datname, schemaname, funcname, calls, total_time, self_time FROM pg_stat_user_functions"
 
 	pgStatActivityQuery = `SELECT
@@ -92,7 +92,7 @@ var (
 				FROM temp_files GROUP BY 1`
 
 	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`
-	pgStatWalSizeQuery = `SELECT sum(size) AS size_bytes FROM pg_ls_waldir()`
+	pgStatWalSizeQuery   = `SELECT sum(size) AS size_bytes FROM pg_ls_waldir()`
 
 	pgSettingsGucQuery = `SELECT name, unit,
 CASE WHEN vartype = 'bool' THEN setting::bool::int::text

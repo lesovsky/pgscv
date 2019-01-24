@@ -42,7 +42,7 @@ type Diskstats []Diskstat
 
 const (
 	// The file provides IO statistics of block devices. For more details refer to Linux kernel's Documentation/iostats.txt.
-	PROC_DISKSTATS       = "/proc/diskstats"
+	PROC_DISKSTATS = "/proc/diskstats"
 )
 
 // Read stats from local procfs source
@@ -83,19 +83,32 @@ func (c Diskstats) ReadLocal() error {
 // Function returns value of particular stat of a block device
 func (d Diskstat) SingleStat(stat string) (value float64) {
 	switch stat {
-	case "rcompleted": value = d.Rcompleted
-	case "rmerged": value = d.Rmerged
-	case "rsectors": value = d.Rsectors
-	case "rspent": value = d.Rspent
-	case "wcompleted": value = d.Wspent
-	case "wmerged": value = d.Wmerged
-	case "wsectors": value = d.Wsectors
-	case "wspent": value = d.Wspent
-	case "ioinprogress": value = d.Ioinprogress
-	case "tspent": value = d.Tspent
-	case "tweighted": value = d.Tweighted
-	case "uptime": value = d.Uptime
-	default: value = 0
+	case "rcompleted":
+		value = d.Rcompleted
+	case "rmerged":
+		value = d.Rmerged
+	case "rsectors":
+		value = d.Rsectors
+	case "rspent":
+		value = d.Rspent
+	case "wcompleted":
+		value = d.Wspent
+	case "wmerged":
+		value = d.Wmerged
+	case "wsectors":
+		value = d.Wsectors
+	case "wspent":
+		value = d.Wspent
+	case "ioinprogress":
+		value = d.Ioinprogress
+	case "tspent":
+		value = d.Tspent
+	case "tweighted":
+		value = d.Tweighted
+	case "uptime":
+		value = d.Uptime
+	default:
+		value = 0
 	}
 	return value
 }

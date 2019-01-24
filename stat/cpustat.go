@@ -1,12 +1,14 @@
 package stat
 
 import (
-	"io/ioutil"
 	"bufio"
 	"bytes"
-	"io"
-	"strings"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"path/filepath"
+	"regexp"
+	"strings"
 )
 
 type CpuRawstat struct {
@@ -25,7 +27,8 @@ type CpuRawstat struct {
 }
 
 const (
-	PROC_STAT          = "/proc/stat"
+	PROC_STAT         = "/proc/stat"
+	SYSFS_CPU_PATTERN = "/sys/devices/system/cpu/cpu*"
 )
 
 /* Read CPU usage raw values from statfile and save to pre-calculation struct */
@@ -63,18 +66,70 @@ func (s *CpuRawstat) ReadLocal() {
 // Function return number of ticks for particular mode
 func (s *CpuRawstat) SingleStat(mode string) (ticks float64) {
 	switch mode {
-	case "user": ticks = s.User
-	case "nice": ticks = s.Nice
-	case "system": ticks = s.Sys
-	case "idle": ticks = s.Idle
-	case "iowait": ticks = s.Iowait
-	case "irq": ticks = s.Irq
-	case "softirq": ticks = s.Softirq
-	case "steal": ticks = s.Steal
-	case "guest": ticks = s.Guest
-	case "guest_nice": ticks = s.GstNice
-	case "total": ticks = s.Total
-	default: ticks = 0
+	case "user":
+		ticks = s.User
+	case "nice":
+		ticks = s.Nice
+	case "system":
+		ticks = s.Sys
+	case "idle":
+		ticks = s.Idle
+	case "iowait":
+		ticks = s.Iowait
+	case "irq":
+		ticks = s.Irq
+	case "softirq":
+		ticks = s.Softirq
+	case "steal":
+		ticks = s.Steal
+	case "guest":
+		ticks = s.Guest
+	case "guest_nice":
+		ticks = s.GstNice
+	case "total":
+		ticks = s.Total
+	default:
+		ticks = 0
 	}
 	return ticks
+}
+
+// Counts online and offline CPUs
+func CountCpu() (online, offline int, err error) {
+	var online_cnt, offline_cnt int
+
+	dirs, err := filepath.Glob(SYSFS_CPU_PATTERN)
+	if err != nil {
+		return 0, 0, fmt.Errorf("failed counting CPUs, malformed pattern: %s", err)
+	}
+
+	for _, d := range dirs {
+		if strings.HasSuffix(d, "/cpu0") { // cpu0 has no 'online' file and always online, just increment counter
+			online_cnt++
+			continue
+		}
+		re := regexp.MustCompile(`cpu[0-9]+$`)
+		file := d + "/online"
+		if re.MatchString(d) {
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to read %s: %s", file, err)
+			}
+			reader := bufio.NewReader(bytes.NewBuffer(content))
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				return 0, 0, fmt.Errorf("failed to read from buffer: %s", err)
+			}
+
+			switch string(line) {
+			case "0":
+				offline_cnt++
+			case "1":
+				online_cnt++
+			default:
+				fmt.Printf("failed counting CPUs, unknown value in %s: %s", file, line)
+			}
+		}
+	}
+	return online_cnt, offline_cnt, nil
 }

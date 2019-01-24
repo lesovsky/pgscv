@@ -1,11 +1,11 @@
 package stat
 
 import (
-	"io/ioutil"
-	"fmt"
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
+	"io/ioutil"
 	"os/exec"
 	"strconv"
 )

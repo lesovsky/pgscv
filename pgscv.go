@@ -3,15 +3,15 @@ package main
 
 import (
 	"fmt"
-	"time"
-	"runtime"
 	"net/http"
+	"runtime"
+	"time"
 
-	"gopkg.in/alecthomas/kingpin.v2"
-	"github.com/prometheus/common/log"
-	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"crypto/md5"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/prometheus/common/log"
+	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"sync"
 )
@@ -21,13 +21,13 @@ const (
 )
 
 var (
-	promPushGw = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").Envar("PROM_PUSHGATEWAY").String()
+	promPushGw       = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").Envar("PROM_PUSHGATEWAY").String()
 	promPushInterval = kingpin.Flag("prom.pushinterval", "Interval between pushes").Default("10s").Envar("PROM_PUSHINTERVAL").Duration()
 
 	cfId = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").Envar("PGSCV_CFID").String()
 
-	err    error		// TODO: может таки от нее можно избавиться?
-	wg sync.WaitGroup
+	err          error // TODO: может таки от нее можно избавиться?
+	wg           sync.WaitGroup
 	start_listen = make(chan int8)
 )
 
@@ -44,18 +44,18 @@ func main() {
 	wg.Add(1)
 	go discoveryLoop()
 
-	<- start_listen
+	<-start_listen
 
 	// TODO: унести содержимое в функции в prometheus.go
 	if *promPushGw == "" {
 		log.Infof("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
 
 		http.Handle("/metrics", promhttp.Handler())
-		if err := http.ListenAndServe("127.0.0.1:19090", nil); err != nil {		// TODO: дефолтный порт должен быть другим
+		if err := http.ListenAndServe("127.0.0.1:19090", nil); err != nil { // TODO: дефолтный порт должен быть другим
 			log.Fatalln(err)
 		}
 	} else {
-		log.Infof("use PUSH model, sending metrics to %s every %d seconds", *promPushGw, *promPushInterval / time.Second)
+		log.Infof("use PUSH model, sending metrics to %s every %d seconds", *promPushGw, *promPushInterval/time.Second)
 		hostname, _ := os.Hostname()
 		var garbage_label string = "db_system_" + fmt.Sprintf("%x", md5.Sum([]byte(hostname)))
 		var pusher *push.Pusher
