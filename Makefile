@@ -17,7 +17,7 @@ all: pgscv
 
 pgscv:
 	go mod download
-	GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${PROGRAM_NAME} ${SOURCES}
+	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${PROGRAM_NAME} ${SOURCES}
 
 install:
 	mkdir -p ${DESTDIR}${PREFIX}/bin/
