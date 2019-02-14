@@ -201,7 +201,7 @@ func (e *Exporter) collectCpuMetrics(ch chan<- prometheus.Metric) (cnt int) {
 func (e *Exporter) collectMemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var meminfoStat stat.Meminfo
 	meminfoStat.ReadLocal()
-	for _, usage := range []string{"mem_total", "mem_free", "mem_used", "swap_total", "swap_free", "swap_used", "mem_cached", "mem_dirty", "mem_writeback", "mem_buffers", "mem_slab"} {
+	for _, usage := range []string{"mem_total", "mem_free", "mem_used", "swap_total", "swap_free", "swap_used", "mem_cached", "mem_dirty", "mem_writeback", "mem_buffers", "mem_inactive", "mem_slab"} {
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_memory_usage_bytes"], prometheus.GaugeValue, float64(meminfoStat.SingleStat(usage)), usage)
 		cnt += 1
 	}
