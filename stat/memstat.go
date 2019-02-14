@@ -28,7 +28,7 @@ type Meminfo struct {
 	SwapUsed     uint64
 	MemCached    uint64
 	MemBuffers   uint64
-	MemInactive  uint64
+	MemAvailable uint64
 	MemDirty     uint64
 	MemWriteback uint64
 	MemSlab      uint64
@@ -73,8 +73,8 @@ func (m *Meminfo) ReadLocal() {
 				m.MemWriteback = value
 			case "Buffers:":
 				m.MemBuffers = value
-			case "Inactive:":
-				m.MemInactive = value
+			case "MemAvailable:":
+				m.MemAvailable = value
 			case "Slab:":
 				m.MemSlab = value
 			}
@@ -107,8 +107,8 @@ func (m Meminfo) SingleStat(stat string) (value uint64) {
 		value = m.MemWriteback
 	case "mem_buffers":
 		value = m.MemBuffers
-	case "mem_inactive":
-		value = m.MemInactive
+	case "mem_available":
+		value = m.MemAvailable
 	case "mem_slab":
 		value = m.MemSlab
 	default:
