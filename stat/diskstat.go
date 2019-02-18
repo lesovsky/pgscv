@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"regexp"
+	"strings"
 )
 
 // Used for storing stats per single device
@@ -111,4 +113,52 @@ func (d Diskstat) SingleStat(stat string) (value float64) {
 		value = 0
 	}
 	return value
+}
+
+// IsDeviceRotational checks kind pf the attached storage, is it rotational or not
+func IsDeviceRotational(devpath string) (float64, error) {
+	rotationalFile := devpath + "/queue/rotational"
+	//schedulerFile := d + "/queue/scheduler"
+
+	content, err := ioutil.ReadFile(rotationalFile)
+	if err != nil {
+		fmt.Printf("failed to read %s: %s", rotationalFile, err)
+	}
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		fmt.Printf("failed to read from buffer: %s", err)
+	}
+
+	switch string(line) {
+	case "0":
+		return 0, nil
+	case "1":
+		return 1, nil
+	default:
+		return -1, fmt.Errorf("unknown kind of device: %s (%s)", strings.TrimPrefix(devpath, "/sys/block/"), string(line))
+	}
+}
+
+// GetDeviceScheduler returns name of the IO scheduler used by device
+func GetDeviceScheduler(devpath string) (sched string, err error) {
+	schedulerFile := devpath + "/queue/scheduler"
+
+	content, err := ioutil.ReadFile(schedulerFile)
+	if err != nil {
+		fmt.Printf("failed to read %s: %s", schedulerFile, err)
+	}
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		fmt.Printf("failed to read from buffer: %s", err)
+	}
+
+	re := regexp.MustCompile(`\[[a-z-]+\]|none`)
+	if sched := re.Find(line); sched != nil {
+		sched := bytes.Trim(sched, "[]")
+		return string(sched), nil
+	}
+
+	return "", fmt.Errorf("Failed to recognize scheduler of %s\n", strings.TrimPrefix(devpath, "/sys/block/"))
 }

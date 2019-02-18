@@ -168,6 +168,7 @@ var (
 		// node hardware
 		"node_hardware_cores_total": "Total number of CPU cores",
 		"node_hardware_numa_nodes":  "Total number of NUMA nodes",
+		"node_hardware_storage_rotational": "Type of the connected storage",
 		// pgbouncer
 		"pgbouncer_pool_cl_active":       "Client connections that are linked to server connection and can process queries",
 		"pgbouncer_pool_cl_waiting":      "Client connections have sent queries but have not yet got a server connection",

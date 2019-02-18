@@ -3,7 +3,10 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -108,6 +111,7 @@ var (
 		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}},
 		{Name: "node_hardware_cores", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"state"}},
 		{Name: "node_hardware_numa", Stype: STYPE_SYSTEM, ValueNames: []string{"nodes"}},
+		{Name: "node_hardware_storage_rotational", Stype: STYPE_SYSTEM, LabelNames: []string{"device", "scheduler"}},
 		// pgbouncer metrics
 		{Name: "pgbouncer_pool", Stype: STYPE_PGBOUNCER, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: STYPE_PGBOUNCER, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
@@ -323,8 +327,41 @@ func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int)
 	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_numa_nodes"], prometheus.CounterValue, float64(numa))
 	cnt++
 
+	// Collect info about storage (attached HDD, SSD, NVMe, etc.
+	cnt += getStorageInfo(e, ch)
 	return cnt
 
+}
+
+//
+func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
+	dirs, err := filepath.Glob("/sys/block/*")
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	var devname, scheduler string
+	var rotational float64
+	for _, devpath := range dirs {
+		re := regexp.MustCompile(`((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])`)
+
+		if re.MatchString(devpath) {
+			devname = strings.TrimPrefix(devpath, "/sys/block/")
+			rotational, err = stat.IsDeviceRotational(devpath)
+			if err != nil {
+				log.Warnln(err)
+				continue
+			}
+			scheduler, err = stat.GetDeviceScheduler(devpath)
+			if err != nil {
+				log.Warnln(err)
+				continue
+			}
+			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_storage_rotational"], prometheus.GaugeValue, rotational, devname, scheduler)
+			cnt++
+		}
+	}
+	return cnt
 }
 
 // Собираем стату постгреса или баунсера.
@@ -515,6 +552,3 @@ func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
 		}
 	}
 }
-
-
-
