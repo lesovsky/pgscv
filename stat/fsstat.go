@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
+	"strings"
 	"syscall"
 )
 
@@ -105,4 +107,49 @@ func (c FsStat) SingleStat(stat string) (value uint64) {
 		value = 0
 	}
 	return value
+}
+
+// ReadMounts returns list of mountpoints
+func ReadMounts() (map[string]int) {
+	var mountpoints = make(map[string]int)
+	content, err := ioutil.ReadFile(PROC_MOUNTS)
+	if err != nil {
+		return nil
+	}
+
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+	for {
+		line, _, err := reader.ReadLine()
+		if err == io.EOF {
+			break
+		}
+
+		fields := strings.Fields(string(line))
+		if len(fields) > 0 {
+			for _, fstype := range interestedFS {
+				if fstype == fields[2] {
+					mountpoints[fields[1]] = 1
+				}
+			}
+		}
+	}
+	return mountpoints
+}
+
+// RewritePath searches symlinks and rewrites it to an origin
+// TODO: might fail with more than one symlink used in the path =)
+func RewritePath(path string) string {
+	parts := strings.Split(path, "/")
+	for i := len(parts); i > 0; i-- {
+		if subpath := strings.Join(parts[0:i], "/"); subpath != "" {
+			// check is subpath a symlink, if symlink - dereference it
+			fi, _ := os.Lstat(subpath)
+			if fi.Mode() & os.ModeSymlink != 0 {
+				resolvedLink, _ := os.Readlink(subpath)
+				newpath := resolvedLink + "/" + strings.Join(parts[i:], "/")
+				return newpath
+			}
+		}
+	}
+	return path
 }

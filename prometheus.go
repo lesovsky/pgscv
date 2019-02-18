@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/statgears/pgscv/stat"
@@ -96,6 +97,7 @@ var (
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
+		{Name: "pg_data_directory", Query: "", Private: false, LabelNames: []string{"mountpoint"}},
 		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
@@ -142,10 +144,15 @@ func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
 	var e = make(map[string]*prometheus.Desc)
 	for _, desc := range statdesc {
 		if itype == desc.Stype {
-			for _, suffix := range desc.ValueNames {
-				var metric_name = desc.Name + "_" + suffix
-				e[metric_name] = prometheus.NewDesc(metric_name, metricsHelp[metric_name], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
+			if len(desc.ValueNames) > 0 {
+				for _, suffix := range desc.ValueNames {
+					var metric_name = desc.Name + "_" + suffix
+					e[metric_name] = prometheus.NewDesc(metric_name, metricsHelp[metric_name], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
+				}
+			} else {
+				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
 			}
+
 		}
 	}
 
@@ -410,6 +417,10 @@ func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 				// ничего не пропускаем, т.к. надо собрать и приватную и шаредную статы
 			}
 
+			if desc.Query == "" {
+				getDatadirInfo(e, conn, ch)
+			}
+
 			rows, err := conn.Query(desc.Query)
 			// Errors aren't critical for us, remember and show them to the user. Return after the error, because
 			// there is no reason to continue.
@@ -472,3 +483,38 @@ func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 		}
 	}
 }
+
+// getDatadirInfo evaluates data_directory's mountpoint
+func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
+	var dataDir string
+	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dataDir); err != nil {
+		return
+	}
+
+	mountpoints := stat.ReadMounts()
+	dirpath := stat.RewritePath(dataDir)
+
+	parts := strings.Split(dirpath, "/")
+	for i := len(parts); i > 0; i-- {
+		if subpath := strings.Join(parts[0:i], "/"); subpath != "" {
+			// check is subpath a symlink? if symlink - dereference and replace it
+			fi, _ := os.Lstat(subpath)
+			if fi.Mode() & os.ModeSymlink != 0 {
+				resolvedLink, _ := os.Readlink(subpath)
+				if _, ok := mountpoints[resolvedLink]; ok {
+					subpath = resolvedLink
+				}
+			}
+			if _, ok := mountpoints[subpath]; ok {
+				ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, subpath)
+				return
+			}
+		} else {
+			ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, "/")
+			return
+		}
+	}
+}
+
+
+
