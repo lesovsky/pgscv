@@ -100,7 +100,7 @@ var (
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
-		{Name: "pg_data_directory", Query: "", Private: false, LabelNames: []string{"mountpoint"}},
+		{Name: "pg_data_directory", Query: "", Private: false, LabelNames: []string{"device", "mountpoint"}},
 		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
@@ -343,10 +343,10 @@ func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
 	var devname, scheduler string
 	var rotational float64
 	for _, devpath := range dirs {
-		re := regexp.MustCompile(`((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])`)
+		re := regexp.MustCompile(`((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`)
 
 		if re.MatchString(devpath) {
-			devname = strings.TrimPrefix(devpath, "/sys/block/")
+			devname = strings.Replace(devpath, "/sys/block/", "/dev/", 1)
 			rotational, err = stat.IsDeviceRotational(devpath)
 			if err != nil {
 				log.Warnln(err)
@@ -537,17 +537,23 @@ func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
 			// check is subpath a symlink? if symlink - dereference and replace it
 			fi, _ := os.Lstat(subpath)
 			if fi.Mode() & os.ModeSymlink != 0 {
-				resolvedLink, _ := os.Readlink(subpath)
+				resolvedLink, err := os.Readlink(subpath)
+				if err != nil {
+					log.Warnf("failed to resolve symlink %s: %s\n", subpath, err)
+					return
+				}
+
 				if _, ok := mountpoints[resolvedLink]; ok {
 					subpath = resolvedLink
 				}
 			}
-			if _, ok := mountpoints[subpath]; ok {
-				ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, subpath)
+			if device, ok := mountpoints[subpath]; ok {
+				ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, subpath)
 				return
 			}
 		} else {
-			ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, "/")
+			device := mountpoints["/"]
+			ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, "/")
 			return
 		}
 	}

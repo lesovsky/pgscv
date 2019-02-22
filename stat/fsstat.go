@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/prometheus/common/log"
 	"io"
 	"io/ioutil"
 	"os"
@@ -109,14 +110,15 @@ func (c FsStat) SingleStat(stat string) (value uint64) {
 	return value
 }
 
-// ReadMounts returns list of mountpoints
-func ReadMounts() (map[string]int) {
-	var mountpoints = make(map[string]int)
+// ReadMounts returns list of pairs [mountpoint]device
+func ReadMounts() (map[string]string) {
+	var mountpoints = make(map[string]string)
 	content, err := ioutil.ReadFile(PROC_MOUNTS)
 	if err != nil {
 		return nil
 	}
 
+	var device, mountpoint string
 	reader := bufio.NewReader(bytes.NewBuffer(content))
 	for {
 		line, _, err := reader.ReadLine()
@@ -124,16 +126,31 @@ func ReadMounts() (map[string]int) {
 			break
 		}
 
-		fields := strings.Fields(string(line))
-		if len(fields) > 0 {
+		if fields := strings.Fields(string(line)); len(fields) > 3 {
+			device = fields[0]
+			mountpoint = fields[1]
 			for _, fstype := range interestedFS {
 				if fstype == fields[2] {
-					mountpoints[fields[1]] = 1
+					// dereference device-mapper
+					if strings.HasPrefix(device, "/dev/mapper/") {
+						device = resolveDeviceMapperName(device)
+					}
+					mountpoints[mountpoint] = device
 				}
 			}
 		}
 	}
 	return mountpoints
+}
+
+// resolveDeviceMapperName translates symlinks from /dev/mapper/* to destination names, e.g. /dev/mapper/pgdb -> /dev/dm-4
+func resolveDeviceMapperName(device string) string {
+	device, err := os.Readlink(device)
+	if err != nil {
+		log.Warnf("failed to resolve symlink '%s' to origin: %s\n", device, err)
+		return ""
+	}
+	return strings.Replace(device, "..", "/dev", 1)
 }
 
 // RewritePath searches symlinks and rewrites it to an origin
