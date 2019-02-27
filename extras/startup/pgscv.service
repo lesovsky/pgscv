@@ -1,0 +1,32 @@
+# This is an example systemd config file for pgSCV
+# You can copy it to "/etc/systemd/system/pgscv.service",
+
+[Unit]
+Description=pgSCV is the Prometheus exporter for PostgreSQL ecosystem
+After=syslog.target network.target
+
+[Service]
+Type=simple
+
+User=postgres
+Group=postgres
+
+WorkingDirectory=~
+
+# Start the pgscv process
+ExecStart=/usr/bin/pgscv --cfid=pgeu --prom.pushgateway=116.203.106.120:19091 --prom.pushinterval=15s
+
+# Only kill the pgscv process
+KillMode=process
+
+# Wait reasonable amount of time for pgSCV up/down
+TimeoutSec=5
+
+# Restart pgSCV if it crashes
+Restart=on-failure
+
+# pgSCV might leak during long period of time, let him to be the first person for eviction
+OOMScoreAdjust=1000
+
+[Install]
+WantedBy=multi-user.target
