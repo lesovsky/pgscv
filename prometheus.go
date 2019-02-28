@@ -97,6 +97,7 @@ var (
 		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
 		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
+		{Name: "pg_replication_slots", Query: pgReplicationSlotsQuery, ValueNames: []string{"restart_lag_bytes"}, LabelNames: []string{"slot_name", "active"}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
@@ -128,6 +129,11 @@ func adjustQueries(descs []*StatDesc, pgVersion int) {
 			switch {
 			case pgVersion < 100000:
 				desc.Query = pgStatReplicationQuery96
+			}
+		case "pg_replication_slots":
+			switch {
+			case pgVersion < 100000:
+				desc.Query = pgReplicationSlotsQuery96
 			}
 		case "pg_wal_directory":
 			switch {

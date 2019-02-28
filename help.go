@@ -64,15 +64,17 @@ var (
 		"pg_stat_bgwriter_buffers_backend_fsync": "Number of times a backend had to execute its own fsync call",
 		"pg_stat_bgwriter_buffers_alloc":         "Number of buffers allocated",
 		// pg_stat_replication
-		"pg_stat_replication_pg_wal_bytes":      "Amount of WAL generated",
-		"pg_stat_replication_pending_lag_bytes": "Amount of WAL generated but not sent",
-		"pg_stat_replication_write_lag_bytes":   "Amount of WAL sent but not written",
-		"pg_stat_replication_flush_lag_bytes":   "Amount of WAL written but not flushed",
-		"pg_stat_replication_replay_lag_bytes":  "Amount of WAL flushed but not replayed",
-		"pg_stat_replication_total_lag_bytes":   "Amount of WAL generated but not replayed",
+		"pg_stat_replication_pg_wal_bytes":      "Amount of WAL generated, in bytes",
+		"pg_stat_replication_pending_lag_bytes": "Amount of WAL generated but not sent, in bytes",
+		"pg_stat_replication_write_lag_bytes":   "Amount of WAL sent but not written, in bytes",
+		"pg_stat_replication_flush_lag_bytes":   "Amount of WAL written but not flushed, in bytes",
+		"pg_stat_replication_replay_lag_bytes":  "Amount of WAL flushed but not replayed, in bytes",
+		"pg_stat_replication_total_lag_bytes":   "Amount of WAL generated but not replayed, in bytes",
 		"pg_stat_replication_write_lag_sec":     "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written it",
 		"pg_stat_replication_flush_lag_sec":     "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written and flushed it",
 		"pg_stat_replication_replay_lag_sec":    "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it",
+		// pg_replication_slots
+		"pg_replciation_slots_restart_lag_bytes": "Amount of WAL since last restart position, in bytes",
 		//pg_stat_user_functions
 		"pg_stat_user_functions_calls":      "Number of times this function has been called",
 		"pg_stat_user_functions_total_time": "Total time spent in this function and all other functions called by it, in milliseconds",
