@@ -81,6 +81,12 @@ var (
 		"pg_stat_user_functions_total_time": "Total time spent in this function and all other functions called by it, in milliseconds",
 		"pg_stat_user_functions_self_time":  "Total time spent in this function itself, not including other functions called by it, in milliseconds",
 		// pg_stat_database_conflicts
+		"pg_stat_database_conflicts_total":      "Total number of recovery conflicts occured",
+		"pg_stat_database_conflicts_tablespace": "Total number of recovery conflicts occured due to dropped tablespaces",
+		"pg_stat_database_conflicts_lock":       "Total number of recovery conflicts occured due to lock timeouts",
+		"pg_stat_database_conflicts_snapshot":   "Total number of recovery conflicts occured due to old snapshot",
+		"pg_stat_database_conflicts_bufferpin":  "Total number of recovery conflicts occured due to pinned buffers",
+		"pg_stat_database_conflicts_deadlock":   "Total number of recovery conflicts occured due to deadlocks",
 		// pg_stat_archiver
 		// pg_stat_sizes
 		// pg_stat_activity

@@ -77,6 +77,7 @@ var (
 	pgStatActivityAutovacValueNames = []string{"workers_total", "antiwraparound_workers_total", "user_vacuum_total", "max_duration"}
 	pgStatStatementsValueNames      = []string{"calls", "total_time", "rows", "shared_blks_hit", "shared_blks_read", "shared_blks_dirtied", "shared_blks_written", "local_blks_hit", "local_blks_read", "local_blks_dirtied", "local_blks_written", "temp_blks_read", "temp_blks_written", "blk_read_time", "blk_write_time"}
 	pgStatReplicationValueNames     = []string{"pg_wal_bytes", "pending_lag_bytes", "write_lag_bytes", "flush_lag_bytes", "replay_lag_bytes", "total_lag_bytes", "write_lag_sec", "flush_lag_sec", "replay_lag_sec"}
+	pgStatDatabaseConflictsValueNames = []string{"total", "tablespace", "lock", "snapshot", "bufferpin", "deadlock"}
 	pgStatCurrentTempFilesVN        = []string{"files_total", "bytes_total", "oldest_file_age_seconds_max"}
 	pgbouncerPoolsVN                = []string{"cl_active", "cl_waiting", "sv_active", "sv_idle", "sv_used", "sv_tested", "sv_login", "maxwait", "maxwait_us"}
 	pgbouncerStatsVN                = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
@@ -99,6 +100,7 @@ var (
 		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
 		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
 		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},

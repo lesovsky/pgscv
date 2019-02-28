@@ -59,6 +59,10 @@ var (
 
 	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS bytes FROM pg_replication_slots`
 
+	pgStatDatabaseConflictsQuery = `SELECT sum(confl_tablespace + confl_lock + confl_snapshot + confl_bufferpin + confl_deadlock) AS total,
+			sum(confl_tablespace) AS tablespace, sum(confl_lock) AS lock, sum(confl_snapshot) AS snapshot,
+			sum(confl_bufferpin) AS bufferpin, sum(confl_deadlock) AS deadlock FROM pg_stat_database_conflicts`
+
 	pgReplicationSlotsCountQuery = `SELECT 'total' as state, count(*) AS conn FROM pg_replication_slots
 		UNION SELECT 'active' AS state, count(*) filter (where active) AS conn FROM pg_replication_slots
 		UNION SELECT 'inactive' AS state, count(*) filter (where not active) AS conn FROM pg_replication_slots`
