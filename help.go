@@ -74,6 +74,7 @@ var (
 		"pg_stat_replication_flush_lag_sec":     "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written and flushed it",
 		"pg_stat_replication_replay_lag_sec":    "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it",
 		// pg_replication_slots
+		"pg_replciation_slots_conn":              "Number of opened replication slots",
 		"pg_replciation_slots_restart_lag_bytes": "Amount of WAL since last restart position, in bytes",
 		//pg_stat_user_functions
 		"pg_stat_user_functions_calls":      "Number of times this function has been called",

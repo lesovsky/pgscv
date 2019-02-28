@@ -55,9 +55,13 @@ var (
 					extract(epoch from replay_lag) as replay_lag_sec
 				FROM pg_stat_replication`
 
-	pgReplicationSlotsQuery96 = `SELECT slot_name, active::int,pg_xlog_location_diff(pg_current_xlog_location(), restart_lsn) AS restart_lag_bytes FROM pg_replication_slots`
+	pgReplicationSlotsQuery96 = `SELECT slot_name, active::int,pg_xlog_location_diff(pg_current_xlog_location(), restart_lsn) AS bytes FROM pg_replication_slots`
 
-	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS restart_lag_bytes FROM pg_replication_slots`
+	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS bytes FROM pg_replication_slots`
+
+	pgReplicationSlotsCountQuery = `SELECT 'total' as state, count(*) AS conn FROM pg_replication_slots
+		UNION SELECT 'active' AS state, count(*) filter (where active) AS conn FROM pg_replication_slots
+		UNION SELECT 'inactive' AS state, count(*) filter (where not active) AS conn FROM pg_replication_slots`
 
 	pgStatStatementsQuery = `SELECT
 					    a.rolname AS usename, d.datname AS datname, p.queryid,

@@ -97,7 +97,8 @@ var (
 		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
 		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
-		{Name: "pg_replication_slots", Query: pgReplicationSlotsQuery, ValueNames: []string{"restart_lag_bytes"}, LabelNames: []string{"slot_name", "active"}},
+		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
+		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
@@ -165,7 +166,6 @@ func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
 
 		}
 	}
-
 	return &Exporter{ServiceID: sid, AllDesc: e}, nil
 }
 
@@ -199,7 +199,6 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			}
 		}
 	}
-
 	log.Debugf("%s: generated %d metrics\n", time.Now().Format("2006-01-02 15:04:05"), metricsCnt)
 }
 
@@ -507,7 +506,7 @@ func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 						}
 
 						var metricValue string = container[c].String
-						v, err := strconv.ParseFloat(metricValue, 64) // преобразуем string в подходящий для прометеуса float
+						v, err := strconv.ParseFloat(metricValue, 64) // преобразуем string в подходящий для прометеуса float64
 						if err != nil {
 							//log.Warnf("WARNING: can't convert to float: %s\n", err)	// TODO: включить варнинг и найти места где не получается распарсить во флоат
 							continue
