@@ -100,6 +100,7 @@ var (
 		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
 		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
 		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_recovery", Query: pgRecoveryStatusQuery, ValueNames: []string{"status"}},
 		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},

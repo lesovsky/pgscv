@@ -76,6 +76,8 @@ var (
 		// pg_replication_slots
 		"pg_replciation_slots_conn":              "Number of opened replication slots",
 		"pg_replciation_slots_restart_lag_bytes": "Amount of WAL since last restart position, in bytes",
+		// recovery status
+		"pg_recovery_status": "Current recovery status of Postgres service",
 		//pg_stat_user_functions
 		"pg_stat_user_functions_calls":      "Number of times this function has been called",
 		"pg_stat_user_functions_total_time": "Total time spent in this function and all other functions called by it, in milliseconds",

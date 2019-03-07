@@ -21,14 +21,14 @@ var (
     					count(*) FILTER (WHERE wait_event_type = 'Lock') AS conn_waiting_total,
     					count(*) FILTER (WHERE state IN ('fastpath function call','disabled')) AS conn_others_total,
     					(SELECT count(*) FROM pg_prepared_xacts) AS conn_prepared_total,
-    					coalesce(extract(epoch from max(now() - coalesce(xact_start, query_start)) FILTER (WHERE (query !~* '^autovacuum:' AND query !~* '^vacuum' AND state != 'idle') AND pid <> pg_backend_pid())), 0) AS xact_max_duration
+    					coalesce(extract(epoch from max(clock_timestamp() - coalesce(xact_start, query_start)) FILTER (WHERE (query !~* '^autovacuum:' AND query !~* '^vacuum' AND state != 'idle') AND pid <> pg_backend_pid())), 0) AS xact_max_duration
 					FROM pg_stat_activity`
 
 	pgStatActivityAutovacQuery = `SELECT
 						count(*) FILTER (WHERE query ~* '^autovacuum:') AS workers_total,
 						count(*) FILTER (WHERE query ~* '^autovacuum:.*to prevent wraparound') AS antiwraparound_workers_total,
 						count(*) FILTER (WHERE query ~ '^vacuum' AND state != 'idle') AS user_vacuum_total,
-						coalesce(extract(epoch from max(now() - coalesce(xact_start, query_start))), 0) AS max_duration
+						coalesce(extract(epoch from max(clock_timestamp() - coalesce(xact_start, query_start))), 0) AS max_duration
 					FROM pg_stat_activity
 					WHERE (query ~* '^autovacuum:' OR query ~* '^vacuum') AND pid <> pg_backend_pid()`
 
@@ -59,6 +59,8 @@ var (
 
 	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS bytes FROM pg_replication_slots`
 
+	pgRecoveryStatusQuery = `SELECT pg_is_in_recovery()::int AS status`
+
 	pgStatDatabaseConflictsQuery = `SELECT sum(confl_tablespace + confl_lock + confl_snapshot + confl_bufferpin + confl_deadlock) AS total,
 			sum(confl_tablespace) AS tablespace, sum(confl_lock) AS lock, sum(confl_snapshot) AS snapshot,
 			sum(confl_bufferpin) AS bufferpin, sum(confl_deadlock) AS deadlock FROM pg_stat_database_conflicts`
@@ -80,7 +82,7 @@ var (
 					JOIN pg_database d ON d.oid=p.dbid
 					WHERE p.calls > 100`
 
-	pgStatBasebackupQuery = "SELECT count(pid) AS count, coalesce(extract(epoch from max(now() - backend_start)), 0) AS duration_seconds_max FROM pg_stat_replication WHERE state = 'backup'"
+	pgStatBasebackupQuery = "SELECT count(pid) AS count, coalesce(extract(epoch from max(clock_timestamp() - backend_start)), 0) AS duration_seconds_max FROM pg_stat_replication WHERE state = 'backup'"
 
 	pgStatCurrentTempFilesQuery = `WITH RECURSIVE tablespace_dirs AS (
 					SELECT dirname, 'pg_tblspc/' || dirname || '/' AS path, 1 AS depth FROM pg_catalog.pg_ls_dir('pg_tblspc/', true, false) AS dirname
@@ -100,7 +102,7 @@ var (
 				) SELECT tablespace,
     				count((file_stat).size) AS files_total,
     				coalesce(sum((file_stat).size)::BIGINT, 0) AS bytes_total,
-    				coalesce(extract(epoch from now() - min((file_stat).access)), 0) AS oldest_file_age_seconds_max
+    				coalesce(extract(epoch from clock_timestamp() - min((file_stat).access)), 0) AS oldest_file_age_seconds_max
 				FROM temp_files GROUP BY 1`
 
 	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`
