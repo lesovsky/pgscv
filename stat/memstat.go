@@ -20,18 +20,23 @@ const (
 
 // Conatiner for memory/swap usage stats
 type Meminfo struct {
-	MemTotal     uint64
-	MemFree      uint64
-	MemUsed      uint64
-	SwapTotal    uint64
-	SwapFree     uint64
-	SwapUsed     uint64
-	MemCached    uint64
-	MemBuffers   uint64
-	MemAvailable uint64
-	MemDirty     uint64
-	MemWriteback uint64
-	MemSlab      uint64
+	MemTotal       uint64
+	MemFree        uint64
+	MemUsed        uint64
+	SwapTotal      uint64
+	SwapFree       uint64
+	SwapUsed       uint64
+	MemCached      uint64
+	MemBuffers     uint64
+	MemAvailable   uint64
+	MemDirty       uint64
+	MemWriteback   uint64
+	MemSlab        uint64
+	HugePagesTotal uint64
+	HugePagesFree  uint64
+	HugePagesRsvd  uint64
+	HugePagesSurp  uint64
+	HugePageSz     uint64
 }
 
 // Read stats from local procfile source
@@ -54,7 +59,10 @@ func (m *Meminfo) ReadLocal() {
 			if err != nil {
 				return
 			}
-			value *= 1024 /* kB -> bytes conversion */
+			// do kB -> bytes conversion if necessary
+			if len(fields) == 3 {
+				value *= 1024
+			}
 
 			switch fields[0] {
 			case "MemTotal:":
@@ -77,6 +85,16 @@ func (m *Meminfo) ReadLocal() {
 				m.MemAvailable = value
 			case "Slab:":
 				m.MemSlab = value
+			case "HugePages_Total:":
+				m.HugePagesTotal = value
+			case "HugePages_Free:":
+				m.HugePagesFree = value
+			case "HugePages_Rsvd:":
+				m.HugePagesRsvd = value
+			case "HugePages_Surp:":
+				m.HugePagesSurp = value
+			case "Hugepagesize:":
+				m.HugePageSz = value
 			}
 		}
 	}
@@ -111,6 +129,16 @@ func (m Meminfo) SingleStat(stat string) (value uint64) {
 		value = m.MemAvailable
 	case "mem_slab":
 		value = m.MemSlab
+	case "hp_total":
+		value = m.HugePagesTotal
+	case "hp_free":
+		value = m.HugePagesFree
+	case "hp_rsvd":
+		value = m.HugePagesRsvd
+	case "hp_surp":
+		value = m.HugePagesSurp
+	case "hp_pagesize":
+		value = m.HugePageSz
 	default:
 		value = 0
 	}
