@@ -100,6 +100,10 @@ func (m *Meminfo) ReadLocal() {
 	}
 	m.MemUsed = m.MemTotal - m.MemFree - m.MemCached - m.MemBuffers - m.MemSlab
 	m.SwapUsed = m.SwapTotal - m.SwapFree
+	m.HugePagesTotal = m.HugePagesTotal * m.HugePageSz
+	m.HugePagesFree = m.HugePagesFree * m.HugePageSz
+	m.HugePagesRsvd = m.HugePagesRsvd * m.HugePageSz
+	m.HugePagesSurp = m.HugePagesSurp * m.HugePageSz
 }
 
 // Function returns value of particular memory/swap stat
