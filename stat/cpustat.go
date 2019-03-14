@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -132,4 +133,38 @@ func CountCpu() (online, offline int, err error) {
 		}
 	}
 	return online_cnt, offline_cnt, nil
+}
+
+// CountGovernors returns map with scaling governors and number of cores that use specific governor
+func CountScalingGovernors() (g map[string]int, err error) {
+	g = make(map[string]int)
+	dirs, err := filepath.Glob(SYSFS_CPU_PATTERN)
+	if err != nil {
+		return nil, fmt.Errorf("failed couning CPUs governors, malformed pattern: %s", err)
+	}
+
+	for _, d := range dirs {
+		re := regexp.MustCompile(`cpu[0-9]+$`)
+		if !re.MatchString(d) { // skip other than 'cpu*' dirs
+			continue
+		}
+		fi, err := os.Stat(d + "/cpufreq")
+		if err != nil {
+			continue // cpufreq dir not found -- no cpu scaling used
+		}
+		file := d + "/cpufreq" + "/scaling_governor"
+		if fi.IsDir() {
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read %s: %s", file, err)
+			}
+			reader := bufio.NewReader(bytes.NewBuffer(content))
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				return nil, fmt.Errorf("failed to read from buffer: %s", err)
+			}
+			g[string(line)]++
+		}
+	}
+	return g, nil
 }

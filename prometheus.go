@@ -60,6 +60,9 @@ const (
 	STAT_SHARED = iota
 	STAT_PRIVATE
 	STAT_ALL
+
+	// regexp describes raw block devices except their partitions, but including stacked devices, such as device-mapper and mdraid
+	regexpBlockDevicesExtended = `((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`
 )
 
 //
@@ -100,6 +103,7 @@ var (
 		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
 		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
 		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_replication_standby", Query: pgReplicationStandbyCount, ValueNames: []string{"count"}, LabelNames: []string{}},
 		{Name: "pg_recovery", Query: pgRecoveryStatusQuery, ValueNames: []string{"status"}},
 		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
@@ -115,6 +119,7 @@ var (
 		{Name: "node_filesystem", Stype: STYPE_SYSTEM, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
 		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}},
 		{Name: "node_hardware_cores", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"state"}},
+		{Name: "node_hardware_scaling_governors", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"governor"}},
 		{Name: "node_hardware_numa", Stype: STYPE_SYSTEM, ValueNames: []string{"nodes"}},
 		{Name: "node_hardware_storage_rotational", Stype: STYPE_SYSTEM, LabelNames: []string{"device", "scheduler"}},
 		// pgbouncer metrics
@@ -328,6 +333,22 @@ func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int)
 		cnt++
 	}
 
+	// Collect used scaling governors
+	sg, err := stat.CountScalingGovernors()
+	if err != nil {
+		log.Errorf("failed counting scaling governors: err", err)
+		return 0
+	}
+	if len(sg) > 0 {
+		for k, v := range sg {
+			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_scaling_governors_total"], prometheus.CounterValue, float64(v), k)
+			cnt++
+		}
+	} else {
+		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_scaling_governors_total"], prometheus.CounterValue, 0, "disabled")
+		cnt++
+	}
+
 	// Collect total number of NUMA nodes
 	numa, err := stat.CountNumaNodes()
 	if err != nil {
@@ -353,7 +374,7 @@ func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
 	var devname, scheduler string
 	var rotational float64
 	for _, devpath := range dirs {
-		re := regexp.MustCompile(`((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`)
+		re := regexp.MustCompile(regexpBlockDevicesExtended)
 
 		if re.MatchString(devpath) {
 			devname = strings.Replace(devpath, "/sys/block/", "/dev/", 1)
@@ -371,6 +392,7 @@ func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
 			cnt++
 		}
 	}
+
 	return cnt
 }
 

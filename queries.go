@@ -59,6 +59,8 @@ var (
 
 	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS bytes FROM pg_replication_slots`
 
+	pgReplicationStandbyCount = `SELECT count(1) FROM pg_stat_replication`
+
 	pgRecoveryStatusQuery = `SELECT pg_is_in_recovery()::int AS status`
 
 	pgStatDatabaseConflictsQuery = `SELECT sum(confl_tablespace + confl_lock + confl_snapshot + confl_bufferpin + confl_deadlock) AS total,

@@ -73,6 +73,7 @@ var (
 		"pg_stat_replication_write_lag_sec":     "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written it",
 		"pg_stat_replication_flush_lag_sec":     "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written and flushed it",
 		"pg_stat_replication_replay_lag_sec":    "Time elapsed between flushing recent WAL locally and receiving notification that this standby server has written, flushed and applied it",
+		"pg_replication_standby_count":          "Total number of connected standbys",
 		// pg_replication_slots
 		"pg_replciation_slots_conn":              "Number of opened replication slots",
 		"pg_replciation_slots_restart_lag_bytes": "Amount of WAL since last restart position, in bytes",
@@ -177,9 +178,10 @@ var (
 		// node various settings
 		"node_settings_sysctl": "Node sysctl variables",
 		// node hardware
-		"node_hardware_cores_total": "Total number of CPU cores",
-		"node_hardware_numa_nodes":  "Total number of NUMA nodes",
-		"node_hardware_storage_rotational": "Type of the connected storage",
+		"node_hardware_cores_total":             "Total number of CPU cores",
+		"node_hardware_scaling_governors_total": "Total number of scaling governors used by CPU cores",
+		"node_hardware_numa_nodes":              "Total number of NUMA nodes",
+		"node_hardware_storage_rotational":      "Type of the connected storage",
 		// pgbouncer
 		"pgbouncer_pool_cl_active":       "Client connections that are linked to server connection and can process queries",
 		"pgbouncer_pool_cl_waiting":      "Client connections have sent queries but have not yet got a server connection",
