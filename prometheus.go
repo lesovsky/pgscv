@@ -44,22 +44,20 @@ type MetricData struct { // эту структуру должна возвра�
 type StatDesc struct {
 	Name       string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
 	Stype      int                             // тип источника статы - постгрес, баунсер, система и т.п.
-	Private    bool                            // является ли стата личной для конкретной базы? например стата для таблиц/индексов/функций -- применимо только к постгресовой стате
+	// TODO: DEPRECATED
+	//Private    bool                            // является ли стата личной для конкретной базы? например стата для таблиц/индексов/функций -- применимо только к постгресовой стате
 	Query      string                          // запрос с помощью которого вытягивается стата из источника
 	ValueNames []string                        // названия полей которые будут использованы как значения метрик
 	ValueTypes map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
 	LabelNames []string                        // названия полей которые будут использованы как метки
+	collectDone bool							// стата уже собрана (для всяких шаредных стат типа pg_stat_bgwriter, pg_stat_database)
+	collectAlways bool							// стату собирать всегда, игнорируя collectDone (для всяких стат типа pg_stat_user_tables и т.п.)
 }
 
 const (
 	STYPE_POSTGRESQL = iota
 	STYPE_PGBOUNCER
 	STYPE_SYSTEM
-
-	// признак того какую стату следует собрать
-	STAT_SHARED = iota
-	STAT_PRIVATE
-	STAT_ALL
 
 	// regexp describes raw block devices except their partitions, but including stacked devices, such as device-mapper and mdraid
 	regexpBlockDevicesExtended = `((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`
@@ -91,12 +89,12 @@ var (
 
 	statdesc = []*StatDesc{
 		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
-		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, Private: true, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_statio_user_tables", Query: pgStatioUserTablesQuery, Private: true, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, Private: true, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, Private: true, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, collectAlways: true, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_statio_user_tables", Query: pgStatioUserTablesQuery, collectAlways: true, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, collectAlways: true, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, collectAlways: true, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
 		{Name: "pg_stat_bgwriter", Query: pgStatBgwriterQuery, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_user_functions", Query: pgStatUserFunctionsQuery, Private: true, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
+		{Name: "pg_stat_user_functions", Query: pgStatUserFunctionsQuery, collectAlways: true, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
 		{Name: "pg_stat_activity", Query: pgStatActivityQuery, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
@@ -109,7 +107,7 @@ var (
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
-		{Name: "pg_data_directory", Query: "", Private: false, LabelNames: []string{"device", "mountpoint"}},
+		{Name: "pg_data_directory", Query: "", LabelNames: []string{"device", "mountpoint"}},
 		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
@@ -190,7 +188,7 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 
 	for i := range Instances {
 		if e.ServiceID == Instances[i].ServiceId {
-			log.Debugf("%s: start collecting metrics\n", time.Now().Format("2006-01-02 15:04:05"))
+			log.Debugf("%s: start collecting metrics for %s", time.Now().Format("2006-01-02 15:04:05"), e.ServiceID)
 
 			// в зависимости от типа экспортера делаем соотв.проверки
 			switch Instances[i].InstanceType {
@@ -408,60 +406,59 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 	var dblist []string
 
 	// формируем список баз -- как минимум в этот список будет входить база из автодискавери
-	// TODO: тут можно облажаться со сбором pg_stat_statements, например в первую итерацию попадает база без модуля, а в последующих циклах со снятым флагом, стату по pg_stat_statements уже не будет собираться
-	// также имеет смысл чекать наличие pgq схемы
 	if instance.InstanceType == STYPE_POSTGRESQL {
 		conn, err := CreateConn(&instance)
 		if err != nil {
-			log.Warnf("Failed to connect: %s, skip", err.Error())
+			log.Warnf("skip collecting stats for %s, failed to connect: %s", instance.ServiceId, err.Error())
 			return 0
 		}
 		if err := PQstatus(conn, instance.InstanceType); err != nil {
-			log.Warnf("Failed to check status: %s, skip", err.Error())
+			log.Warnf("skip collecting stats for %s, failed to check status: %s", instance.ServiceId, err.Error())
 			remove_instance <- instance.Pid // удаляем инстанс их хэш карты
 			return 0
 		}
+		// адаптируем запросы под конкретную версию
+		var version int
+		if err := conn.QueryRow(pgVersionNumQuery).Scan(&version); err != nil {
+			log.Warnf("skip collecting stats for %s, failed to obtain postgresql version: %s", instance.ServiceId, err)
+			return 0
+		}
+		adjustQueries(statdesc, version)
+
 
 		dblist, err = getDBList(conn)
 		if err != nil {
-			log.Warnf("Failed to get list of databases: %s. Use default database name: %s", err, instance.Dbname)
+			log.Warnf("failed to get list of databases: %s, use default database name: %s", err, instance.Dbname)
 			dblist = []string{instance.Dbname}
 		}
 
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Warnf("failed to close the connection %s@%s:%s/%s: %s, ignore", instance.User, instance.Host, instance.Port, instance.Dbname, err)
+		}
 	} else {
 		dblist = []string{"pgbouncer"}
 	}
 
-	// теперь нужно пройтись по всем базам и собрать стату
-	var target = STAT_ALL // при первой попытке сбора пытаемся собрать всю имеющуюся стату
+	// Before start collecting, do reset all 'collectDone' flags
+	for _, desc := range statdesc {
+		desc.collectDone = false
+	}
 
 	for _, dbname := range dblist {
 		instance.Dbname = dbname
 
 		conn, err := CreateConn(&instance) // открываем коннект к базе
 		if err != nil {
-			log.Warnf("Failed to connect: %s, skip", err.Error())
-			return 0
+			log.Warnf("skip collecting stats for database %s/%s, failed to connect: %s", instance.ServiceId, dbname, err.Error())
+			continue
 		}
 
-		// адаптируем запросы под конкретную версию
-		if target == STAT_ALL && instance.InstanceType == STYPE_POSTGRESQL {
-			var version int
-			if err := conn.QueryRow(pgVersionNumQuery).Scan(&version); err != nil {
-				log.Warnf("Failed to obtain PostgreSQL version: %s. Skipping stats collecting for %s database", err, dbname)
-				continue
-			}
-			adjustQueries(statdesc, version)
+		// собираем стату БД, в зависимости от типа это может быть баунсерная или постгресовая стата
+		e.getDBStat(conn, ch, instance.InstanceType)
+		if err := conn.Close(); err != nil {
+			log.Warnf("failed to close the connection %s@%s:%s/%s: %s", instance.User, instance.Host, instance.Port, instance.Dbname, err)
 		}
-
-		// собираем стату
-		e.getPgStat(conn, ch, instance.InstanceType, target)
-		conn.Close() // закрываем соединение
-
-		target = STAT_PRIVATE // как только шаредная стата собрана, не имеет смысла ее собирать еще раз, далее собираем только приватную стату.
 	}
-
 	return cnt
 }
 
@@ -469,95 +466,142 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 // Шаредная стата описывает кластер целиком, приватная относится к конкретной базе и описывает таблицы/индексы/функции которые принадлежат этой базе
 // Для сбора статы обходим все имеющиеся источники и пропускаем ненужные. Далее выполняем запрос ассоциированный с источником и делаем его в подключение.
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
-func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, target int) {
+//func (e *Exporter) getPgStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, target int) {
+func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int) {
 	// обходим по всем источникам
 	for _, desc := range statdesc {
-		if desc.Stype == itype {
-			switch target {
-			case STAT_SHARED:
-				if desc.Private {
-					continue // нам нужно собрать шаредную стату, соотв. пропускаем всю приватную
-				}
-			case STAT_PRIVATE:
-				if !desc.Private {
-					continue // нам нужно собрать приватную стату, соотв. пропускаем всю шаредную
-				}
-			case STAT_ALL:
-				// ничего не пропускаем, т.к. надо собрать и приватную и шаредную статы
+		if desc.Stype != itype {
+			continue
+		}
+
+		if desc.collectDone == true && desc.collectAlways == false {
+			continue // стата собрана, пропускаем в этой базе
+		}
+		log.Debugf("start collecting %s", desc.Name)
+
+		// если появится еще один desc с пустым запросом могут быть траблы
+		if desc.Query == "" {
+			if err := getDatadirInfo(e, conn, ch); err != nil {
+				log.Warnf("skip collecting %s: %s", desc.Name, err)
+			} else {
+				desc.collectDone = true
+			}
+			continue
+		}
+
+		// check pg_stat_statements availability in this database
+		if desc.Name == "pg_stat_statements" && ! IsPGSSAvailable(conn) {
+			log.Debugln("skip collecting pg_stat_statements in this database")
+			continue
+		}
+
+		rows, err := conn.Query(desc.Query)
+		// Errors aren't critical for us, remember and show them to the user.
+		// Return after the error, because there is no reason to continue.
+		if err != nil {
+			log.Warnf("skip collecting %s, failed to execute query: %s", desc.Name, err)
+			continue // если произошла ошибка, то пропускаем этот конкретный шаг сбора статы
+		}
+
+		var container []sql.NullString
+		var pointers []interface{}
+
+		colnames, _ := rows.Columns()
+		ncols := len(colnames)
+
+		for rows.Next() {
+			pointers = make([]interface{}, ncols)
+			container = make([]sql.NullString, ncols)
+
+			for i := range pointers {
+				pointers[i] = &container[i]
 			}
 
-			if desc.Query == "" {
-				getDatadirInfo(e, conn, ch)
-			}
-
-			rows, err := conn.Query(desc.Query)
-			// Errors aren't critical for us, remember and show them to the user. Return after the error, because
-			// there is no reason to continue.
+			err := rows.Scan(pointers...)
 			if err != nil {
-				log.Warnf("Failed to execute query: %s\n%s", err, desc.Query)
-				continue // если произошла ошибка, то пропускаем этот конкретный шаг сбора статы
+				log.Warnf("skip collecting %s, failed to scan query result: %s", desc.Name, err)
+				continue // если произошла ошибка, то пропускаем эту строку и переходим к следующей
 			}
 
-			var container []sql.NullString
-			var pointers []interface{}
+			for c, colname := range colnames {
+				// Если колонки нет в списке меток, то генерим метрику на основе значения [row][column].
+				// Если имя колонки входит в список меток, то пропускаем ее -- нам не нужно генерить из нее метрику, т.к. она как метка+значение сама будет частью метрики
+				if !Contains(desc.LabelNames, colname) {
+					var labelValues = make([]string, len(desc.LabelNames))
 
-			colnames, _ := rows.Columns()
-			ncols := len(colnames)
-
-			for rows.Next() {
-				pointers = make([]interface{}, ncols)
-				container = make([]sql.NullString, ncols)
-
-				for i := range pointers {
-					pointers[i] = &container[i]
-				}
-
-				err := rows.Scan(pointers...)
-				if err != nil {
-					log.Warnf("Failed to scan query result: %s\n%s", err, desc.Query)
-					continue // если произошла ошибка, то пропускаем эту строку и переходим к следующей
-				}
-
-				for c, colname := range colnames {
-					// Если колонки нет в списке меток, то генерим метрику на основе значения [row][column]. Если имя колонки входит в список меток, то пропускаем ее -- нам не нужно генерить из нее метрику, т.к. она как метка+значение сама будет частью метрики
-					if !Contains(desc.LabelNames, colname) {
-						var labelValues = make([]string, len(desc.LabelNames))
-						// итерируемся по именам меток, нужно собрать из результата-ответа от базы, значения для соотв. меток
-						for i, lname := range desc.LabelNames {
-							// определяем номер (индекс) колонки в PGresult, который соотв. названию метки -- по этому индексу возьмем значение для метки из PGresult (таким образом мы не привязываемся к порядку полей в запросе)
-							for idx, cname := range colnames {
-								if cname == lname {
-									labelValues[i] = container[idx].String
-								}
+					// итерируемся по именам меток, нужно собрать из результата-ответа от базы, значения для соотв. меток
+					for i, lname := range desc.LabelNames {
+						// определяем номер (индекс) колонки в PGresult, который соотв. названию метки -- по этому индексу возьмем значение для метки из PGresult
+						// (таким образом мы не привязываемся к порядку полей в запросе)
+						for idx, cname := range colnames {
+							if cname == lname {
+								labelValues[i] = container[idx].String
 							}
 						}
-
-						var metricValue string = container[c].String
-						v, err := strconv.ParseFloat(metricValue, 64) // преобразуем string в подходящий для прометеуса float64
-						if err != nil {
-							//log.Warnf("WARNING: can't convert to float: %s\n", err)	// TODO: включить варнинг и найти места где не получается распарсить во флоат
-							continue
-						}
-
-						ch <- prometheus.MustNewConstMetric(
-							e.AllDesc[desc.Name+"_"+colname], // *prometheus.Desc который также участвует в Describe методе
-							prometheus.CounterValue,          // тип метрики
-							v,                                // значение метрики
-							labelValues...,                   // массив меток
-						)
 					}
+
+					// игнорируем пустые строки, это NULL - нас они не интересуют
+					if container[c].String == "" {
+						log.Debugf("skip collecting %s_%s metric: got empty value", desc.Name, colname)
+						continue
+					}
+
+					// получаем значение метрики (string) и конвертим его в подходящий для прометеуса float64
+					v, err := strconv.ParseFloat(container[c].String, 64)
+					if err != nil {
+						log.Debugf("skip collecting %s_%s metric: %s", desc.Name, colname, err)
+						continue
+					}
+
+					// отправляем метрику в прометеус
+					ch <- prometheus.MustNewConstMetric(
+						e.AllDesc[desc.Name+"_"+colname], // *prometheus.Desc который также участвует в Describe методе
+						prometheus.CounterValue,          // тип метрики
+						v,                                // значение метрики
+						labelValues...,                   // массив меток
+					)
 				}
 			}
-			rows.Close()
+		}
+		// if we're here, it means stats collected successfully and no errors occurred
+		desc.collectDone = true
+		log.Debugf("%s collected", desc.Name)
+		if err := rows.Close(); err != nil {
+			log.Debugf("metrics collected, but failed to close rows: %s, ignore", err)
 		}
 	}
 }
 
+// IsPGSSAvailable returns true if pg_stat_statements exists and available
+func IsPGSSAvailable(conn *sql.DB) bool {
+	log.Debugln("check pg_stat_statements availability")
+	/* check pg_stat_statements */
+	var pgCheckPGSSExists = `SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = 'pg_stat_statements')`
+	var pgCheckPGSSCount = `SELECT 1 FROM pg_stat_statements LIMIT 1`
+	var v_exists bool
+	var v_count int
+	if err := conn.QueryRow(pgCheckPGSSExists).Scan(&v_exists); err != nil {
+		log.Debugln("failed to check pg_stat_statements view in information_schema")
+		return false	// failed to query information_schema
+	}
+	if v_exists == false {
+		log.Debugln("pg_stat_statements is not available in this database")
+		return false	// failed to query information_schema
+	} else {
+		if err = conn.QueryRow(pgCheckPGSSCount).Scan(&v_count); err != nil {
+			log.Debugln("pg_stat_statements exists but not queryable")
+			return false	// view exists, but unavailable for queries - empty shared_preload_libraries ?
+		}
+	}
+	return true
+}
+
+
 // getDatadirInfo evaluates data_directory's mountpoint
-func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
+func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) (err error) {
 	var dataDir string
 	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dataDir); err != nil {
-		return
+		return err
 	}
 
 	mountpoints := stat.ReadMounts()
@@ -571,8 +615,7 @@ func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
 			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, err := os.Readlink(subpath)
 				if err != nil {
-					log.Warnf("failed to resolve symlink %s: %s\n", subpath, err)
-					return
+					return fmt.Errorf("failed to resolve symlink %s: %s\n", subpath, err)
 				}
 
 				if _, ok := mountpoints[resolvedLink]; ok {
@@ -581,12 +624,13 @@ func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) {
 			}
 			if device, ok := mountpoints[subpath]; ok {
 				ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, subpath)
-				return
+				return nil
 			}
 		} else {
 			device := mountpoints["/"]
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, "/")
-			return
+			return nil
 		}
 	}
+	return nil
 }

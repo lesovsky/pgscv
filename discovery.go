@@ -43,7 +43,7 @@ func discoveryLoop() {
 	log.Debugln("auto-discovery: run initial discovery")
 
 	// добавляем псевдо-инстанс для системных метрик
-	Instances[0] = Instance{InstanceType: STYPE_SYSTEM}
+	Instances[0] = Instance{InstanceType: STYPE_SYSTEM, ServiceId: "system"}
 
 	if err := lookupInstances(); err != nil {
 		log.Fatalf("initial discovery failed: lookup error: %s", err)

@@ -71,6 +71,7 @@ var (
 		UNION SELECT 'active' AS state, count(*) filter (where active) AS conn FROM pg_replication_slots
 		UNION SELECT 'inactive' AS state, count(*) filter (where not active) AS conn FROM pg_replication_slots`
 
+	// TODO: remove 512 limit and p.calls > 100 ?
 	pgStatStatementsQuery = `SELECT
 					    a.rolname AS usename, d.datname AS datname, p.queryid,
 					    regexp_replace(regexp_replace(left(p.query, 512),E'( |\t)+',' ','g'),E'\n', '', 'g') AS query,
