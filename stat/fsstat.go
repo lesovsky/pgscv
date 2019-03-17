@@ -1,3 +1,5 @@
+// Package stat is used for retrieving different kind of statistics.
+// fsstat.go is related to mounted filesystems statistics
 package stat
 
 import (
@@ -12,6 +14,7 @@ import (
 	"syscall"
 )
 
+// FsStat is the container for statistics of particular filesystem
 type FsStat struct {
 	Device            string // An underlying storage device
 	Mountpoint        string // A directory where the filesystem is mounted
@@ -28,6 +31,7 @@ type FsStat struct {
 	FreeInodes        uint64 // The number of inodes available for use
 }
 
+// FsStats is an array for all filesystem statistics
 type FsStats []FsStat
 
 var (
@@ -35,11 +39,12 @@ var (
 )
 
 const (
-	PROC_MOUNTS = "/proc/mounts"
+	procMounts = "/proc/mounts"
 )
 
+// ReadLocal method read statistics about filesystem from 'procfs' filesystem
 func (s *FsStats) ReadLocal() error {
-	content, err := ioutil.ReadFile(PROC_MOUNTS)
+	content, err := ioutil.ReadFile(procMounts)
 	if err != nil {
 		return nil
 	}
@@ -83,7 +88,7 @@ func (s *FsStats) ReadLocal() error {
 	return nil
 }
 
-// Function returns value of particular stat of an interface
+// SingleStat method returns value of particular stat of filesystem
 func (c FsStat) SingleStat(stat string) (value uint64) {
 	switch stat {
 	case "total_bytes":
@@ -111,9 +116,9 @@ func (c FsStat) SingleStat(stat string) (value uint64) {
 }
 
 // ReadMounts returns list of pairs [mountpoint]device
-func ReadMounts() (map[string]string) {
+func ReadMounts() map[string]string {
 	var mountpoints = make(map[string]string)
-	content, err := ioutil.ReadFile(PROC_MOUNTS)
+	content, err := ioutil.ReadFile(procMounts)
 	if err != nil {
 		return nil
 	}
@@ -153,15 +158,15 @@ func resolveDeviceMapperName(device string) string {
 	return strings.Replace(device, "..", "/dev", 1)
 }
 
-// RewritePath searches symlinks and rewrites it to an origin
-// TODO: might fail with more than one symlink used in the path =)
+// RewritePath searches symlinks, follows to origin and rewrite passed path
 func RewritePath(path string) string {
+	// TODO: might fail with more than one symlink used in the path =)
 	parts := strings.Split(path, "/")
 	for i := len(parts); i > 0; i-- {
 		if subpath := strings.Join(parts[0:i], "/"); subpath != "" {
 			// check is subpath a symlink, if symlink - dereference it
 			fi, _ := os.Lstat(subpath)
-			if fi.Mode() & os.ModeSymlink != 0 {
+			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, _ := os.Readlink(subpath)
 				newpath := resolvedLink + "/" + strings.Join(parts[i:], "/")
 				return newpath

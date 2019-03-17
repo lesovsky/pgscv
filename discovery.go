@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Container for service Instance - connection settings to service, connection pointer, info, prometheus worker, etc...
+// Instance is the container for discovered service
 type Instance struct {
 	Pid          int32 // process identificator
 	InstanceType int   // "postgres" or "pgbouncer"
@@ -31,19 +31,19 @@ type Instance struct {
 }
 
 var (
-	// хэш карта для дискавери, в нее затаскиваются все обнаруженные инстансы постгресов и баунсеров
+	// Instances is the map with all discovered services
 	Instances = make(map[int32]Instance)
 
-	remove_instance                 = make(chan int32) // канал для удаления инстансов
-	discoveryInterval time.Duration = 60 * time.Second
+	chRemoveInstance  = make(chan int32) // канал для удаления инстансов
+	discoveryInterval = 60 * time.Second
 )
 
-//
+// discoveryLoop is the main loop aimed to discover services
 func discoveryLoop() {
 	log.Debugln("auto-discovery: run initial discovery")
 
 	// добавляем псевдо-инстанс для системных метрик
-	Instances[0] = Instance{InstanceType: STYPE_SYSTEM, ServiceId: "system"}
+	Instances[0] = Instance{InstanceType: stypeSystem, ServiceId: "system"}
 
 	if err := lookupInstances(); err != nil {
 		log.Fatalf("initial discovery failed: lookup error: %s", err)
@@ -56,11 +56,11 @@ func discoveryLoop() {
 	defer wg.Done()
 
 	log.Debugln("auto-discovery: initial discovery complete")
-	start_listen <- 1
+	chStartListen <- 1
 
 	for {
 		select {
-		case pid := <-remove_instance:
+		case pid := <-chRemoveInstance:
 			removeInstance(pid)
 		case <-time.After(discoveryInterval):
 			if err := lookupInstances(); err != nil {
@@ -75,6 +75,7 @@ func discoveryLoop() {
 	}
 }
 
+// lookupInstances scans PIDs and looking for required services
 func lookupInstances() error {
 	allPids, err := process.Pids()
 	if err != nil {
@@ -125,7 +126,7 @@ func lookupInstances() error {
 	return nil
 }
 
-//
+// setupInstances configures discovered service and adds into the service's list
 func setupInstances() error {
 	for i := range Instances {
 		if Instances[i].Worker == nil {
@@ -134,11 +135,11 @@ func setupInstances() error {
 			tmp.CFamilyId = *cfId
 
 			switch tmp.InstanceType {
-			case STYPE_POSTGRESQL:
+			case stypePostgresql:
 				tmp.ServiceId = "postgres:" + strconv.Itoa(tmp.Port)
-			case STYPE_PGBOUNCER:
+			case stypePgbouncer:
 				tmp.ServiceId = "pgbouncer:" + strconv.Itoa(tmp.Port)
-			case STYPE_SYSTEM:
+			case stypeSystem:
 				// nothing to do
 			}
 
@@ -161,14 +162,14 @@ func setupInstances() error {
 	return nil
 }
 
-// удаляем инстанс на случай если к нему нет возможности обратиться (неважно отвалился он временно или совсем)
+// removeInstance removes service from the list (in case of its unavailability)
 func removeInstance(pid int32) {
 	prometheus.Unregister(Instances[pid].Worker)
+	log.Infof("auto-discovery: collector unregistered for %s, process %d", Instances[pid].ServiceId, pid)
 	delete(Instances, pid)
-	log.Infof("auto-discovery: collector unregistered for process %d", pid)
 }
 
-//
+// discoverPgbouncer
 func discoverPgbouncer(proc *process.Process) (Instance, error) {
 	// пока тупо возвращаем значение без всякого дискавери
 	// надо взять конфиг из cmdline прочитать его и найти параметры порта и адреса
@@ -227,10 +228,10 @@ func discoverPgbouncer(proc *process.Process) (Instance, error) {
 	}
 
 	log.Infof("auto-discovery: pgbouncer service has been found, pid %d, available through %s, port %d", proc.Pid, sdir, 6432)
-	return Instance{InstanceType: STYPE_PGBOUNCER, Pid: proc.Pid, Host: sdir, Port: lport, User: "pgbouncer", Dbname: "pgbouncer"}, nil
+	return Instance{InstanceType: stypePgbouncer, Pid: proc.Pid, Host: sdir, Port: lport, User: "pgbouncer", Dbname: "pgbouncer"}, nil
 }
 
-//
+// discoverPostgres
 func discoverPostgres(proc *process.Process) (Instance, error) {
 	// надо найти сокет для коннекта
 	cmdline, err := proc.CmdlineSlice()
@@ -271,5 +272,5 @@ func discoverPostgres(proc *process.Process) (Instance, error) {
 		}
 	}
 	log.Infof("auto-discovery: postgresql service has been found, pid %d, available through %s, port %d", proc.Pid, unixsocketdir, port)
-	return Instance{InstanceType: STYPE_POSTGRESQL, Pid: proc.Pid, Host: unixsocketdir, Port: port}, nil
+	return Instance{InstanceType: stypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: port}, nil
 }

@@ -5,34 +5,46 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/lib/pq"
+	log "github.com/prometheus/common/log"
 )
 
 const (
 	dbDriver = "postgres"
 
-	errCodeInvalidPassword = "28P01"
+	//errCodeInvalidPassword = "28P01"
 
-	// Self-identification queries
-	PQhostQuery           = "SELECT inet_server_addr() inet, current_setting('unix_socket_directories') unix;"
-	PQportQuery           = "SELECT coalesce(inet_server_port(),5432)"
-	PQuserQuery           = "SELECT current_user"
-	PQdbQuery             = "SELECT current_database()"
+	// PQhostQuery identifies an address of used connection to Postgres, is it a network address or UNIX socket
+	PQhostQuery = "SELECT inet_server_addr() inet, current_setting('unix_socket_directories') unix;"
+	// PQportQuery identifies a port number of used connection to Postgres
+	PQportQuery = "SELECT coalesce(inet_server_port(),5432)"
+	// PQuserQuery identifies an user which used to connect to Postgres
+	PQuserQuery = "SELECT current_user"
+	// PQdbQuery identifies a database to which made the connection
+	PQdbQuery = "SELECT current_database()"
+	// PQstatusQueryPostgres is query used for checking status of the Postgres's connection
 	PQstatusQueryPostgres = "SELECT 1"
-	PQstatusQueryBouncer  = "SHOW VERSION"
+	// PQstatusQueryBouncer is query used for checking status of the Pgbouncer's connection
+	PQstatusQueryBouncer = "SHOW VERSION"
 
-	// Session parameters used by pgCenter at connection start
-	WorkMemQuery          = "SET work_mem TO '32MB'"
-	LogMinDurationQuery   = "SET log_min_duration_statement TO 10000"
+	// TODO: если мы переопределяем сессионные переменные, то получаем их когда запрашиваем настройки pg_show_all_settings()
+
+	// WorkMemQuery specfies work_mem value for working session
+	WorkMemQuery = "SET work_mem TO '32MB'"
+	// LogMinDurationQuery specifies SQL to override log_min_duration_statement
+	LogMinDurationQuery = "SET log_min_duration_statement TO 10000"
+	// StatementTimeoutQuery specifies SQL to override statement_timeout
 	StatementTimeoutQuery = "SET statement_timeout TO 5000"
-	LockTimeoutQuery      = "SET lock_timeout TO 2000"
-	DeadlockTimeoutQuery  = "SET deadlock_timeout TO 1000"
-
+	// LockTimeoutQuery specifies SQL to override lock_timeout
+	LockTimeoutQuery = "SET lock_timeout TO 2000"
+	// DeadlockTimeoutQuery specifies SQL to override deadlock_timeout
+	DeadlockTimeoutQuery = "SET deadlock_timeout TO 1000"
+	// DbListQuery queries a list of connectable databases
 	DbListQuery = "SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn"
 )
 
-// Assembles libpq connection string, connect to Postgres and returns 'connection' object
+// CreateConn assembles 'libpq' connection string, connects to Postgres and returns 'connection' object
 func CreateConn(c *Instance) (conn *sql.DB, err error) {
-	if c.InstanceType >= STYPE_SYSTEM {
+	if c.InstanceType >= stypeSystem {
 		return nil, nil
 	}
 
@@ -54,7 +66,7 @@ func CreateConn(c *Instance) (conn *sql.DB, err error) {
 	}
 
 	// Set session's safe settings for PostgreSQL conns
-	if c.InstanceType == STYPE_POSTGRESQL {
+	if c.InstanceType == stypePostgresql {
 		setSafeSession(conn)
 	}
 
@@ -79,7 +91,7 @@ func assembleConnstr(c *Instance) string {
 	return s
 }
 
-// Connect to Postgres, ask password if required.
+// PQconnectdb connects to Postgres
 func PQconnectdb(c *Instance, connstr string) (conn *sql.DB, err error) {
 	conn, err = sql.Open(dbDriver, connstr)
 	if err != nil {
@@ -108,21 +120,19 @@ func replaceEmptySettings(c *Instance, conn *sql.DB) (err error) {
 	return nil
 }
 
-// Set session's safe settings.
-// It's possible to pass these parameters via connection string at startup, but they're not logged then.
+// Set session's safe settings. It's possible to pass these parameters via connection string at startup, but they're not logged then.
 func setSafeSession(conn *sql.DB) {
 	for _, query := range []string{WorkMemQuery, StatementTimeoutQuery, LockTimeoutQuery, DeadlockTimeoutQuery, LogMinDurationQuery} {
 		_, err := conn.Exec(query)
 		// Trying to SET superuser-only parameters for NOSUPERUSER will lead to error, but it's not critical.
-		// Notice about occured error, clear it and go on.
+		// Notice about occurred error, clear it and go on.
 		if err, ok := err.(*pq.Error); ok {
-			fmt.Printf("%s: %s\nSTATEMENT: %s\n", err.Severity, err.Message, query)
+			log.Warnf("%s: %s\nSTATEMENT: %s\n", err.Severity, err.Message, query)
 		}
-		err = nil
 	}
 }
 
-//
+// getDBList returns the list of databases that allowed for connection
 func getDBList(conn *sql.DB) (list []string, err error) {
 	rows, err := conn.Query(DbListQuery)
 	if err != nil {
@@ -141,7 +151,7 @@ func getDBList(conn *sql.DB) (list []string, err error) {
 	return list, nil
 }
 
-// Returns endpoint (hostname or UNIX-socket) to which pgCenter is connected
+// PQhost returns endpoint (network address or socket directory) to which pgSCV is connected
 func PQhost(c *sql.DB) (_ string, err error) {
 	// Don't use query with coalesce(inet, unix), because 'inet' and 'unix' are the different types,
 	// at casting 'inet' to text, netmask is added to the final address and the netmask is unnecessary.
@@ -156,32 +166,32 @@ func PQhost(c *sql.DB) (_ string, err error) {
 	return u.String, err
 }
 
-// Returns port number to which pgCenter is connected
+// PQport returns the port number to which pgSCV is connected
 func PQport(c *sql.DB) (i int, err error) {
 	err = c.QueryRow(PQportQuery).Scan(&i)
 	return i, err
 }
 
-// Returns username which is used by pgCenter
+// PQuser returns username which is used by pgSCV
 func PQuser(c *sql.DB) (s string, err error) {
 	err = c.QueryRow(PQuserQuery).Scan(&s)
 	return s, err
 }
 
-// Returns database name to which pgCenter is connected
+// PQdb returns database name to which pgSCV is connected
 func PQdb(c *sql.DB) (s string, err error) {
 	err = c.QueryRow(PQdbQuery).Scan(&s)
 	return s, err
 }
 
-// Returns connections status
+// PQstatus returns connections status - just do 'SELECT 1' and return result - nil or err
 func PQstatus(c *sql.DB, itype int) error {
 	var q string
 
 	switch itype {
-	case STYPE_POSTGRESQL:
+	case stypePostgresql:
 		q = PQstatusQueryPostgres
-	case STYPE_PGBOUNCER:
+	case stypePgbouncer:
 		q = PQstatusQueryBouncer
 	}
 

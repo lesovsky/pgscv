@@ -1,3 +1,5 @@
+// Package stat is used for retrieving different kind of statistics.
+// cpustat.go is related to CPU usage stats which is located in '/proc/stat'
 package stat
 
 import (
@@ -12,6 +14,7 @@ import (
 	"strings"
 )
 
+// CpuRawstat is a container for raw values collected from cpu-stat source
 type CpuRawstat struct {
 	Entry   string
 	User    float64
@@ -28,13 +31,13 @@ type CpuRawstat struct {
 }
 
 const (
-	PROC_STAT         = "/proc/stat"
-	SYSFS_CPU_PATTERN = "/sys/devices/system/cpu/cpu*"
+	procStatFile    = "/proc/stat"
+	sysfsCpuPattern = "/sys/devices/system/cpu/cpu*"
 )
 
-/* Read CPU usage raw values from statfile and save to pre-calculation struct */
+// ReadLocal reads CPU raw stats from local 'procfs' filesystem
 func (s *CpuRawstat) ReadLocal() {
-	content, err := ioutil.ReadFile(PROC_STAT)
+	content, err := ioutil.ReadFile(procStatFile)
 	if err != nil {
 		return
 	}
@@ -64,7 +67,7 @@ func (s *CpuRawstat) ReadLocal() {
 	return
 }
 
-// Function return number of ticks for particular mode
+// SingleStat returns number of ticks for particular mode
 func (s *CpuRawstat) SingleStat(mode string) (ticks float64) {
 	switch mode {
 	case "user":
@@ -95,18 +98,18 @@ func (s *CpuRawstat) SingleStat(mode string) (ticks float64) {
 	return ticks
 }
 
-// Counts online and offline CPUs
+// CountCpu returns number of online and offline CPU cores
 func CountCpu() (online, offline int, err error) {
-	var online_cnt, offline_cnt int
+	var onlineCnt, offlineCnt int
 
-	dirs, err := filepath.Glob(SYSFS_CPU_PATTERN)
+	dirs, err := filepath.Glob(sysfsCpuPattern)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed counting CPUs, malformed pattern: %s", err)
 	}
 
 	for _, d := range dirs {
 		if strings.HasSuffix(d, "/cpu0") { // cpu0 has no 'online' file and always online, just increment counter
-			online_cnt++
+			onlineCnt++
 			continue
 		}
 		re := regexp.MustCompile(`cpu[0-9]+$`)
@@ -124,21 +127,21 @@ func CountCpu() (online, offline int, err error) {
 
 			switch string(line) {
 			case "0":
-				offline_cnt++
+				offlineCnt++
 			case "1":
-				online_cnt++
+				onlineCnt++
 			default:
 				fmt.Printf("failed counting CPUs, unknown value in %s: %s", file, line)
 			}
 		}
 	}
-	return online_cnt, offline_cnt, nil
+	return onlineCnt, offlineCnt, nil
 }
 
-// CountGovernors returns map with scaling governors and number of cores that use specific governor
+// CountScalingGovernors returns map with scaling governors and number of cores that use specific governor
 func CountScalingGovernors() (g map[string]int, err error) {
 	g = make(map[string]int)
-	dirs, err := filepath.Glob(SYSFS_CPU_PATTERN)
+	dirs, err := filepath.Glob(sysfsCpuPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed couning CPUs governors, malformed pattern: %s", err)
 	}

@@ -1,3 +1,4 @@
+// Package stat is used for retrieving different kind of statistics.
 package stat
 
 import (
@@ -11,10 +12,11 @@ import (
 )
 
 const (
-	PROC_UPTIME = "/proc/uptime"
+	procUptime = "/proc/uptime"
 )
 
 var (
+	// SysTicks stores the system timer's frequency
 	SysTicks float64 = 100
 )
 
@@ -29,23 +31,23 @@ func init() {
 func uptime() (float64, error) {
 	var upsec, upcent float64
 
-	content, err := ioutil.ReadFile(PROC_UPTIME)
+	content, err := ioutil.ReadFile(procUptime)
 	if err != nil {
-		return 0, fmt.Errorf("failed to read %s", PROC_UPTIME)
+		return 0, fmt.Errorf("failed to read %s", procUptime)
 	}
 
 	reader := bufio.NewReader(bytes.NewBuffer(content))
 
 	line, _, err := reader.ReadLine()
 	if err != nil {
-		return 0, fmt.Errorf("failed to scan data from %s", PROC_UPTIME)
+		return 0, fmt.Errorf("failed to scan data from %s", procUptime)
 	}
 	fmt.Sscanf(string(line), "%f.%f", &upsec, &upcent)
 
 	return (upsec * SysTicks) + (upcent * SysTicks / 100), nil
 }
 
-// Count lines in local file
+// CountLinesLocal returns number of lines in the stats file
 func CountLinesLocal(f string) (int, error) {
 	content, err := ioutil.ReadFile(f)
 	if err != nil {
@@ -57,7 +59,7 @@ func CountLinesLocal(f string) (int, error) {
 	count := 0
 	lineSep := []byte{'\n'}
 
-	if f == PROC_NETDEV {
+	if f == ProcNetdev {
 		count = count - 2 // Shift the counter because '/proc/net/dev' contains 2 lines of header
 	}
 

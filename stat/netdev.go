@@ -1,5 +1,5 @@
-// Stuff related to network interfaces stats
-
+// Package stat is used for retrieving different kind of statistics.
+// netdev.go is related to network interfaces stats which is located in '/proc/net/dev'
 package stat
 
 import (
@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// Container for stats per single interface
+// Netdev is the container for stats related to a single network interface
 type Netdev struct {
 	Ifname string /* interface name */
 	Speed  uint32 /* interface network speed */
@@ -35,7 +35,7 @@ type Netdev struct {
 	Tcarrier    float64 /* total number of carrier losses */
 	Tcompressed float64 /* total number of received multicast packets */
 	// enchanced
-	Packets     float64 /* total number of received or transmited packets */
+	Packets     float64 /* total number of received or transmitted packets */
 	Raverage    float64 /* average size of received packets */
 	Taverage    float64 /* average size of transmitted packets */
 	Saturation  float64 /* saturation - the number of errors/second seen for the interface */
@@ -45,19 +45,20 @@ type Netdev struct {
 	Uptime      float64 /* system uptime */
 }
 
-// Container for all stats from proc-file
+// Netdevs is the container for all stats of all network interfaces
 type Netdevs []Netdev
 
 const (
-	PROC_NETDEV = "/proc/net/dev"
+	// ProcNetdev is the location of file with network interfaces statistics
+	ProcNetdev = "/proc/net/dev"
 )
 
-// Read stats from local procfile source
+// ReadLocal method reads stats from local 'procfs' filesystem
 func (c Netdevs) ReadLocal() error {
 	var j = 0
-	content, err := ioutil.ReadFile(PROC_NETDEV)
+	content, err := ioutil.ReadFile(ProcNetdev)
 	if err != nil {
-		return fmt.Errorf("failed to read %s", PROC_NETDEV)
+		return fmt.Errorf("failed to read %s", ProcNetdev)
 	}
 	reader := bufio.NewReader(bytes.NewBuffer(content))
 
@@ -83,7 +84,7 @@ func (c Netdevs) ReadLocal() error {
 			&ifs.Rbytes, &ifs.Rpackets, &ifs.Rerrs, &ifs.Rdrop, &ifs.Rfifo, &ifs.Rframe, &ifs.Rcompressed, &ifs.Rmulticast,
 			&ifs.Tbytes, &ifs.Tpackets, &ifs.Terrs, &ifs.Tdrop, &ifs.Tfifo, &ifs.Tcolls, &ifs.Tcarrier, &ifs.Tcompressed)
 		if err != nil {
-			return fmt.Errorf("failed to scan data from %s", PROC_NETDEV)
+			return fmt.Errorf("failed to scan data from %s", ProcNetdev)
 		}
 
 		ifs.Ifname = strings.TrimRight(ifs.Ifname, ":")
@@ -98,7 +99,7 @@ func (c Netdevs) ReadLocal() error {
 	return nil
 }
 
-// Function returns value of particular stat of an interface
+// SingleStat method returns value of particular stat of an interface
 func (c Netdev) SingleStat(stat string) (value float64) {
 	switch stat {
 	case "rbytes":

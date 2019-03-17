@@ -1,5 +1,5 @@
-// Stuff related to memory/swap usage stats
-
+// Package stat is used for retrieving different kind of statistics.
+// memstat.go is related to memory/swap usage stats which is located in '/proc/meminfo'
 package stat
 
 import (
@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	PROC_MEMINFO            = "/proc/meminfo"
-	SYSFS_NUMA_NODE_PATTERN = "/sys/devices/system/node/node*"
+	procMeminfo          = "/proc/meminfo"
+	sysfsNumaNodePattern = "/sys/devices/system/node/node*"
 )
 
-// Conatiner for memory/swap usage stats
+// Meminfo is the container for memory/swap usage stats
 type Meminfo struct {
 	MemTotal       uint64
 	MemFree        uint64
@@ -39,9 +39,9 @@ type Meminfo struct {
 	HugePageSz     uint64
 }
 
-// Read stats from local procfile source
+// ReadLocal method reads stats about memory/swap from local 'procfs' filesystem
 func (m *Meminfo) ReadLocal() {
-	content, err := ioutil.ReadFile(PROC_MEMINFO)
+	content, err := ioutil.ReadFile(procMeminfo)
 	if err != nil {
 		return
 	}
@@ -106,7 +106,7 @@ func (m *Meminfo) ReadLocal() {
 	m.HugePagesSurp = m.HugePagesSurp * m.HugePageSz
 }
 
-// Function returns value of particular memory/swap stat
+// SingleStat method returns value of particular memory/swap stats
 func (m Meminfo) SingleStat(stat string) (value uint64) {
 	switch stat {
 	case "mem_total":
@@ -149,12 +149,11 @@ func (m Meminfo) SingleStat(stat string) (value uint64) {
 	return value
 }
 
-// Counts NUMA nodes
+// CountNumaNodes returns number of NUMA nodes in the system
 func CountNumaNodes() (n int, err error) {
-	d, err := filepath.Glob(SYSFS_NUMA_NODE_PATTERN)
+	d, err := filepath.Glob(sysfsNumaNodePattern)
 	if err != nil {
 		return 0, fmt.Errorf("failed counting NUMA nodes, malformed pattern: %s", err)
 	}
-
 	return len(d), nil
 }

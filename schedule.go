@@ -5,11 +5,11 @@ import (
 	"time"
 )
 
-// Настройки планирования запуска сбора метрик - позволяет собирать метрики только через определенный интервал
+// Schedule defines scheduling settings for stats descriptor
 type Schedule struct {
 	Active    bool          // is this schedule active
-	Interval  time.Duration // runtime interval
-	LastFired time.Time     // timestamp of last run
+	Interval  time.Duration // collecting interval
+	LastFired time.Time     // timestamp of last collect
 }
 
 // Activate method activates existing schedule

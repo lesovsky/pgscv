@@ -1,3 +1,5 @@
+// Package stat is used for retrieving different kind of statistics.
+// sysctl.go is related to sysctl settings
 package stat
 
 import (
@@ -8,11 +10,12 @@ import (
 )
 
 const (
-	PROC_SYSCTL_BASE = "/proc/sys"
+	procSysctlBase = "/proc/sys"
 )
 
+// GetSysctl read sysctl value from local 'procfs' filesystem
 func GetSysctl(sysctl string) (int, error) {
-	data, err := ioutil.ReadFile(path.Join(PROC_SYSCTL_BASE, strings.Replace(sysctl, ".", "/", -1)))
+	data, err := ioutil.ReadFile(path.Join(procSysctlBase, strings.Replace(sysctl, ".", "/", -1)))
 	if err != nil {
 		return -1, err
 	}
@@ -25,5 +28,5 @@ func GetSysctl(sysctl string) (int, error) {
 
 // SetSysctl modifies the specified sysctl flag to the new value
 func SetSysctl(sysctl string, new int) error {
-	return ioutil.WriteFile(path.Join(PROC_SYSCTL_BASE, sysctl), []byte(strconv.Itoa(new)), 0640)
+	return ioutil.WriteFile(path.Join(procSysctlBase, sysctl), []byte(strconv.Itoa(new)), 0640)
 }

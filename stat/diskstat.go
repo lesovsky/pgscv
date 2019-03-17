@@ -1,5 +1,5 @@
-// Stuff related to diskstats which is located at /proc/diskstats.
-
+// Package stat is used for retrieving different kind of statistics.
+// diskstat.go is related to block devices statistics which is located in /proc/diskstats.
 package stat
 
 import (
@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-// Used for storing stats per single device
+// Diskstat is the container for storing stats per single block device
 type Diskstat struct {
 	/* diskstats basic */
 	Major, Minor int     // 1 - major number; 2 - minor mumber
@@ -39,19 +39,19 @@ type Diskstat struct {
 	// But for devices serving requests in parallel, such as RAID arrays and modern SSDs, this number does not reflect their performance limits.
 }
 
-// Container for all stats from proc-file
+// Diskstats is the container for all vlock devices stats
 type Diskstats []Diskstat
 
 const (
-	// The file provides IO statistics of block devices. For more details refer to Linux kernel's Documentation/iostats.txt.
-	PROC_DISKSTATS = "/proc/diskstats"
+	// ProcDiskstats is the file which provides IO statistics of block devices. For more details refer to Linux kernel's Documentation/iostats.txt.
+	ProcDiskstats = "/proc/diskstats"
 )
 
-// Read stats from local procfs source
+// ReadLocal method read stats about block devices from local 'procfs' filesystem
 func (c Diskstats) ReadLocal() error {
-	content, err := ioutil.ReadFile(PROC_DISKSTATS)
+	content, err := ioutil.ReadFile(ProcDiskstats)
 	if err != nil {
-		return fmt.Errorf("failed to read %s", PROC_DISKSTATS)
+		return fmt.Errorf("failed to read %s", ProcDiskstats)
 	}
 	reader := bufio.NewReader(bytes.NewBuffer(content))
 
@@ -72,17 +72,16 @@ func (c Diskstats) ReadLocal() error {
 			&ios.Wcompleted, &ios.Wmerged, &ios.Wsectors, &ios.Wspent,
 			&ios.Ioinprogress, &ios.Tspent, &ios.Tweighted)
 		if err != nil {
-			return fmt.Errorf("failed to scan data from %s", PROC_DISKSTATS)
+			return fmt.Errorf("failed to scan data from %s", ProcDiskstats)
 		}
 
 		ios.Uptime = uptime
 		c[i] = ios
 	}
-
 	return nil
 }
 
-// Function returns value of particular stat of a block device
+// SingleStat method returns value of particular stat of a block device
 func (d Diskstat) SingleStat(stat string) (value float64) {
 	switch stat {
 	case "rcompleted":
@@ -115,10 +114,9 @@ func (d Diskstat) SingleStat(stat string) (value float64) {
 	return value
 }
 
-// IsDeviceRotational checks kind pf the attached storage, is it rotational or not
+// IsDeviceRotational checks kind of the attached storage, and returns true if it is rotational
 func IsDeviceRotational(devpath string) (float64, error) {
 	rotationalFile := devpath + "/queue/rotational"
-	//schedulerFile := d + "/queue/scheduler"
 
 	content, err := ioutil.ReadFile(rotationalFile)
 	if err != nil {
