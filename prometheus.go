@@ -42,16 +42,15 @@ type MetricData struct { // эту структуру должна возвра�
 
 // источник статистики - имя, запрос, список полей-значений и полей-меток
 type StatDesc struct {
-	Name       string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
-	Stype      int                             // тип источника статы - постгрес, баунсер, система и т.п.
-	// TODO: DEPRECATED
-	//Private    bool                            // является ли стата личной для конкретной базы? например стата для таблиц/индексов/функций -- применимо только к постгресовой стате
-	Query      string                          // запрос с помощью которого вытягивается стата из источника
-	ValueNames []string                        // названия полей которые будут использованы как значения метрик
-	ValueTypes map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
-	LabelNames []string                        // названия полей которые будут использованы как метки
-	collectDone bool							// стата уже собрана (для всяких шаредных стат типа pg_stat_bgwriter, pg_stat_database)
-	collectAlways bool							// стату собирать всегда, игнорируя collectDone (для всяких стат типа pg_stat_user_tables и т.п.)
+	Name          string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
+	Stype         int                             // тип источника статы - постгрес, баунсер, система и т.п.
+	Query         string                          // запрос с помощью которого вытягивается стата из источника
+	ValueNames    []string                        // названия полей которые будут использованы как значения метрик
+	ValueTypes    map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
+	LabelNames    []string                        // названия полей которые будут использованы как метки
+	collectDone   bool                            // стата уже собрана (для всяких шаредных стат типа pg_stat_bgwriter, pg_stat_database)
+	collectAlways bool                            // стату собирать всегда, игнорируя collectDone (для всяких стат типа pg_stat_user_tables и т.п.)
+	Schedule      Schedule                        // расписание по которому осуществляется сбор метрик
 }
 
 const (
@@ -106,27 +105,25 @@ var (
 		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
-		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}},
-		{Name: "pg_data_directory", Query: "", LabelNames: []string{"device", "mountpoint"}},
-		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}},
+		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "pg_data_directory", Query: "", LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5*time.Minute}},
 		// system metrics
 		{Name: "node_cpu_usage", Stype: STYPE_SYSTEM, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: STYPE_SYSTEM, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
 		{Name: "node_netdev", Stype: STYPE_SYSTEM, ValueNames: netdevValueNames, LabelNames: []string{"interface"}},
 		{Name: "node_memory", Stype: STYPE_SYSTEM, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
 		{Name: "node_filesystem", Stype: STYPE_SYSTEM, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
-		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}},
-		{Name: "node_hardware_cores", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"state"}},
-		{Name: "node_hardware_scaling_governors", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"governor"}},
-		{Name: "node_hardware_numa", Stype: STYPE_SYSTEM, ValueNames: []string{"nodes"}},
-		{Name: "node_hardware_storage_rotational", Stype: STYPE_SYSTEM, LabelNames: []string{"device", "scheduler"}},
+		{Name: "node_settings", Stype: STYPE_SYSTEM, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "node_hardware_cores", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"state"}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "node_hardware_scaling_governors", Stype: STYPE_SYSTEM, ValueNames: []string{"total"}, LabelNames: []string{"governor"}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "node_hardware_numa", Stype: STYPE_SYSTEM, ValueNames: []string{"nodes"}, Schedule: Schedule{Interval: 5*time.Minute}},
+		{Name: "node_hardware_storage_rotational", Stype: STYPE_SYSTEM, LabelNames: []string{"device", "scheduler"}, Schedule: Schedule{Interval: 5*time.Minute}},
 		// pgbouncer metrics
 		{Name: "pgbouncer_pool", Stype: STYPE_PGBOUNCER, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: STYPE_PGBOUNCER, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
 	}
 )
-
-// TODO: pull режим не отдает системные метрики
 
 //
 func adjustQueries(descs []*StatDesc, pgVersion int) {
@@ -169,7 +166,10 @@ func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
 			} else {
 				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
 			}
-
+			// activate schedule if requested
+			if use_schedule && desc.Schedule.Interval != 0 {
+				desc.Schedule.Activate()
+			}
 		}
 	}
 	return &Exporter{ServiceID: sid, AllDesc: e}, nil
@@ -195,17 +195,40 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 			case STYPE_POSTGRESQL, STYPE_PGBOUNCER:
 				metricsCnt += e.collectPgMetrics(ch, Instances[i])
 			case STYPE_SYSTEM:
-				metricsCnt += e.collectCpuMetrics(ch)
-				metricsCnt += e.collectMemMetrics(ch)
-				metricsCnt += e.collectDiskstatsMetrics(ch)
-				metricsCnt += e.collectNetdevMetrics(ch)
-				metricsCnt += e.collectFsMetrics(ch)
-				metricsCnt += e.collectSysctlMetrics(ch)
-				metricsCnt += e.collectHardwareMetrics(ch)
+				metricsCnt += e.collectSystemMetrics(ch)
 			}
 		}
 	}
 	log.Debugf("%s: generated %d metrics\n", time.Now().Format("2006-01-02 15:04:05"), metricsCnt)
+}
+
+//
+func (e *Exporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
+	funcs := map[string]func(chan<- prometheus.Metric)(int){
+		"node_cpu_usage": e.collectCpuMetrics,
+		"node_diskstats": e.collectDiskstatsMetrics,
+		"node_netdev": e.collectNetdevMetrics,
+		"node_memory": e.collectMemMetrics,
+		"node_filesystem": e.collectFsMetrics,
+		"node_settings": e.collectSysctlMetrics,
+		"node_hardware_cores": e.collectCpuCoresState,
+		"node_hardware_scaling_governors": e.collectCpuScalingGovernors,
+		"node_hardware_numa": e.collectNumaNodes,
+		"node_hardware_storage_rotational": e.collectStorageSchedulers,
+	}
+
+	for _, desc := range statdesc {
+		if desc.Stype != STYPE_SYSTEM {
+			continue
+		}
+		if desc.Schedule.IsActive() && !desc.Schedule.IsExpired(desc.Name) {
+			continue
+		}
+		// execute the method
+		cnt += funcs[desc.Name](ch)
+		desc.Schedule.Update()
+	}
+	return cnt
 }
 
 //
@@ -238,7 +261,12 @@ func (e *Exporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric) (cnt int
 	bdev_cnt, err := stat.CountLinesLocal(stat.PROC_DISKSTATS)
 	if err == nil {
 		diskUtilStat = make(stat.Diskstats, bdev_cnt)
-		diskUtilStat.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
+		err := diskUtilStat.ReadLocal()
+		if err != nil {
+			log.Errorf("failed to collect netdev metrics: %s", err)
+			return 0
+		}
+
 		for _, s := range diskUtilStat {
 			if s.Rcompleted == 0 && s.Wcompleted == 0 {
 				continue // skip devices which never doing IOs
@@ -259,7 +287,12 @@ func (e *Exporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	ifs_cnt, err := stat.CountLinesLocal(stat.PROC_NETDEV)
 	if err == nil {
 		netdevUtil = make(stat.Netdevs, ifs_cnt)
-		netdevUtil.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
+		err := netdevUtil.ReadLocal()
+		if err != nil {
+			log.Errorf("failed to collect netdev metrics: %s", err)
+			return 0
+		}
+
 		for _, s := range netdevUtil {
 			if s.Rpackets == 0 && s.Tpackets == 0 {
 				continue // skip interfaces which never seen packets
@@ -286,7 +319,12 @@ func (e *Exporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
 // Collects metrics about mounted filesystems
 func (e *Exporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var fsStats = make(stat.FsStats, 0, 10)
-	fsStats.ReadLocal() // TODO: errcheck, see collectHardwareMetrics() example
+	err := fsStats.ReadLocal()
+	if err != nil {
+		log.Errorf("failed to collect filesystem metrics: %s", err)
+		return 0
+	}
+
 	for _, fs := range fsStats {
 		for _, usage := range []string{"total_bytes", "free_bytes", "available_bytes", "used_bytes", "reserved_bytes", "reserved_pct"} {
 			// TODO: добавить fstype
@@ -298,7 +336,6 @@ func (e *Exporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 			cnt += 1
 		}
 	}
-
 	return cnt
 }
 
@@ -307,22 +344,22 @@ func (e *Exporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	for _, sysctl := range sysctlList {
 		value, err := stat.GetSysctl(sysctl)
 		if err != nil {
-			log.Errorf("failed to obtain sysctl: err", err)
+			log.Errorf("failed to obtain sysctl: %s", err)
 			continue
 		}
+
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
 		cnt += 1
 	}
-
 	return cnt
 }
 
-// Collects metrics about running system - hardware configuration
-func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int) {
+//
+func (e *Exporter) collectCpuCoresState(ch chan<- prometheus.Metric) (cnt int) {
 	// Collect total number of CPU cores
 	online, offline, err := stat.CountCpu()
 	if err != nil {
-		log.Errorf("failed counting CPUs: err", err)
+		log.Errorf("failed counting CPUs: %s", err)
 		return 0
 	}
 	total := online + offline
@@ -330,13 +367,17 @@ func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int)
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_cores_total"], prometheus.CounterValue, float64(v), state)
 		cnt++
 	}
+	return cnt
+}
 
-	// Collect used scaling governors
+// Collect used scaling governors
+func (e *Exporter) collectCpuScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
 	sg, err := stat.CountScalingGovernors()
 	if err != nil {
-		log.Errorf("failed counting scaling governors: err", err)
+		log.Errorf("failed counting scaling governors: %s", err)
 		return 0
 	}
+
 	if len(sg) > 0 {
 		for k, v := range sg {
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_scaling_governors_total"], prometheus.CounterValue, float64(v), k)
@@ -346,24 +387,23 @@ func (e *Exporter) collectHardwareMetrics(ch chan<- prometheus.Metric) (cnt int)
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_scaling_governors_total"], prometheus.CounterValue, 0, "disabled")
 		cnt++
 	}
+	return cnt
+}
 
-	// Collect total number of NUMA nodes
+// Collect total number of NUMA nodes
+func (e *Exporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt int) {
 	numa, err := stat.CountNumaNodes()
 	if err != nil {
-		log.Errorf("failed counting NUMA nodes: err", err)
-		return cnt
+		log.Errorf("failed counting NUMA nodes: %s", err)
+		return 0
 	}
 	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_numa_nodes"], prometheus.CounterValue, float64(numa))
 	cnt++
-
-	// Collect info about storage (attached HDD, SSD, NVMe, etc.
-	cnt += getStorageInfo(e, ch)
 	return cnt
-
 }
 
-//
-func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
+// Collect info about storage (attached HDD, SSD, NVMe, etc.
+func (e *Exporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt int) {
 	dirs, err := filepath.Glob("/sys/block/*")
 	if err != nil {
 		fmt.Println(err)
@@ -390,7 +430,6 @@ func getStorageInfo(e *Exporter, ch chan<- prometheus.Metric) (cnt int) {
 			cnt++
 		}
 	}
-
 	return cnt
 }
 
@@ -424,7 +463,6 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 			return 0
 		}
 		adjustQueries(statdesc, version)
-
 
 		dblist, err = getDBList(conn)
 		if err != nil {
@@ -477,6 +515,12 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 		if desc.collectDone == true && desc.collectAlways == false {
 			continue // стата собрана, пропускаем в этой базе
 		}
+
+		// check desc's schedule
+		if desc.Schedule.IsActive() && !desc.Schedule.IsExpired(desc.Name) {
+			continue
+		}
+
 		log.Debugf("start collecting %s", desc.Name)
 
 		// если появится еще один desc с пустым запросом могут быть траблы
@@ -484,23 +528,23 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 			if err := getDatadirInfo(e, conn, ch); err != nil {
 				log.Warnf("skip collecting %s: %s", desc.Name, err)
 			} else {
+				desc.Schedule.Update()
 				desc.collectDone = true
 			}
 			continue
 		}
 
 		// check pg_stat_statements availability in this database
-		if desc.Name == "pg_stat_statements" && ! IsPGSSAvailable(conn) {
+		if desc.Name == "pg_stat_statements" && !IsPGSSAvailable(conn) {
 			log.Debugln("skip collecting pg_stat_statements in this database")
 			continue
 		}
 
 		rows, err := conn.Query(desc.Query)
-		// Errors aren't critical for us, remember and show them to the user.
-		// Return after the error, because there is no reason to continue.
+		// Errors aren't critical for us, remember and show them to the user. Return after the error, because there is no reason to continue.
 		if err != nil {
 			log.Warnf("skip collecting %s, failed to execute query: %s", desc.Name, err)
-			continue // если произошла ошибка, то пропускаем этот конкретный шаг сбора статы
+			continue
 		}
 
 		var container []sql.NullString
@@ -563,9 +607,12 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 				}
 			}
 		}
+		// if schedule active, update its timestamp
+		desc.Schedule.Update()
 		// if we're here, it means stats collected successfully and no errors occurred
 		desc.collectDone = true
 		log.Debugf("%s collected", desc.Name)
+
 		if err := rows.Close(); err != nil {
 			log.Debugf("metrics collected, but failed to close rows: %s, ignore", err)
 		}
@@ -582,20 +629,19 @@ func IsPGSSAvailable(conn *sql.DB) bool {
 	var v_count int
 	if err := conn.QueryRow(pgCheckPGSSExists).Scan(&v_exists); err != nil {
 		log.Debugln("failed to check pg_stat_statements view in information_schema")
-		return false	// failed to query information_schema
+		return false // failed to query information_schema
 	}
 	if v_exists == false {
 		log.Debugln("pg_stat_statements is not available in this database")
-		return false	// failed to query information_schema
+		return false // pg_stat_statements is not available
 	} else {
-		if err = conn.QueryRow(pgCheckPGSSCount).Scan(&v_count); err != nil {
+		if err := conn.QueryRow(pgCheckPGSSCount).Scan(&v_count); err != nil {
 			log.Debugln("pg_stat_statements exists but not queryable")
-			return false	// view exists, but unavailable for queries - empty shared_preload_libraries ?
+			return false // view exists, but unavailable for queries - empty shared_preload_libraries ?
 		}
 	}
 	return true
 }
-
 
 // getDatadirInfo evaluates data_directory's mountpoint
 func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) (err error) {

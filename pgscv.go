@@ -23,12 +23,11 @@ const (
 var (
 	promPushGw       = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").Envar("PROM_PUSHGATEWAY").String()
 	promPushInterval = kingpin.Flag("prom.pushinterval", "Interval between pushes").Default("10s").Envar("PROM_PUSHINTERVAL").Duration()
+	cfId             = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").Envar("PGSCV_CFID").String()
 
-	cfId = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").Envar("PGSCV_CFID").String()
-
-	err          error // TODO: может таки от нее можно избавиться?
 	wg           sync.WaitGroup
 	start_listen = make(chan int8)
+	use_schedule bool
 )
 
 func main() {
@@ -39,6 +38,10 @@ func main() {
 	// обязательно должен быть
 	if *cfId == "" {
 		log.Fatalln("global system identifier must be specified.")
+	}
+	// use schedulers in push mode
+	if *promPushGw != "" {
+		use_schedule = true
 	}
 
 	wg.Add(1)

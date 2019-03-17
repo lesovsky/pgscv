@@ -142,15 +142,16 @@ func setupInstances() error {
 				// nothing to do
 			}
 
-			tmp.Worker, err = NewExporter(tmp.InstanceType, tmp.CFamilyId, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
+			e, err := NewExporter(tmp.InstanceType, tmp.CFamilyId, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
 			if err != nil {
 				return err
 			}
+			tmp.Worker = e
 
 			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
 			if *promPushGw == "" {
 				prometheus.MustRegister(tmp.Worker)
-				log.Debugln("auto-discovery: exporter registered for process with pid %d", tmp.Pid)
+				log.Debugf("auto-discovery: exporter registered for %s with pid %d", tmp.ServiceId, tmp.Pid)
 			}
 
 			Instances[i] = tmp
