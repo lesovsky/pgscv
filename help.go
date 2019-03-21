@@ -20,6 +20,7 @@ var (
 		"pg_stat_database_blk_read_time":  "Time spent reading data file blocks by backends, in milliseconds",
 		"pg_stat_database_blk_write_time": "Time spent writing data file blocks by backends, in milliseconds",
 		"pg_stat_database_db_size":        "Size of the database, in bytes",
+		"pg_stat_database_stats_age_seconds": "Age of the collected statistics, in seconds",
 		// pg_stat_user_tables
 		"pg_stat_user_tables_seq_scan":            "Number of sequential scans initiated",
 		"pg_stat_user_tables_seq_tup_read":        "Number of live rows fetched by sequential scans",

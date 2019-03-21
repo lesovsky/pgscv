@@ -3,9 +3,9 @@ package main
 
 var (
 	pgVersionNumQuery = "SELECT current_setting('server_version_num')"
-	pgGetSysIdQuery   = "SELECT system_identifier FROM pg_control_system()"
+	//pgGetSysIdQuery   = "SELECT system_identifier FROM pg_control_system()"
 
-	pgStatDatabaseQuery      = "SELECT datid, datname, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as db_size FROM pg_stat_database"
+	pgStatDatabaseQuery      = "SELECT datid, datname, xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as db_size, coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)"
 	pgStatUserTablesQuery    = "SELECT current_database() AS datname, schemaname, relname, seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, n_mod_since_analyze, vacuum_count, autovacuum_count, analyze_count, autoanalyze_count FROM pg_stat_user_tables"
 	pgStatioUserTablesQuery  = "SELECT current_database() AS datname, schemaname, relname, heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit FROM pg_statio_user_tables"
 	pgStatUserIndexesQuery   = "SELECT current_database() AS datname, schemaname, relname, indexrelname, idx_scan, idx_tup_read, idx_tup_fetch FROM pg_stat_user_indexes"
@@ -71,19 +71,16 @@ var (
 		UNION SELECT 'active' AS state, count(*) filter (where active) AS conn FROM pg_replication_slots
 		UNION SELECT 'inactive' AS state, count(*) filter (where not active) AS conn FROM pg_replication_slots`
 
-	// TODO: remove 512 limit and p.calls > 100 ?
 	pgStatStatementsQuery = `SELECT
-					    a.rolname AS usename, d.datname AS datname, p.queryid,
-					    regexp_replace(regexp_replace(left(p.query, 512),E'( |\t)+',' ','g'),E'\n', '', 'g') AS query,
-    					p.calls, p.total_time, p.rows,
+					    pg_get_userbyid(p.userid) AS usename, d.datname AS datname, p.queryid,
+					    regexp_replace(left(p.query, 1024),E'\\s+', ' ', 'g') AS query,
+						p.calls, p.rows,
+						p.total_time, p.blk_read_time, p.blk_write_time,
     					p.shared_blks_hit, p.shared_blks_read, p.shared_blks_dirtied, p.shared_blks_written,
     					p.local_blks_hit, p.local_blks_read, p.local_blks_dirtied, p.local_blks_written,
-    					p.temp_blks_read, p.temp_blks_written,
-    					p.blk_read_time, p.blk_write_time
+						p.temp_blks_read, p.temp_blks_written
 					FROM pg_stat_statements p
-					JOIN pg_roles a ON a.oid=p.userid
-					JOIN pg_database d ON d.oid=p.dbid
-					WHERE p.calls > 100`
+					JOIN pg_database d ON d.oid=p.dbid`
 
 	pgStatBasebackupQuery = "SELECT count(pid) AS count, coalesce(extract(epoch from max(clock_timestamp() - backend_start)), 0) AS duration_seconds_max FROM pg_stat_replication WHERE state = 'backup'"
 
