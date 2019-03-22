@@ -138,6 +138,7 @@ var (
 		// pg schema
 		"pg_schema_non_pk_table_exists": "PostgreSQL table with no PRIMARY KEY",
 		"pg_schema_invalid_index_exists": "PostgreSQL invalid index",
+		"pg_schema_non_indexed_fkey_exists": "PostgreSQL non-indexed foreign key",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
 		// node /proc/diskstats metrics
