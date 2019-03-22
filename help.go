@@ -135,6 +135,8 @@ var (
 		// pg_locks
 		// pg_settings
 		"pg_settings_guc": "Postgres configuration settings",
+		// pg schema
+		"pg_schema_non_pk_table_exists": "PostgreSQL table with no PRIMARY KEY",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
 		// node /proc/diskstats metrics

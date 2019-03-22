@@ -12,29 +12,29 @@ type Schedule struct {
 	LastFired time.Time     // timestamp of last collect
 }
 
-// Activate method activates existing schedule
-func (s *Schedule) Activate() {
+// ActivateSchedule method activates existing schedule
+func (s *StatDesc) ActivateSchedule() {
 	s.Active = true
 }
 
-// IsActive method returns true if the schedule is active
-func (s *Schedule) IsActive() bool {
+// IsScheduleActive method returns true if the schedule is active
+func (s *StatDesc) IsScheduleActive() bool {
 	return s.Active
 }
 
-// IsExpired method returns true if schedule's time is up
-func (s *Schedule) IsExpired(name string) bool {
+// IsScheduleExpired method returns true if schedule's time is up
+func (s *StatDesc) IsScheduleExpired() bool {
 	elapsed := time.Since(s.LastFired)
 	if elapsed < s.Interval {
 		return false
 	}
-	log.Debugf("time for %s, elapsed: %v > %v", name, elapsed, s.Interval)
+	log.Debugf("time for %s, elapsed: %v > %v", s.Name, elapsed, s.Interval)
 	return true
 }
 
-// Update method updates time when schedule was executed
-func (s *Schedule) Update() {
-	if s.Active {
+// ScheduleUpdateExpired method updates schedule when it's expired
+func (s *StatDesc) ScheduleUpdateExpired() {
+	if s.Active && s.IsScheduleExpired() {
 		s.LastFired = time.Now()
 	}
 }

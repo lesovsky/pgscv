@@ -43,7 +43,7 @@ type Exporter struct {
 //}
 // *** DEPRECATED ***
 
-// StatDesc is the statistics descriptor, with detailed info about this kind of stats
+// StatDesc is the statistics descriptor, with detailed info about particular kind of stats
 type StatDesc struct {
 	Name          string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
 	Stype         int                             // тип источника статы - постгрес, баунсер, система и т.п.
@@ -52,8 +52,8 @@ type StatDesc struct {
 	ValueTypes    map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
 	LabelNames    []string                        // названия полей которые будут использованы как метки
 	collectDone   bool                            // стата уже собрана (для всяких шаредных стат типа pg_stat_bgwriter, pg_stat_database)
-	collectAlways bool                            // стату собирать всегда, игнорируя collectDone (для всяких стат типа pg_stat_user_tables и т.п.)
-	Schedule      Schedule                        // расписание по которому осуществляется сбор метрик
+	collectOneshot bool                            // стату собирать только один раз за раунд, (например всякие шаредные статы тип pg_stat_database)
+	Schedule                              // расписание по которому осуществляется сбор метрик
 }
 
 const (
@@ -89,28 +89,31 @@ var (
 		"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
 
 	statdesc = []*StatDesc{
-		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
-		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, collectAlways: true, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_statio_user_tables", Query: pgStatioUserTablesQuery, collectAlways: true, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, collectAlways: true, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, collectAlways: true, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_stat_bgwriter", Query: pgStatBgwriterQuery, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_user_functions", Query: pgStatUserFunctionsQuery, collectAlways: true, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
-		{Name: "pg_stat_activity", Query: pgStatActivityQuery, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
-		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
-		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
-		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
-		{Name: "pg_replication_standby", Query: pgReplicationStandbyCount, ValueNames: []string{"count"}, LabelNames: []string{}},
-		{Name: "pg_recovery", Query: pgRecoveryStatusQuery, ValueNames: []string{"status"}},
-		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
-		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
-		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_data_directory", Query: "", LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_settings", Query: pgSettingsGucQuery, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		// system metrics
+		// collect oneshot -- these Postgres statistics are collected once per round
+		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
+		{Name: "pg_stat_bgwriter", Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_user_functions", Query: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
+		{Name: "pg_stat_activity", Query: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
+		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
+		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, collectOneshot: true, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
+		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, collectOneshot: true, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_replication_standby", Query: pgReplicationStandbyCount, collectOneshot: true, ValueNames: []string{"count"}, LabelNames: []string{}},
+		{Name: "pg_recovery", Query: pgRecoveryStatusQuery, collectOneshot: true, ValueNames: []string{"status"}},
+		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
+		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
+		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_data_directory", Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_settings", Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		// collect always -- these Postgres statistics are collected every time in all databases
+		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_statio_user_tables", Query: pgStatioUserTablesQuery, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_schema_non_pk_table", Query: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		// system metrics are always oneshot, there is no 'database' entity
 		{Name: "node_cpu_usage", Stype: stypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: stypeSystem, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
 		{Name: "node_netdev", Stype: stypeSystem, ValueNames: netdevValueNames, LabelNames: []string{"interface"}},
@@ -121,7 +124,7 @@ var (
 		{Name: "node_hardware_scaling_governors", Stype: stypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"governor"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "node_hardware_numa", Stype: stypeSystem, ValueNames: []string{"nodes"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "node_hardware_storage_rotational", Stype: stypeSystem, LabelNames: []string{"device", "scheduler"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		// pgbouncer metrics
+		// pgbouncer metrics are always oneshot, there is only one 'database' entity
 		{Name: "pgbouncer_pool", Stype: stypePgbouncer, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: stypePgbouncer, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
 	}
@@ -170,7 +173,7 @@ func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
 			}
 			// activate schedule if requested
 			if useSchedule && desc.Schedule.Interval != 0 {
-				desc.Schedule.Activate()
+				desc.ActivateSchedule()
 			}
 		}
 	}
@@ -223,12 +226,12 @@ func (e *Exporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 		if desc.Stype != stypeSystem {
 			continue
 		}
-		if desc.Schedule.IsActive() && !desc.Schedule.IsExpired(desc.Name) {
+		if desc.IsScheduleActive() && !desc.IsScheduleExpired() {
 			continue
 		}
 		// execute the method
 		cnt += funcs[desc.Name](ch)
-		desc.Schedule.Update()
+		desc.ScheduleUpdateExpired()
 	}
 	return cnt
 }
@@ -349,7 +352,6 @@ func (e *Exporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
 			log.Errorf("failed to obtain sysctl: %s", err)
 			continue
 		}
-
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
 		cnt += 1
 	}
@@ -379,7 +381,6 @@ func (e *Exporter) collectCpuScalingGovernors(ch chan<- prometheus.Metric) (cnt 
 		log.Errorf("failed counting scaling governors: %s", err)
 		return 0
 	}
-
 	if len(sg) > 0 {
 		for k, v := range sg {
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_scaling_governors_total"], prometheus.CounterValue, float64(v), k)
@@ -480,11 +481,12 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		dblist = []string{"pgbouncer"}
 	}
 
-	// Before start collecting, do reset all 'collectDone' flags
+	// Before start the collecting, resetting all 'collectDone' flags
 	for _, desc := range statdesc {
 		desc.collectDone = false
 	}
 
+	// Run collecting round, go through databases and collect required statistics
 	for _, dbname := range dblist {
 		instance.Dbname = dbname
 
@@ -498,6 +500,12 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		e.getDBStat(conn, ch, instance.InstanceType)
 		if err := conn.Close(); err != nil {
 			log.Warnf("failed to close the connection %s@%s:%d/%s: %s", instance.User, instance.Host, instance.Port, instance.Dbname, err)
+		}
+	}
+	// After collecting, update expired schedules. Don't update schedules inside the collecting round, because that might cancel collecting non-oneshot statistics
+	for _, desc := range statdesc {
+		if desc.collectDone {
+			desc.ScheduleUpdateExpired()
 		}
 	}
 	return cnt
@@ -514,13 +522,12 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 		if desc.Stype != itype {
 			continue
 		}
-
-		if desc.collectDone == true && desc.collectAlways == false {
-			continue // стата собрана, пропускаем в этой базе
+		// Check the schedule, skip if not expired
+		if desc.IsScheduleActive() && ! desc.IsScheduleExpired() {
+			continue
 		}
-
-		// check desc's schedule
-		if desc.Schedule.IsActive() && !desc.Schedule.IsExpired(desc.Name) {
+		// Skip collecting if statistics is oneshot and already collected (in the previous database)
+		if desc.collectDone && desc.collectOneshot {
 			continue
 		}
 
@@ -531,7 +538,7 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 			if err := getDatadirInfo(e, conn, ch); err != nil {
 				log.Warnf("skip collecting %s: %s", desc.Name, err)
 			} else {
-				desc.Schedule.Update()
+				desc.ScheduleUpdateExpired()
 				desc.collectDone = true
 			}
 			continue
@@ -544,7 +551,6 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 		}
 
 		rows, err := conn.Query(desc.Query)
-		// Errors aren't critical for us, remember and show them to the user. Return after the error, because there is no reason to continue.
 		if err != nil {
 			log.Warnf("skip collecting %s, failed to execute query: %s", desc.Name, err)
 			continue
@@ -556,7 +562,9 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 		colnames, _ := rows.Columns()
 		ncols := len(colnames)
 
+		var noRows = true
 		for rows.Next() {
+			noRows = false
 			pointers = make([]interface{}, ncols)
 			container = make([]sql.NullString, ncols)
 
@@ -610,15 +618,15 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 				}
 			}
 		}
-		// if schedule active, update its timestamp
-		desc.Schedule.Update()
-		// if we're here, it means stats collected successfully and no errors occurred
+		if err := rows.Close(); err != nil {
+			log.Debugf("failed to close rows: %s, ignore", err)
+		}
+		if noRows {
+			log.Debugf("no rows returned for %s", desc.Name)
+			continue
+		}
 		desc.collectDone = true
 		log.Debugf("%s collected", desc.Name)
-
-		if err := rows.Close(); err != nil {
-			log.Debugf("metrics collected, but failed to close rows: %s, ignore", err)
-		}
 	}
 }
 
