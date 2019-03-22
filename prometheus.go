@@ -113,6 +113,7 @@ var (
 		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
 		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
 		{Name: "pg_schema_non_pk_table", Query: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_invalid_index", Query: pgSchemaInvalidIndexesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// system metrics are always oneshot, there is no 'database' entity
 		{Name: "node_cpu_usage", Stype: stypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: stypeSystem, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},

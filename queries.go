@@ -117,4 +117,5 @@ CASE WHEN vartype IN ('string', 'enum', 'bool') THEN setting END AS secondary
 FROM pg_show_all_settings()`
 
 	pgSchemaNonPrimaryKeyTablesQuery = `SELECT current_database() AS datname, t.nspname AS schemaname, t.relname AS relname, 1 AS exists FROM (SELECT c.oid, c.relname, n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'r' AND n.nspname NOT IN('pg_catalog', 'information_schema')) AS t LEFT OUTER JOIN pg_constraint c ON c.contype = 'p' AND c.conrelid = t.oid WHERE c.conname IS NULL`
+	pgSchemaInvalidIndexesQuery = `SELECT current_database() AS datname, t.nspname AS schemaname, i.indrelid::regclass AS relname, i.indexrelid::regclass AS indexrelname, 1 AS exists FROM (SELECT c.oid, c.relname, n.nspname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE c.relkind = 'i' AND n.nspname NOT IN('pg_catalog', 'information_schema')) AS t JOIN pg_index i ON t.oid = i.indexrelid WHERE NOT i.indisvalid`
 )
