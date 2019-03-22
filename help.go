@@ -136,9 +136,9 @@ var (
 		// pg_settings
 		"pg_settings_guc": "Postgres configuration settings",
 		// pg schema
-		"pg_schema_non_pk_table_exists": "PostgreSQL table with no PRIMARY KEY",
-		"pg_schema_invalid_index_exists": "PostgreSQL invalid index",
-		"pg_schema_non_indexed_fkey_exists": "PostgreSQL non-indexed foreign key",
+		"pg_schema_non_pk_table_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname of relation with no primary key",
+		"pg_schema_invalid_index_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, indexrelname of index which is invalid",
+		"pg_schema_non_indexed_fkey_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, colnames, constraint, referenced of foreign key constrint which has no index",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
 		// node /proc/diskstats metrics
