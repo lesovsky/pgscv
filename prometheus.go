@@ -119,6 +119,7 @@ var (
 		{Name: "pg_schema_non_indexed_fkey", Stype:stypePostgresql, Query: pgSchemaNonIndexedFKQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_schema_redundant_index", Stype:stypePostgresql, Query: pgSchemaRedundantIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_schema_sequence_fullness", Stype:stypePostgresql, Query: pgSchemaSequencesFullnessQuery, ValueNames: []string{"ratio"}, LabelNames: []string{"datname", "schemaname", "seqname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_fkey_columns_mismatch", Stype:stypePostgresql, Query: pgSchemaFkeyColumnsMismatch, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// system metrics are always oneshot, there is no 'database' entity
 		{Name: "node_cpu_usage", Stype: stypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: stypeSystem, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},

@@ -141,6 +141,7 @@ var (
 		"pg_schema_non_indexed_fkey_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, colnames, constraint, referenced of foreign key constrint which has no index",
 		"pg_schema_redundant_index_bytes": "Size occupied by redundant index, in bytes",
 		"pg_schema_sequence_fullness_ratio": "Fullness ratio of the sequence, in percent",
+		"pg_schema_fkey_columns_mismatch_exists": "A metric with a constant '1' value labeled by datname, schemanames, relnames, colnames of fkey whose columns have different type",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
 		// node /proc/diskstats metrics
