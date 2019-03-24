@@ -57,9 +57,11 @@ type StatDesc struct {
 }
 
 const (
-	stypePostgresql = iota
+	stypeDisabled = iota
+	stypePostgresql
 	stypePgbouncer
 	stypeSystem
+
 
 	// regexp describes raw block devices except their partitions, but including stacked devices, such as device-mapper and mdraid
 	regexpBlockDevicesExtended = `((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`
@@ -90,32 +92,33 @@ var (
 
 	statdesc = []*StatDesc{
 		// collect oneshot -- these Postgres statistics are collected once per round
-		{Name: "pg_stat_database", Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
-		{Name: "pg_stat_bgwriter", Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_user_functions", Query: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
-		{Name: "pg_stat_activity", Query: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_activity_autovac", Query: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_statements", Query: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
-		{Name: "pg_stat_replication", Query: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
-		{Name: "pg_replication_slots_restart_lag", Query: pgReplicationSlotsQuery, collectOneshot: true, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
-		{Name: "pg_replication_slots", Query: pgReplicationSlotsCountQuery, collectOneshot: true, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
-		{Name: "pg_replication_standby", Query: pgReplicationStandbyCount, collectOneshot: true, ValueNames: []string{"count"}, LabelNames: []string{}},
-		{Name: "pg_recovery", Query: pgRecoveryStatusQuery, collectOneshot: true, ValueNames: []string{"status"}},
-		{Name: "pg_stat_database_conflicts", Query: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_basebackup", Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
-		{Name: "pg_stat_current_temp", Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
-		{Name: "pg_wal_directory", Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_data_directory", Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_settings", Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_stat_database", Stype:stypePostgresql, Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
+		{Name: "pg_stat_bgwriter", Stype:stypePostgresql, Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_user_functions", Stype:stypePostgresql, Query: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
+		{Name: "pg_stat_activity", Stype:stypePostgresql, Query: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_activity_autovac", Stype:stypePostgresql, Query: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_statements", Stype:stypePostgresql, Query: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
+		{Name: "pg_stat_replication", Stype:stypePostgresql, Query: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
+		{Name: "pg_replication_slots_restart_lag", Stype:stypePostgresql, Query: pgReplicationSlotsQuery, collectOneshot: true, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
+		{Name: "pg_replication_slots", Stype:stypePostgresql, Query: pgReplicationSlotsCountQuery, collectOneshot: true, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_replication_standby", Stype:stypePostgresql, Query: pgReplicationStandbyCount, collectOneshot: true, ValueNames: []string{"count"}, LabelNames: []string{}},
+		{Name: "pg_recovery", Stype:stypePostgresql, Query: pgRecoveryStatusQuery, collectOneshot: true, ValueNames: []string{"status"}},
+		{Name: "pg_stat_database_conflicts", Stype:stypePostgresql, Query: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_basebackup", Stype:stypePostgresql, Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
+		{Name: "pg_stat_current_temp", Stype:stypePostgresql, Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
+		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_data_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_settings", Stype:stypePostgresql, Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// collect always -- these Postgres statistics are collected every time in all databases
-		{Name: "pg_stat_user_tables", Query: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_statio_user_tables", Query: pgStatioUserTablesQuery, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_stat_user_indexes", Query: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_statio_user_indexes", Query: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_schema_non_pk_table", Query: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_invalid_index", Query: pgSchemaInvalidIndexesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_non_indexed_fkey", Query: pgSchemaNonIndexedFKQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_redundant_index", Query: pgSchemaRedundantIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_stat_user_tables", Stype:stypePostgresql, Query: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_statio_user_tables", Stype:stypePostgresql, Query: pgStatioUserTablesQuery, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_stat_user_indexes", Stype:stypePostgresql, Query: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_statio_user_indexes", Stype:stypePostgresql, Query: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_schema_non_pk_table", Stype:stypePostgresql, Query: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_invalid_index", Stype:stypePostgresql, Query: pgSchemaInvalidIndexesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_non_indexed_fkey", Stype:stypePostgresql, Query: pgSchemaNonIndexedFKQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_redundant_index", Stype:stypePostgresql, Query: pgSchemaRedundantIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_sequence_fullness", Stype:stypePostgresql, Query: pgSchemaSequencesFullnessQuery, ValueNames: []string{"ratio"}, LabelNames: []string{"datname", "schemaname", "seqname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// system metrics are always oneshot, there is no 'database' entity
 		{Name: "node_cpu_usage", Stype: stypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
 		{Name: "node_diskstats", Stype: stypeSystem, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
@@ -151,6 +154,10 @@ func adjustQueries(descs []*StatDesc, pgVersion int) {
 			switch {
 			case pgVersion < 100000:
 				desc.Query = pgStatWalSizeQuery96
+			}
+		case "pg_schema_sequence_fullness":
+			if pgVersion < 100000 {
+				desc.Stype = stypeDisabled
 			}
 		}
 	}

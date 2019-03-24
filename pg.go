@@ -44,7 +44,7 @@ const (
 
 // CreateConn assembles 'libpq' connection string, connects to Postgres and returns 'connection' object
 func CreateConn(c *Instance) (conn *sql.DB, err error) {
-	if c.InstanceType >= stypeSystem {
+	if c.InstanceType != stypePostgresql && c.InstanceType != stypePgbouncer {
 		return nil, nil
 	}
 
