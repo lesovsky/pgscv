@@ -137,7 +137,7 @@ var (
 		"pg_settings_guc": "Postgres configuration settings",
 		// pg schema
 		"pg_schema_non_pk_table_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname of relation with no primary key",
-		"pg_schema_invalid_index_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, indexrelname of index which is invalid",
+		"pg_schema_invalid_index_bytes": "Total size of invalid index, in bytes",
 		"pg_schema_non_indexed_fkey_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, colnames, constraint, referenced of foreign key constrint which has no index",
 		"pg_schema_redundant_index_bytes": "Size occupied by redundant index, in bytes",
 		"pg_schema_sequence_fullness_ratio": "Fullness ratio of the sequence, in percent",
