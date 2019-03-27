@@ -40,7 +40,7 @@ var (
 					pg_xlog_location_diff(write_location, flush_location) AS flush_lag_bytes,
 					pg_xlog_location_diff(flush_location, replay_location) AS replay_lag_bytes,
 					pg_xlog_location_diff(pg_current_xlog_location(), replay_location) AS total_lag_bytes
-				FROM pg_stat_replication`
+				FROM pg_stat_replication WHERE state != 'backup' AND application_name != 'pg_basebackup'`
 
 	pgStatReplicationQuery = `SELECT coalesce(client_addr, '127.0.0.1') AS client_addr,
 					application_name,
@@ -53,13 +53,15 @@ var (
 					extract(epoch from write_lag) as write_lag_sec,
 					extract(epoch from flush_lag) as flush_lag_sec,
 					extract(epoch from replay_lag) as replay_lag_sec
-				FROM pg_stat_replication`
+				FROM pg_stat_replication WHERE state != 'backup' AND application_name != 'pg_basebackup'`
 
 	pgReplicationSlotsQuery96 = `SELECT slot_name, active::int,pg_xlog_location_diff(pg_current_xlog_location(), restart_lsn) AS bytes FROM pg_replication_slots`
 
 	pgReplicationSlotsQuery = `SELECT slot_name, active::int,pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn) AS bytes FROM pg_replication_slots`
 
-	pgReplicationStandbyCount = `SELECT count(1) FROM pg_stat_replication`
+	pgReplicationStandbyCount = `SELECT count(1) FROM pg_stat_replication WHERE state != 'backup' AND application_name != 'pg_basebackup'`
+
+	pgStatBasebackupQuery = "SELECT count(pid) AS count, coalesce(extract(epoch from max(clock_timestamp() - backend_start)), 0) AS duration_seconds_max FROM pg_stat_replication WHERE state = 'backup'"
 
 	pgRecoveryStatusQuery = `SELECT pg_is_in_recovery()::int AS status`
 
@@ -81,8 +83,6 @@ var (
 						p.temp_blks_read, p.temp_blks_written
 					FROM pg_stat_statements p
 					JOIN pg_database d ON d.oid=p.dbid`
-
-	pgStatBasebackupQuery = "SELECT count(pid) AS count, coalesce(extract(epoch from max(clock_timestamp() - backend_start)), 0) AS duration_seconds_max FROM pg_stat_replication WHERE state = 'backup'"
 
 	pgStatCurrentTempFilesQuery = `WITH RECURSIVE tablespace_dirs AS (
 					SELECT dirname, 'pg_tblspc/' || dirname || '/' AS path, 1 AS depth FROM pg_catalog.pg_ls_dir('pg_tblspc/', true, false) AS dirname
