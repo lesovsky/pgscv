@@ -126,7 +126,8 @@ var (
 		"pg_stat_basebackup_count":                "Total number of basebackups currently running",
 		"pg_stat_basebackup_duration_seconds_max": "Duration of the longest basebackup",
 		"pg_wal_directory_size_bytes":             "Total size of WAL directory",
-		"pg_data_directory":                       "Details about data_directory",
+		"pg_wal_directory":                        "A metric with a constant '1' value with details about WAL directory",
+		"pg_data_directory":                       "A metric with a constant '1' value with details about DATA directory",
 		// active temp files
 		"pg_stat_current_temp_files_total":                 "Total number of active temp files",
 		"pg_stat_current_temp_bytes_total":                 "Total amount of space used by temp files, in bytes",

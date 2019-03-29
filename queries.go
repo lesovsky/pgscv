@@ -105,7 +105,7 @@ var (
     				coalesce(extract(epoch from clock_timestamp() - min((file_stat).access)), 0) AS oldest_file_age_seconds_max
 				FROM temp_files GROUP BY 1`
 
-	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`
+	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`	// TODO: in this case 'archive_status' accounts as a segment
 	pgStatWalSizeQuery   = `SELECT sum(size) AS size_bytes FROM pg_ls_waldir()`
 
 	pgSettingsGucQuery = `SELECT name, unit,

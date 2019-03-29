@@ -159,19 +159,22 @@ func resolveDeviceMapperName(device string) string {
 }
 
 // RewritePath searches symlinks, follows to origin and rewrite passed path
-func RewritePath(path string) string {
+func RewritePath(path string) (string, error) {
 	// TODO: might fail with more than one symlink used in the path =)
 	parts := strings.Split(path, "/")
 	for i := len(parts); i > 0; i-- {
 		if subpath := strings.Join(parts[0:i], "/"); subpath != "" {
 			// check is subpath a symlink, if symlink - dereference it
-			fi, _ := os.Lstat(subpath)
+			fi, err := os.Lstat(subpath)
+			if err != nil {
+				return "", err
+			}
 			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, _ := os.Readlink(subpath)
 				newpath := resolvedLink + "/" + strings.Join(parts[i:], "/")
-				return newpath
+				return newpath, nil
 			}
 		}
 	}
-	return path
+	return path, nil
 }

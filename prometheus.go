@@ -107,6 +107,7 @@ var (
 		{Name: "pg_stat_basebackup", Stype:stypePostgresql, Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Stype:stypePostgresql, Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
 		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_data_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_settings", Stype:stypePostgresql, Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// collect always -- these Postgres statistics are collected every time in all databases
@@ -458,6 +459,7 @@ func (e *Exporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt in
 // После того как стата собрана, на основе данных хранилища формируем метрики для прометеуса. Учитывая что шаредная стата уже собрана, в последующих циклам собираем только приватную стату. И так пока на дойдем до конца списка баз
 func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instance) (cnt int) {
 	var dblist []string
+	var version int		// version of Postgres or Pgbouncer or something else?
 
 	// формируем список баз -- как минимум в этот список будет входить база из автодискавери
 	if instance.InstanceType == stypePostgresql {
@@ -472,7 +474,6 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 			return 0
 		}
 		// адаптируем запросы под конкретную версию
-		var version int
 		if err := conn.QueryRow(pgVersionNumQuery).Scan(&version); err != nil {
 			log.Warnf("skip collecting stats for %s, failed to obtain postgresql version: %s", instance.ServiceId, err)
 			return 0
@@ -508,7 +509,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		}
 
 		// собираем стату БД, в зависимости от типа это может быть баунсерная или постгресовая стата
-		e.getDBStat(conn, ch, instance.InstanceType)
+		e.getDBStat(conn, ch, instance.InstanceType, version)
 		if err := conn.Close(); err != nil {
 			log.Warnf("failed to close the connection %s@%s:%d/%s: %s", instance.User, instance.Host, instance.Port, instance.Dbname, err)
 		}
@@ -527,7 +528,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 // Шаредная стата описывает кластер целиком, приватная относится к конкретной базе и описывает таблицы/индексы/функции которые принадлежат этой базе
 // Для сбора статы обходим все имеющиеся источники и пропускаем ненужные. Далее выполняем запрос ассоциированный с источником и делаем его в подключение.
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
-func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int) {
+func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) {
 	// обходим по всем источникам
 	for _, desc := range statdesc {
 		if desc.Stype != itype {
@@ -544,9 +545,9 @@ func (e *Exporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype in
 
 		log.Debugf("start collecting %s", desc.Name)
 
-		// если появится еще один desc с пустым запросом могут быть траблы
+		// обрабатываем статки с пустым запросом
 		if desc.Query == "" {
-			if err := getDatadirInfo(e, conn, ch); err != nil {
+			if err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
 				log.Warnf("skip collecting %s: %s", desc.Name, err)
 			} else {
 				desc.ScheduleUpdateExpired()
@@ -664,21 +665,34 @@ func IsPGSSAvailable(conn *sql.DB) bool {
 	return true
 }
 
-// getDatadirInfo evaluates data_directory's mountpoint
-func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) (err error) {
-	var dataDir string
-	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dataDir); err != nil {
+// getPostgresDirInfo evaluates mountpoint of Postgres directory
+func getPostgresDirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric, target string, version int) (err error) {
+	var dirpath string
+	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dirpath); err != nil {
 		return err
+	}
+	if target == "pg_wal_directory" {
+		if  version >= 100000 {
+			dirpath = dirpath + "/pg_wal"
+		} else {
+			dirpath = dirpath + "/pg_xlog"
+		}
 	}
 
 	mountpoints := stat.ReadMounts()
-	dirpath := stat.RewritePath(dataDir)
+	realpath, err := stat.RewritePath(dirpath)
+	if err != nil {
+		return err
+	}
 
-	parts := strings.Split(dirpath, "/")
+	parts := strings.Split(realpath, "/")
 	for i := len(parts); i > 0; i-- {
 		if subpath := strings.Join(parts[0:i], "/"); subpath != "" {
 			// check is subpath a symlink? if symlink - dereference and replace it
-			fi, _ := os.Lstat(subpath)
+			fi, err := os.Lstat(subpath)
+			if err != nil {
+				return err
+			}
 			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, err := os.Readlink(subpath)
 				if err != nil {
@@ -690,12 +704,12 @@ func getDatadirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric) (err
 				}
 			}
 			if device, ok := mountpoints[subpath]; ok {
-				ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, subpath)
+				ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, subpath)
 				return nil
 			}
 		} else {
 			device := mountpoints["/"]
-			ch <- prometheus.MustNewConstMetric(e.AllDesc["pg_data_directory"], prometheus.GaugeValue, 1, device, "/")
+			ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, "/")
 			return nil
 		}
 	}
