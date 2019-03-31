@@ -128,6 +128,7 @@ var (
 		"pg_wal_directory_size_bytes":             "Total size of WAL directory",
 		"pg_wal_directory":                        "A metric with a constant '1' value with details about WAL directory",
 		"pg_data_directory":                       "A metric with a constant '1' value with details about DATA directory",
+		"pg_catalog_size_bytes":                   "Total size of pg_catalog, in bytes",
 		// active temp files
 		"pg_stat_current_temp_files_total":                 "Total number of active temp files",
 		"pg_stat_current_temp_bytes_total":                 "Total amount of space used by temp files, in bytes",

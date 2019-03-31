@@ -109,6 +109,7 @@ var (
 		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_data_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_catalog_size", Stype:stypePostgresql, Query: pgCatalogSizeQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_settings", Stype:stypePostgresql, Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// collect always -- these Postgres statistics are collected every time in all databases
 		{Name: "pg_stat_user_tables", Stype:stypePostgresql, Query: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
