@@ -125,9 +125,12 @@ var (
 		// pg_stat_basebackup
 		"pg_stat_basebackup_count":                "Total number of basebackups currently running",
 		"pg_stat_basebackup_duration_seconds_max": "Duration of the longest basebackup",
-		"pg_wal_directory_size_bytes":             "Total size of WAL directory",
-		"pg_wal_directory":                        "A metric with a constant '1' value with details about WAL directory",
+		// postgresql catalogs
 		"pg_data_directory":                       "A metric with a constant '1' value with details about DATA directory",
+		"pg_wal_directory":                        "A metric with a constant '1' value with details about WAL directory",
+		"pg_log_directory":                        "A metric with a constant '1' value with details about LOG directory",
+		"pg_wal_directory_size_bytes":             "Total size of WAL directory",
+		"pg_log_directory_size_bytes":             "Total size of log directory, in bytes",
 		"pg_catalog_size_bytes":                   "Total size of pg_catalog, in bytes",
 		// active temp files
 		"pg_stat_current_temp_files_total":                 "Total number of active temp files",

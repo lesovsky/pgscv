@@ -106,9 +106,11 @@ var (
 		{Name: "pg_stat_database_conflicts", Stype:stypePostgresql, Query: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_basebackup", Stype:stypePostgresql, Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
 		{Name: "pg_stat_current_temp", Stype:stypePostgresql, Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
+		{Name: "pg_data_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_log_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_wal_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_data_directory", Stype:stypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_log_directory", Stype:stypePostgresql, Query: pgLogdirSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_catalog_size", Stype:stypePostgresql, Query: pgCatalogSizeQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "pg_settings", Stype:stypePostgresql, Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// collect always -- these Postgres statistics are collected every time in all databases
@@ -672,11 +674,22 @@ func getPostgresDirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric, 
 	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dirpath); err != nil {
 		return err
 	}
-	if target == "pg_wal_directory" {
+	switch target {
+	case "pg_wal_directory":
 		if  version >= 100000 {
 			dirpath = dirpath + "/pg_wal"
 		} else {
 			dirpath = dirpath + "/pg_xlog"
+		}
+	case "pg_log_directory":
+		var logpath string
+		if err := conn.QueryRow(`SELECT current_setting('log_directory') WHERE current_setting('logging_collector') = 'on' `).Scan(&logpath); err != nil {
+			return err
+		}
+		if strings.HasPrefix(logpath, "/") {
+			dirpath = logpath
+		} else {
+			dirpath = dirpath + "/" + logpath
 		}
 	}
 
@@ -705,12 +718,12 @@ func getPostgresDirInfo(e *Exporter, conn *sql.DB, ch chan<- prometheus.Metric, 
 				}
 			}
 			if device, ok := mountpoints[subpath]; ok {
-				ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, subpath)
+				ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, subpath, realpath)
 				return nil
 			}
 		} else {
 			device := mountpoints["/"]
-			ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, "/")
+			ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, "/", realpath)
 			return nil
 		}
 	}

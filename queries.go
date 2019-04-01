@@ -107,6 +107,7 @@ var (
 
 	pgStatWalSizeQuery96 = `SELECT (SELECT count(*) FROM pg_ls_dir('pg_xlog')) * pg_size_bytes(current_setting('wal_segment_size')) as size_bytes`	// TODO: in this case 'archive_status' accounts as a segment
 	pgStatWalSizeQuery   = `SELECT sum(size) AS size_bytes FROM pg_ls_waldir()`
+	pgLogdirSizeQuery = `SELECT sum(size) AS size_bytes FROM (SELECT (pg_stat_file(logdir||'/'||pg_ls_dir(logdir))).size FROM current_setting('log_directory') AS logdir WHERE current_setting('logging_collector') = 'on') AS size`
 	pgCatalogSizeQuery = `SELECT current_database() AS datname, sum(pg_total_relation_size(relname::regclass)) AS bytes FROM pg_stat_sys_tables WHERE schemaname = 'pg_catalog'`
 
 	pgSettingsGucQuery = `SELECT name, unit,
