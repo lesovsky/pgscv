@@ -77,7 +77,8 @@ var (
 	pgStatioUserIndexesValueNames     = []string{"idx_blks_read", "idx_blks_hit"}
 	pgStatBgwriterValueNames          = []string{"checkpoints_timed", "checkpoints_req", "checkpoint_write_time", "checkpoint_sync_time", "buffers_checkpoint", "buffers_clean", "maxwritten_clean", "buffers_backend", "buffers_backend_fsync", "buffers_alloc"}
 	pgStatUserFunctionsValueNames     = []string{"calls", "total_time", "self_time"}
-	pgStatActivityValueNames          = []string{"conn_total", "conn_idle_total", "conn_idle_xact_total", "conn_active_total", "conn_waiting_total", "conn_others_total", "conn_prepared_total", "xact_max_duration"}
+	pgStatActivityValueNames          = []string{"conn_total", "conn_idle_total", "conn_idle_xact_total", "conn_active_total", "conn_waiting_total", "conn_others_total", "conn_prepared_total"}
+	pgStatActivityDurationsNames      = []string{"max_seconds","idle_xact_max_seconds","wait_max_seconds"}
 	pgStatActivityAutovacValueNames   = []string{"workers_total", "antiwraparound_workers_total", "user_vacuum_total", "max_duration"}
 	pgStatStatementsValueNames        = []string{"calls", "rows", "total_time", "blk_read_time", "blk_write_time", "shared_blks_hit", "shared_blks_read", "shared_blks_dirtied", "shared_blks_written", "local_blks_hit", "local_blks_read", "local_blks_dirtied", "local_blks_written", "temp_blks_read", "temp_blks_written"}
 	pgStatReplicationValueNames       = []string{"pg_wal_bytes", "pending_lag_bytes", "write_lag_bytes", "flush_lag_bytes", "replay_lag_bytes", "total_lag_bytes", "write_lag_sec", "flush_lag_sec", "replay_lag_sec"}
@@ -96,6 +97,7 @@ var (
 		{Name: "pg_stat_bgwriter", Stype:stypePostgresql, Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_user_functions", Stype:stypePostgresql, Query: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
 		{Name: "pg_stat_activity", Stype:stypePostgresql, Query: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_activity", Stype:stypePostgresql, Query: pgStatActivityDurationsQuery, collectOneshot: true, ValueNames: pgStatActivityDurationsNames, LabelNames: []string{}},
 		{Name: "pg_stat_activity_autovac", Stype:stypePostgresql, Query: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
 		{Name: "pg_stat_statements", Stype:stypePostgresql, Query: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
 		{Name: "pg_stat_replication", Stype:stypePostgresql, Query: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},

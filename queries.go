@@ -20,9 +20,14 @@ var (
     					count(*) FILTER (WHERE state = 'active') AS conn_active_total,
     					count(*) FILTER (WHERE wait_event_type = 'Lock') AS conn_waiting_total,
     					count(*) FILTER (WHERE state IN ('fastpath function call','disabled')) AS conn_others_total,
-    					(SELECT count(*) FROM pg_prepared_xacts) AS conn_prepared_total,
-    					coalesce(extract(epoch from max(clock_timestamp() - coalesce(xact_start, query_start)) FILTER (WHERE (query !~* '^autovacuum:' AND query !~* '^vacuum' AND state != 'idle') AND pid <> pg_backend_pid())), 0) AS xact_max_duration
+						(SELECT count(*) FROM pg_prepared_xacts) AS conn_prepared_total
 					FROM pg_stat_activity`
+
+	pgStatActivityDurationsQuery = `SELECT
+		coalesce(extract(epoch FROM max(clock_timestamp() - coalesce(xact_start, query_start)) FILTER (WHERE (query !~* '^autovacuum:' AND query !~* '^vacuum' AND state != 'idle') AND pid <> pg_backend_pid())), 0) AS max_seconds,
+		coalesce(max(extract(epoch FROM (now()-coalesce(xact_start, query_start)))) FILTER (WHERE state IN ('idle in transaction','idle in transaction (aborted)')), 0) AS idle_xact_max_seconds,
+		coalesce(max(extract(epoch FROM (now()-coalesce(xact_start, query_start)))) FILTER (WHERE state = 'active' AND wait_event_type = 'Lock'), 0) AS wait_max_seconds
+	FROM pg_stat_activity`
 
 	pgStatActivityAutovacQuery = `SELECT
 						count(*) FILTER (WHERE query ~* '^autovacuum:') AS workers_total,
