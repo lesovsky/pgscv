@@ -137,6 +137,7 @@ var (
 		{Name: "node_hardware_scaling_governors", Stype: stypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"governor"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "node_hardware_numa", Stype: stypeSystem, ValueNames: []string{"nodes"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		{Name: "node_hardware_storage_rotational", Stype: stypeSystem, LabelNames: []string{"device", "scheduler"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_uptime_seconds", Stype: stypeSystem},
 		// pgbouncer metrics are always oneshot, there is only one 'database' entity
 		{Name: "pgbouncer_pool", Stype: stypePgbouncer, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: stypePgbouncer, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
@@ -237,6 +238,7 @@ func (e *Exporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 		"node_hardware_scaling_governors":  e.collectCpuScalingGovernors,
 		"node_hardware_numa":               e.collectNumaNodes,
 		"node_hardware_storage_rotational": e.collectStorageSchedulers,
+		"node_uptime_seconds":				e.collectSystemUptime,
 	}
 
 	for _, desc := range statdesc {
@@ -427,6 +429,7 @@ func (e *Exporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt in
 	dirs, err := filepath.Glob("/sys/block/*")
 	if err != nil {
 		fmt.Println(err)
+		return 0
 	}
 
 	var devname, scheduler string
@@ -451,6 +454,17 @@ func (e *Exporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt in
 		}
 	}
 	return cnt
+}
+
+// collectSystemUptime collects metric about system uptime
+func (e *Exporter) collectSystemUptime(ch chan<- prometheus.Metric) (cnt int) {
+	uptime, err := stat.Uptime()
+	if err != nil {
+		fmt.Println(err)
+		return 0
+	}
+	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_uptime_seconds"], prometheus.CounterValue, uptime)
+	return 1
 }
 
 // collectPgMetrics collects metrics about PostgreSQL

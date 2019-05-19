@@ -62,7 +62,7 @@ func (c Netdevs) ReadLocal() error {
 	}
 	reader := bufio.NewReader(bytes.NewBuffer(content))
 
-	uptime, err := uptime()
+	uptime, err := UptimeMs()
 	if err != nil {
 		return err
 	}

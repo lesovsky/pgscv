@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"os/exec"
 	"strconv"
 )
@@ -27,9 +28,9 @@ func init() {
 	}
 }
 
-// Read uptime value from local procfile
-func uptime() (float64, error) {
-	var upsec, upcent float64
+// Read uptime value from local procfile, and return value in seconds
+func Uptime() (float64, error) {
+	var uptime, idletime float64
 
 	content, err := ioutil.ReadFile(procUptime)
 	if err != nil {
@@ -42,8 +43,21 @@ func uptime() (float64, error) {
 	if err != nil {
 		return 0, fmt.Errorf("failed to scan data from %s", procUptime)
 	}
-	fmt.Sscanf(string(line), "%f.%f", &upsec, &upcent)
+	_, err = fmt.Sscanf(string(line), "%f %f", &uptime, &idletime)
+	if err != nil {
+		return -1, err
+	}
 
+	return uptime, nil
+}
+
+// Read uptime value from local procfile, and return value in milliseconds
+func UptimeMs() (float64, error) {
+	uptime, err := Uptime()
+	if err != nil {
+		return -1, err
+	}
+	upsec, upcent := math.Modf(uptime)
 	return (upsec * SysTicks) + (upcent * SysTicks / 100), nil
 }
 

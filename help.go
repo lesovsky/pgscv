@@ -151,6 +151,7 @@ var (
 		"pg_schema_fkey_columns_mismatch_exists": "A metric with a constant '1' value labeled by datname, schemanames, relnames, colnames of fkey whose columns have different type",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",
+		"node_uptime_seconds": "Node uptime, in seconds",
 		// node /proc/diskstats metrics
 		"node_diskstats_rcompleted":   "Total number of read operations completed successfully",
 		"node_diskstats_rmerged":      "Total number of merged read operations",
