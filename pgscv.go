@@ -73,7 +73,7 @@ func main() {
 			}
 
 			if err := pusher.Add(); err != nil {
-				log.Errorf("Could not push to Pushgateway: %s", err)
+				log.Errorf("%s: could not push metrics: %s", time.Now().Format("2006-01-02T15:04:05.999"), err)
 			}
 			time.Sleep(*promPushInterval)
 		}
