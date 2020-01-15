@@ -21,9 +21,9 @@ const (
 )
 
 var (
-	promPushGw       = kingpin.Flag("prom.pushgateway", "Pushgateway address push to").Default("").Envar("PROM_PUSHGATEWAY").String()
-	promPushInterval = kingpin.Flag("prom.pushinterval", "Interval between pushes").Default("10s").Envar("PROM_PUSHINTERVAL").Duration()
-	cfId             = kingpin.Flag("cfid", "Cluster family identificator, must be the same over the master and all its standbys").Envar("PGSCV_CFID").String()
+	metricGateway = kingpin.Flag("metric-gateway", "Metric gateway address push to").Default("").Envar("PGSCV_METRIC_GATEWAY").String()
+	sendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("10s").Envar("PGSCV_SEND_INTERVAL").Duration()
+	projectId     = kingpin.Flag("projectid", "Project identificator").Envar("PGSCV_PROJECTID").String()
 
 	wg            sync.WaitGroup
 	chStartListen = make(chan int8)
@@ -36,11 +36,11 @@ func main() {
 	kingpin.Parse()
 
 	// обязательно должен быть
-	if *cfId == "" {
+	if *projectId == "" {
 		log.Fatalln("global system identifier must be specified.")
 	}
 	// use schedulers in push mode
-	if *promPushGw != "" {
+	if *metricGateway != "" {
 		useSchedule = true
 	}
 
@@ -50,7 +50,7 @@ func main() {
 	<-chStartListen
 
 	// TODO: унести содержимое в функции в prometheus.go
-	if *promPushGw == "" {
+	if *metricGateway == "" {
 		log.Infof("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
 
 		http.Handle("/metrics", promhttp.Handler())
@@ -58,7 +58,7 @@ func main() {
 			log.Fatalln(err)
 		}
 	} else {
-		log.Infof("use PUSH model, sending metrics to %s every %d seconds", *promPushGw, *promPushInterval/time.Second)
+		log.Infof("use PUSH model, sending metrics to %s every %d seconds", *metricGateway, *sendInterval/time.Second)
 		hostname, _ := os.Hostname()
 		var garbageLabel = "db_system_" + fmt.Sprintf("%x", md5.Sum([]byte(hostname)))
 		var pusher *push.Pusher
@@ -67,7 +67,7 @@ func main() {
 			// A garbage label is the special one which provides metrics uniqueness across several hosts and guarantees
 			// metrics will not be overwritten on Pushgateway side. There is no other use-cases for this label, hence
 			// before ingesting by Prometheus this label should be removed with 'metric_relabel_config' rule.
-			pusher = push.New(*promPushGw, garbageLabel)
+			pusher = push.New(*metricGateway, garbageLabel)
 			for i := range Instances {
 				pusher.Collector(Instances[i].Worker)
 			}
@@ -75,7 +75,7 @@ func main() {
 			if err := pusher.Add(); err != nil {
 				log.Errorf("%s: could not push metrics: %s", time.Now().Format("2006-01-02T15:04:05.999"), err)
 			}
-			time.Sleep(*promPushInterval)
+			time.Sleep(*sendInterval)
 		}
 	}
 

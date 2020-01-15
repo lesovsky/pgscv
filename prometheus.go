@@ -171,7 +171,7 @@ func adjustQueries(descs []*StatDesc, pgVersion int) {
 }
 
 // NewExporter creates a new configured exporter
-func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
+func NewExporter(itype int, projectid string, sid string) (*Exporter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -183,10 +183,10 @@ func NewExporter(itype int, cfid string, sid string) (*Exporter, error) {
 			if len(desc.ValueNames) > 0 {
 				for _, suffix := range desc.ValueNames {
 					var metricName = desc.Name + "_" + suffix
-					e[metricName] = prometheus.NewDesc(metricName, metricsHelp[metricName], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
+					e[metricName] = prometheus.NewDesc(metricName, metricsHelp[metricName], desc.LabelNames, prometheus.Labels{"projectid": projectid, "sid": sid, "db_instance": hostname})
 				}
 			} else {
-				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"cfid": cfid, "sid": sid, "db_instance": hostname})
+				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"projectid": projectid, "sid": sid, "db_instance": hostname})
 			}
 			// activate schedule if requested
 			if useSchedule && desc.Schedule.Interval != 0 {

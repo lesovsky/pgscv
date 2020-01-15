@@ -27,7 +27,7 @@ type Instance struct {
 	// sysid - уникальный идентификатор кластера, теоретически нужен если надо отличать несколько инстансов на одном хосте, либо для агргеации статы всего кластера размазанного по нескольким хостам
 	// если идентификатор не задан на старте, то пытаемся прочитать его с pg_controldata
 	ServiceId string // Service identifier -- отличает сервисы запущенные на одном хосте
-	CFamilyId string // Cluster family identifier -- группирует сервисы между хостами
+	ProjectID string // Project ID -- объединяет метрики одного проекта
 }
 
 var (
@@ -132,7 +132,7 @@ func setupInstances() error {
 		if Instances[i].Worker == nil {
 			var tmp = Instances[i]
 
-			tmp.CFamilyId = *cfId
+			tmp.ProjectID = *projectId
 
 			switch tmp.InstanceType {
 			case stypePostgresql:
@@ -143,14 +143,14 @@ func setupInstances() error {
 				// nothing to do
 			}
 
-			e, err := NewExporter(tmp.InstanceType, tmp.CFamilyId, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
+			e, err := NewExporter(tmp.InstanceType, tmp.ProjectID, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
 			if err != nil {
 				return err
 			}
 			tmp.Worker = e
 
 			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
-			if *promPushGw == "" {
+			if *metricGateway == "" {
 				prometheus.MustRegister(tmp.Worker)
 				log.Debugf("auto-discovery: exporter registered for %s with pid %d", tmp.ServiceId, tmp.Pid)
 			}

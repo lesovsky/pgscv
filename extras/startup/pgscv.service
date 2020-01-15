@@ -14,7 +14,7 @@ Group=postgres
 WorkingDirectory=~
 
 # Start the pgscv process
-ExecStart=/usr/bin/pgscv --cfid=pgeu --prom.pushgateway=116.203.106.120:19091 --prom.pushinterval=15s
+ExecStart=/usr/bin/pgscv --projectid=123 --metric-gateway=116.203.106.120:19091 --send-interval=15s
 
 # Only kill the pgscv process
 KillMode=process
