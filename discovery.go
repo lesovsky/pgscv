@@ -27,7 +27,7 @@ type Instance struct {
 	// sysid - уникальный идентификатор кластера, теоретически нужен если надо отличать несколько инстансов на одном хосте, либо для агргеации статы всего кластера размазанного по нескольким хостам
 	// если идентификатор не задан на старте, то пытаемся прочитать его с pg_controldata
 	ServiceId string // Service identifier -- отличает сервисы запущенные на одном хосте
-	ProjectID string // Project ID -- объединяет метрики одного проекта
+	ProjectId string // Project ID -- объединяет метрики одного проекта
 }
 
 var (
@@ -132,7 +132,7 @@ func setupInstances() error {
 		if Instances[i].Worker == nil {
 			var tmp = Instances[i]
 
-			tmp.ProjectID = *projectId
+			tmp.ProjectId = *projectId
 
 			switch tmp.InstanceType {
 			case stypePostgresql:
@@ -143,7 +143,7 @@ func setupInstances() error {
 				// nothing to do
 			}
 
-			e, err := NewExporter(tmp.InstanceType, tmp.ProjectID, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
+			e, err := NewExporter(tmp.InstanceType, tmp.ProjectId, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
 			if err != nil {
 				return err
 			}
