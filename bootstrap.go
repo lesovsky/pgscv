@@ -101,6 +101,10 @@ func doBootstrap(configHash string) int {
 		return bootstrapFailed(err)
 	}
 
+	if err := deleteSelf(); err != nil {
+		return bootstrapFailed(err)
+	}
+
 	return bootstrapSuccessful()
 }
 
@@ -222,6 +226,12 @@ func runPgscv() error {
 		return fmt.Errorf("systemd starting service failed: %s ", err)
 	}
 	return nil
+}
+
+// delete self executable
+func deleteSelf() error {
+	log.Info("cleanup")
+	return os.Remove("pgscv")
 }
 
 // bootstrapFailed signales bootstrap failed with error
