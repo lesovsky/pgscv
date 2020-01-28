@@ -1,6 +1,7 @@
 DOCKER_ACCOUNT = barcodepro
 SITENAME = weaponry
 APPNAME = pgscv
+IMAGENAME = ${APPNAME}-distribution
 
 PREFIX ?= /usr
 INCLUDEDIR =
@@ -35,11 +36,11 @@ build:
 	tar czf ${APPNAME}.tar.gz ${APPNAME}
 
 docker-build:
-	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${APPNAME}:${COMMIT} .
+	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT} .
 	docker image prune --force --filter label=stage=intermediate
 
 docker-push:
-	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${APPNAME}:${COMMIT}
+	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}
 
 deploy:
 	ansible-playbook deployment/ansible/deploy.yml -e env=${ENV}
