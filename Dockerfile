@@ -1,0 +1,19 @@
+# stage 1
+# __release_tag__ 1.13 was released 2019-09-03
+FROM golang:1.13 as build-stage
+LABEL stage=intermediate
+WORKDIR /app
+COPY . .
+RUN make build
+
+# stage 2
+# __release_tag__ 1.17.8 was released 2020-01-21
+FROM nginx:1.17.8
+RUN rm /etc/nginx/nginx.conf
+RUN rm /etc/nginx/conf.d/default.conf
+COPY ./extras/nginx.conf /etc/nginx/nginx.conf
+COPY ./extras/pgscv.conf /etc/nginx/conf.d/pgscv.conf
+COPY --from=build-stage /app/pgscv.tar.gz /var/www/html/pgscv.tar.gz
+EXPOSE 1080
+STOPSIGNAL SIGTERM
+CMD ["nginx", "-g", "daemon off;"]

@@ -1,30 +1,45 @@
-PROGRAM_NAME = pgscv
+DOCKER_ACCOUNT = barcodepro
+SITENAME = weaponry
+APPNAME = pgscv
+
 PREFIX ?= /usr
 INCLUDEDIR =
 LIBDIR =
 
 SOURCES = $(wildcard *.go)
-COMMIT=$(shell git rev-parse HEAD)
+COMMIT=$(shell git rev-parse --short HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
-LDFLAGS = -ldflags "-X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
-
+LDFLAGS = -a -installsuffix cgo -ldflags "-X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
 DESTDIR ?=
 
-.PHONY: all clean install uninstall
+.PHONY: help clean build docker-build docker-push deploy
 
-all: pgscv
+.DEFAULT_GOAL := help
 
-pgscv:
-	go mod download
-	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${PROGRAM_NAME} ${SOURCES}
-
-install:
-	mkdir -p ${DESTDIR}${PREFIX}/bin/
-	install -pm 755 ${PROGRAM_NAME} ${DESTDIR}${PREFIX}/bin/${PROGRAM_NAME}
+help:
+	@echo "Makefile available targets:"
+	@echo "  * clean                 remove program executable"
+	@echo "  * build                 build program executable"
+	@echo "  * docker-build          build Docker image"
+	@echo "  * docker-push           push Docker image to Registry"
+	@echo "  * deploy -e ENV=env     deploy to Kubernetes"
 
 clean:
-	rm -f ${PROGRAM_NAME}
+	rm -f ${APPNAME}
+	rm -f ${APPNAME}.tar.gz
 
-uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/${PROGRAM_NAME}
+build:
+	go mod download
+	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${APPNAME} ${SOURCES}
+	tar czf ${APPNAME}.tar.gz ${APPNAME}
+
+docker-build:
+	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${APPNAME}:${COMMIT} .
+	docker image prune --force --filter label=stage=intermediate
+
+docker-push:
+	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${APPNAME}:${COMMIT}
+
+deploy:
+	ansible-playbook deployment/ansible/deploy.yml -e env=${ENV}
