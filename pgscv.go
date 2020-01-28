@@ -23,7 +23,8 @@ const (
 var (
 	metricGateway = kingpin.Flag("metric-gateway", "Metric gateway address push to").Default("").Envar("PGSCV_METRIC_GATEWAY").String()
 	sendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("10s").Envar("PGSCV_SEND_INTERVAL").Duration()
-	projectId     = kingpin.Flag("projectid", "Project identificator").Envar("PGSCV_PROJECTID").String()
+	projectId     = kingpin.Flag("projectid", "Project identifier").Envar("PGSCV_PROJECTID").String()
+	bootstrapKey  = kingpin.Flag("bootstrap", "Run bootstrap, requires root privileges").Envar("PGSCV_BOOTSTRAP").String()
 
 	wg            sync.WaitGroup
 	chStartListen = make(chan int8)
@@ -35,10 +36,15 @@ func main() {
 	kingpin.Version(fmt.Sprintf("pgscv exporter %s (built with %s)", pgSCVVersion, runtime.Version()))
 	kingpin.Parse()
 
+	if *bootstrapKey != "" {
+		os.Exit(doBootstrap(*bootstrapKey))
+	}
+
 	// обязательно должен быть
 	if *projectId == "" {
-		log.Fatalln("global system identifier must be specified.")
+		log.Fatalln("project identifier must be specified.")
 	}
+
 	// use schedulers in push mode
 	if *metricGateway != "" {
 		useSchedule = true
