@@ -23,7 +23,7 @@ User=postgres
 Group=postgres
 
 Environment="PGSCV_PROJECTID={{ .ProjectId }}"
-Environment="PGSCV_METRIC_GATEWAY=push.wpnr.brcd.pro"
+Environment="PGSCV_METRIC_GATEWAY=https://push.wpnr.brcd.pro"
 Environment="PGSCV_SEND_INTERVAL=60s"
 
 WorkingDirectory=~
