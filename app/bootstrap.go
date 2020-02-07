@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"encoding/base64"
@@ -67,8 +67,8 @@ func newBootstrapConfig(configHash string) (*bootstrapConfig, error) {
 	return &c, nil
 }
 
-// doBootstrap is the main bootstrap entry point
-func doBootstrap(configHash string) int {
+// RunBootstrap is the main bootstrap entry point
+func RunBootstrap(configHash string) int {
 	log.Info("Running bootstrap")
 	if err := preCheck(configHash); err != nil {
 		return bootstrapFailed(err)

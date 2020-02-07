@@ -1,25 +1,25 @@
 //
-package main
+package app
 
 var (
 	metricsHelp = map[string]string{
 		// pg_stat_database
-		"pg_stat_database_xact_commit":    "Number of transactions that have been committed",
-		"pg_stat_database_xact_rollback":  "Number of transactions that have been rolled back",
-		"pg_stat_database_blks_read":      "Number of disk blocks read",
-		"pg_stat_database_blks_hit":       "Number of times disk blocks were found already in the buffer cache",
-		"pg_stat_database_tup_returned":   "Number of rows returned by queries",
-		"pg_stat_database_tup_fetched":    "Number of rows fetched by queries",
-		"pg_stat_database_tup_inserted":   "Number of rows inserted by queries",
-		"pg_stat_database_tup_updated":    "Number of rows updated by queries",
-		"pg_stat_database_tup_deleted":    "Number of rows deleted by queries",
-		"pg_stat_database_conflicts":      "Number of queries canceled due to conflicts with recovery",
-		"pg_stat_database_temp_files":     "Number of temporary files created by queries",
-		"pg_stat_database_temp_bytes":     "Total amount of data written to temporary files by queries",
-		"pg_stat_database_deadlocks":      "Number of deadlocks detected",
-		"pg_stat_database_blk_read_time":  "Time spent reading data file blocks by backends, in milliseconds",
-		"pg_stat_database_blk_write_time": "Time spent writing data file blocks by backends, in milliseconds",
-		"pg_stat_database_db_size":        "Size of the database, in bytes",
+		"pg_stat_database_xact_commit":       "Number of transactions that have been committed",
+		"pg_stat_database_xact_rollback":     "Number of transactions that have been rolled back",
+		"pg_stat_database_blks_read":         "Number of disk blocks read",
+		"pg_stat_database_blks_hit":          "Number of times disk blocks were found already in the buffer cache",
+		"pg_stat_database_tup_returned":      "Number of rows returned by queries",
+		"pg_stat_database_tup_fetched":       "Number of rows fetched by queries",
+		"pg_stat_database_tup_inserted":      "Number of rows inserted by queries",
+		"pg_stat_database_tup_updated":       "Number of rows updated by queries",
+		"pg_stat_database_tup_deleted":       "Number of rows deleted by queries",
+		"pg_stat_database_conflicts":         "Number of queries canceled due to conflicts with recovery",
+		"pg_stat_database_temp_files":        "Number of temporary files created by queries",
+		"pg_stat_database_temp_bytes":        "Total amount of data written to temporary files by queries",
+		"pg_stat_database_deadlocks":         "Number of deadlocks detected",
+		"pg_stat_database_blk_read_time":     "Time spent reading data file blocks by backends, in milliseconds",
+		"pg_stat_database_blk_write_time":    "Time spent writing data file blocks by backends, in milliseconds",
+		"pg_stat_database_db_size":           "Size of the database, in bytes",
 		"pg_stat_database_stats_age_seconds": "Age of the collected statistics, in seconds",
 		// pg_stat_user_tables
 		"pg_stat_user_tables_seq_scan":            "Number of sequential scans initiated",
@@ -128,12 +128,12 @@ var (
 		"pg_stat_basebackup_count":                "Total number of basebackups currently running",
 		"pg_stat_basebackup_duration_seconds_max": "Duration of the longest basebackup",
 		// postgresql catalogs
-		"pg_data_directory":                       "A metric with a constant '1' value with details about DATA directory",
-		"pg_wal_directory":                        "A metric with a constant '1' value with details about WAL directory",
-		"pg_log_directory":                        "A metric with a constant '1' value with details about LOG directory",
-		"pg_wal_directory_size_bytes":             "Total size of WAL directory",
-		"pg_log_directory_size_bytes":             "Total size of log directory, in bytes",
-		"pg_catalog_size_bytes":                   "Total size of pg_catalog, in bytes",
+		"pg_data_directory":           "A metric with a constant '1' value with details about DATA directory",
+		"pg_wal_directory":            "A metric with a constant '1' value with details about WAL directory",
+		"pg_log_directory":            "A metric with a constant '1' value with details about LOG directory",
+		"pg_wal_directory_size_bytes": "Total size of WAL directory",
+		"pg_log_directory_size_bytes": "Total size of log directory, in bytes",
+		"pg_catalog_size_bytes":       "Total size of pg_catalog, in bytes",
 		// active temp files
 		"pg_stat_current_temp_files_total":                 "Total number of active temp files",
 		"pg_stat_current_temp_bytes_total":                 "Total amount of space used by temp files, in bytes",
@@ -143,11 +143,11 @@ var (
 		// pg_settings
 		"pg_settings_guc": "Postgres configuration settings",
 		// pg schema
-		"pg_schema_non_pk_table_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname of relation with no primary key",
-		"pg_schema_invalid_index_bytes": "Total size of invalid index, in bytes",
-		"pg_schema_non_indexed_fkey_exists": "A metric with a constant '1' value labeled by datname, schemaname, relname, colnames, constraint, referenced of foreign key constrint which has no index",
-		"pg_schema_redundant_index_bytes": "Size occupied by redundant index, in bytes",
-		"pg_schema_sequence_fullness_ratio": "Fullness ratio of the sequence, in percent",
+		"pg_schema_non_pk_table_exists":          "A metric with a constant '1' value labeled by datname, schemaname, relname of relation with no primary key",
+		"pg_schema_invalid_index_bytes":          "Total size of invalid index, in bytes",
+		"pg_schema_non_indexed_fkey_exists":      "A metric with a constant '1' value labeled by datname, schemaname, relname, colnames, constraint, referenced of foreign key constrint which has no index",
+		"pg_schema_redundant_index_bytes":        "Size occupied by redundant index, in bytes",
+		"pg_schema_sequence_fullness_ratio":      "Fullness ratio of the sequence, in percent",
 		"pg_schema_fkey_columns_mismatch_exists": "A metric with a constant '1' value labeled by datname, schemanames, relnames, colnames of fkey whose columns have different type",
 		// node cpu metrics
 		"node_cpu_usage_time": "Node CPU usage, in ticks",

@@ -1,5 +1,5 @@
 //
-package main
+package app
 
 import (
 	"database/sql"

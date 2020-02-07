@@ -1,4 +1,4 @@
-package main
+package app
 
 // Contains returns true if array of strings contains specific string
 func Contains(ss []string, str string) bool {

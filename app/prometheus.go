@@ -1,5 +1,5 @@
 //
-package main
+package app
 
 import (
 	"database/sql"
@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/statgears/pgscv/stat"
+	"scout/app/stat"
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/common/log"
@@ -19,29 +19,11 @@ import (
 
 // Exporter wraps all metrics for specific service (instance)
 type Exporter struct {
-	// делает экспортер уникальным для конкретного сервиса на запущщеном хосте -- т.е. для N сервисов будет N экспортеров
-	ServiceID string
-	AllDesc   map[string]*prometheus.Desc
+	// делает экспортер уникальным для конкретного сервиса на запущеном хосте -- т.е. для N сервисов будет N экспортеров
+	ServiceID    string
+	AllDesc      map[string]*prometheus.Desc
+	InstanceRepo InstanceRepo
 }
-
-// *** DEPRECATED ***
-// RawMetricDatum is the set of metrics that have the same selector
-// структура содержит значение и набор меток, структура будет являться частью мапы которая определяет набор значений конкретной метрики, например
-// pg_stat_database_xact_commits: { 4351, {1, pgbench}}, { 5241, {2, appdb}}, { 4918, {3, testdb}}, { 9812, {4, maindb}}
-// структура хранит только одно значение для будущей метрики + значения меток для этой метрики.
-// далее датумы для одной метрики но с разными значениями будут сгруппированы в рамках структуры MetricData
-//type RawMetricDatum struct {
-//	Value       string
-//	LabelValues []string
-//}
-// MetricData is the containter for specific set of metric
-// хранилище конкретной метрики, содержит идентификтаор, описание для прометеуса и хэш-мапу всех значений для этой метрики
-//type MetricData struct { // эту структуру должна возвращать конкретная функция которая берет откуда-то стату и оформляет в вид подходящий для экспорта в прометеус
-//	MetricDesc *prometheus.Desc       // идентификатор метрики для прометеуса
-//	MetricType prometheus.ValueType   // тип этой метрики
-//	RawDataMap map[int]RawMetricDatum // набор значений метрики и значений всех ее меток
-//}
-// *** DEPRECATED ***
 
 // StatDesc is the statistics descriptor, with detailed info about particular kind of stats
 type StatDesc struct {
@@ -171,11 +153,16 @@ func adjustQueries(descs []*StatDesc, pgVersion int) {
 }
 
 // NewExporter creates a new configured exporter
-func NewExporter(itype int, projectid string, sid string) (*Exporter, error) {
+func NewExporter(instance Instance, repo *InstanceRepo) (*Exporter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
 	}
+	var (
+		itype     = instance.InstanceType
+		projectid = instance.ProjectId
+		sid       = instance.ServiceId
+	)
 
 	var e = make(map[string]*prometheus.Desc)
 	for _, desc := range statdesc {
@@ -189,12 +176,13 @@ func NewExporter(itype int, projectid string, sid string) (*Exporter, error) {
 				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
 			// activate schedule if requested
-			if useSchedule && desc.Schedule.Interval != 0 {
+			if repo.appConfig.ScheduleEnabled && desc.Schedule.Interval != 0 {
 				desc.ActivateSchedule()
 			}
 		}
 	}
-	return &Exporter{ServiceID: sid, AllDesc: e}, nil
+
+	return &Exporter{ServiceID: sid, AllDesc: e, InstanceRepo: *repo}, nil
 }
 
 // Describe method describes all metrics specified in the exporter
@@ -208,14 +196,14 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	var metricsCnt int
 
-	for i := range Instances {
-		if e.ServiceID == Instances[i].ServiceId {
+	for _, instance := range e.InstanceRepo.Instances {
+		if e.ServiceID == instance.ServiceId {
 			log.Debugf("%s: start collecting metrics for %s", time.Now().Format("2006-01-02 15:04:05"), e.ServiceID)
 
 			// в зависимости от типа экспортера делаем соотв.проверки
-			switch Instances[i].InstanceType {
+			switch instance.InstanceType {
 			case stypePostgresql, stypePgbouncer:
-				metricsCnt += e.collectPgMetrics(ch, Instances[i])
+				metricsCnt += e.collectPgMetrics(ch, instance)
 			case stypeSystem:
 				metricsCnt += e.collectSystemMetrics(ch)
 			}
@@ -488,7 +476,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		}
 		if err := PQstatus(conn, instance.InstanceType); err != nil {
 			log.Warnf("skip collecting stats for %s, failed to check status: %s", instance.ServiceId, err.Error())
-			chRemoveInstance <- instance.Pid // удаляем инстанс их хэш карты
+			e.InstanceRepo.chRemoveInstance <- instance.Pid // удаляем инстанс их хэш карты
 			return 0
 		}
 		// адаптируем запросы под конкретную версию

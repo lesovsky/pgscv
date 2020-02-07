@@ -1,17 +1,12 @@
 DOCKER_ACCOUNT = barcodepro
 SITENAME = weaponry
-APPNAME = pgscv
+APPNAME = scout
 IMAGENAME = ${APPNAME}-distribution
 
-PREFIX ?= /usr
-INCLUDEDIR =
-LIBDIR =
-
-SOURCES = $(wildcard *.go)
 COMMIT=$(shell git rev-parse --short HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
-LDFLAGS = -a -installsuffix cgo -ldflags "-X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
+LDFLAGS = -a -installsuffix cgo -ldflags "-X main.appName=${APPNAME} -X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
 DESTDIR ?=
 
 .PHONY: help clean build docker-build docker-push deploy
@@ -27,12 +22,11 @@ help:
 	@echo "  * deploy -e ENV=env     deploy to Kubernetes"
 
 clean:
-	rm -f ${APPNAME}
-	rm -f ${APPNAME}.tar.gz
+	rm -f ${APPNAME} ${APPNAME}.tar.gz
 
 build:
 	go mod download
-	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${APPNAME} ${SOURCES}
+	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${APPNAME} ./cmd/app
 	tar czf ${APPNAME}.tar.gz ${APPNAME}
 
 docker-build:

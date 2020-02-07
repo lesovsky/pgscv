@@ -1,5 +1,5 @@
 //
-package main
+package app
 
 import (
 	"bufio"
@@ -17,57 +17,65 @@ import (
 
 // Instance is the container for discovered service
 type Instance struct {
-	Pid          int32 // process identificator
+	Pid          int32 // process identifier
 	InstanceType int   // "postgres" or "pgbouncer"
 	Host         string
 	Port         int
 	User         string
 	Dbname       string
-	Worker       *Exporter
-	// sysid - уникальный идентификатор кластера, теоретически нужен если надо отличать несколько инстансов на одном хосте, либо для агргеации статы всего кластера размазанного по нескольким хостам
-	// если идентификатор не задан на старте, то пытаемся прочитать его с pg_controldata
-	ServiceId string // Service identifier -- отличает сервисы запущенные на одном хосте
-	ProjectId string // Project ID -- объединяет метрики одного проекта
+	Exporter     *Exporter
+	ServiceId    string // Service identifier -- отличает сервисы запущенные на одном хосте
+	ProjectId    string // Project ID -- объединяет метрики одного проекта
 }
 
-var (
-	// Instances is the map with all discovered services
-	Instances = make(map[int32]Instance)
+type InstanceRepo struct {
+	Instances        map[int32]Instance
+	chRemoveInstance chan int32
+	appConfig        *Config
+}
 
-	chRemoveInstance  = make(chan int32) // канал для удаления инстансов
-	discoveryInterval = 60 * time.Second
-)
+//var (
+//	// Instances is the map with all discovered services
+//	Instances = make(map[int32]Instance)
+//
+//	chRemoveInstance  = make(chan int32) // канал для удаления инстансов
+//	discoveryInterval = 60 * time.Second
+//)
+
+func NewInstanceRepo(config *Config) *InstanceRepo {
+	return &InstanceRepo{
+		Instances:        make(map[int32]Instance),
+		chRemoveInstance: make(chan int32),
+		appConfig:        config,
+	}
+}
+
+func (repo *InstanceRepo) StartInitialDiscovery() error {
+	// добавляем псевдо-инстанс для системных метрик
+	repo.Instances[0] = Instance{InstanceType: stypeSystem, ServiceId: "system"}
+
+	if err := repo.lookupInstances(); err != nil {
+		return err
+	}
+	if err := repo.setupInstances(); err != nil {
+		return err
+	}
+	return nil
+}
 
 // discoveryLoop is the main loop aimed to discover services
-func discoveryLoop() {
-	log.Debugln("auto-discovery: run initial discovery")
-
-	// добавляем псевдо-инстанс для системных метрик
-	Instances[0] = Instance{InstanceType: stypeSystem, ServiceId: "system"}
-
-	if err := lookupInstances(); err != nil {
-		log.Fatalf("initial discovery failed: lookup error: %s", err)
-	}
-
-	if err := setupInstances(); err != nil {
-		log.Fatalf("initial discovery failed: setup error: %s", err)
-	}
-
-	defer wg.Done()
-
-	log.Debugln("auto-discovery: initial discovery complete")
-	chStartListen <- 1
-
+func (repo *InstanceRepo) StartBackgroundDiscovery() {
+	// TODO: нет кейса для выхода
 	for {
 		select {
-		case pid := <-chRemoveInstance:
-			removeInstance(pid)
-		case <-time.After(discoveryInterval):
-			if err := lookupInstances(); err != nil {
+		case pid := <-repo.chRemoveInstance:
+			repo.removeInstance(pid)
+		case <-time.After(60 * time.Second):
+			if err := repo.lookupInstances(); err != nil {
 				log.Warnf("auto-discovery failed: %s, skip", err)
 				continue
 			}
-			if err := setupInstances(); err != nil {
+			if err := repo.setupInstances(); err != nil {
 				log.Warnf("auto-discovery failed: create exporter error: %s, skip", err)
 				continue
 			}
@@ -76,7 +84,7 @@ func discoveryLoop() {
 }
 
 // lookupInstances scans PIDs and looking for required services
-func lookupInstances() error {
+func (repo *InstanceRepo) lookupInstances() error {
 	allPids, err := process.Pids()
 	if err != nil {
 		return err
@@ -85,7 +93,7 @@ func lookupInstances() error {
 	// проходимся по всем пидам и смотрим что у них за имена, и далее отталкиваеимся от имен и cmdline
 	for _, pid := range allPids {
 		// если инстанс уже есть в мапе, то пропускаем его
-		if _, ok := Instances[pid]; ok {
+		if _, ok := repo.Instances[pid]; ok {
 			log.Debugf("auto-discovery: service with pid %d already in the map, skip", pid)
 			continue
 		}
@@ -110,14 +118,14 @@ func lookupInstances() error {
 				if err != nil {
 					return err
 				}
-				Instances[pid] = pginfo // добавляем параметры подключения в карту
+				repo.Instances[pid] = pginfo // добавляем параметры подключения в карту
 			}
 		case "pgbouncer":
 			pgbinfo, err := discoverPgbouncer(proc)
 			if err != nil {
 				return err
 			}
-			Instances[pid] = pgbinfo // добавляем параметры подключения в карту
+			repo.Instances[pid] = pgbinfo // добавляем параметры подключения в карту
 		default:
 			continue // остальное нас не интересует
 		}
@@ -127,46 +135,46 @@ func lookupInstances() error {
 }
 
 // setupInstances configures discovered service and adds into the service's list
-func setupInstances() error {
-	for i := range Instances {
-		if Instances[i].Worker == nil {
-			var tmp = Instances[i]
+func (repo *InstanceRepo) setupInstances() error {
+	for i, instance := range repo.Instances {
+		if instance.Exporter == nil {
+			var newInstance = instance
+			newInstance.ProjectId = repo.appConfig.ProjectIdStr
 
-			tmp.ProjectId = *projectId
-
-			switch tmp.InstanceType {
+			switch instance.InstanceType {
 			case stypePostgresql:
-				tmp.ServiceId = "postgres:" + strconv.Itoa(tmp.Port)
+				newInstance.ServiceId = "postgres:" + strconv.Itoa(instance.Port)
 			case stypePgbouncer:
-				tmp.ServiceId = "pgbouncer:" + strconv.Itoa(tmp.Port)
+				newInstance.ServiceId = "pgbouncer:" + strconv.Itoa(instance.Port)
 			case stypeSystem:
 				// nothing to do
 			}
 
-			e, err := NewExporter(tmp.InstanceType, tmp.ProjectId, tmp.ServiceId) // передаем идентификатор инстанса, с помощью него можно отличать инстансы на одном хосте или строить глобальные cluster-wide графики
+			// создаем экспортер для экземпляра инстанса, затем помещаем созданный экспортер в экземпляр
+			var err error
+			newInstance.Exporter, err = NewExporter(newInstance, repo)
 			if err != nil {
 				return err
 			}
-			tmp.Worker = e
 
 			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
-			if *metricGateway == "" {
-				prometheus.MustRegister(tmp.Worker)
-				log.Debugf("auto-discovery: exporter registered for %s with pid %d", tmp.ServiceId, tmp.Pid)
+			if repo.appConfig.MetricServiceBaseURL == "" {
+				prometheus.MustRegister(newInstance.Exporter)
+				repo.appConfig.Logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", instance.ServiceId, instance.Pid)
 			}
 
-			Instances[i] = tmp
+			// put update instance copy into repo
+			repo.Instances[i] = newInstance
 		}
 	}
-
 	return nil
 }
 
 // removeInstance removes service from the list (in case of its unavailability)
-func removeInstance(pid int32) {
-	prometheus.Unregister(Instances[pid].Worker)
-	log.Infof("auto-discovery: collector unregistered for %s, process %d", Instances[pid].ServiceId, pid)
-	delete(Instances, pid)
+func (repo *InstanceRepo) removeInstance(pid int32) {
+	prometheus.Unregister(repo.Instances[pid].Exporter)
+	log.Infof("auto-discovery: collector unregistered for %s, process %d", repo.Instances[pid].ServiceId, pid)
+	delete(repo.Instances, pid)
 }
 
 // discoverPgbouncer
