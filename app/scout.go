@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
+	"github.com/rs/zerolog"
 	"net/http"
 	"os"
 	"scout/app/discovery"
@@ -14,11 +15,10 @@ import (
 
 // TODO: слишком длинная функция
 func Start(c *Config) error {
-	logger := c.Logger
+	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	dc := &discovery.DiscoveryConfig{
-		Logger: logger,
-		//ServiceMode: serviceMode,
+		Logger:          logger,
 		ProjectIdStr:    c.ProjectIdStr,
 		ScheduleEnabled: c.ScheduleEnabled,
 	}

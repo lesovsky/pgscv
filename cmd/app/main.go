@@ -4,6 +4,7 @@ package main
 import (
 	"fmt"
 	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"scout/app"
@@ -16,7 +17,6 @@ var (
 
 func main() {
 	var (
-		logger               = zerolog.New(os.Stdout).With().Timestamp().Str("service", appName).Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").String()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		projectIdStr         = kingpin.Flag("projectid", "Project identifier string").Envar("PROJECTID").String()
@@ -26,8 +26,9 @@ func main() {
 	)
 	kingpin.Parse()
 
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	var sc = &app.Config{
-		Logger:               logger,
+		Logger:               log.Logger,
 		MetricServiceBaseURL: *metricServiceBaseURL,
 		MetricsSendInterval:  *metricsSendInterval,
 		ProjectIdStr:         *projectIdStr,
@@ -59,7 +60,7 @@ func main() {
 
 	// обязательно должен быть
 	if sc.ProjectIdStr == "" {
-		logger.Fatal().Msg("project identifier is not specified")
+		log.Fatal().Msg("project identifier is not specified")
 	}
 
 	// use schedulers in push mode
@@ -68,8 +69,8 @@ func main() {
 	}
 
 	if err := app.Start(sc); err != nil {
-		logger.Error().Err(err)
+		log.Error().Err(err)
 	}
 
-	logger.Info().Msg("Graceful shutdown")
+	log.Info().Msg("Graceful shutdown")
 }

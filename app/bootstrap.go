@@ -29,7 +29,7 @@ Environment="SEND_INTERVAL=60s"
 WorkingDirectory=~
 
 # Start the agent process
-ExecStart=/usr/bin/scout
+ExecStart=/usr/local/bin/scout
 
 # Only kill the agent process
 KillMode=process
@@ -110,7 +110,7 @@ func RunBootstrap(configHash string) int {
 
 // run pre-bootstrap checks
 func preCheck(configHash string) error {
-	log.Info().Msg("pre-bootstrap checks")
+	log.Info().Msg("Run pre-bootstrap checks")
 	if configHash == "" {
 		return fmt.Errorf("empty config passed")
 	}
@@ -129,13 +129,13 @@ func preCheck(configHash string) error {
 
 // installs agent binary
 func installBin() error {
-	log.Info().Msg("install agent")
+	log.Info().Msg("Install agent")
 	from, err := os.Open("./scout")
 	if err != nil {
 		return fmt.Errorf("open file failed: %s", err)
 
 	}
-	to, err := os.OpenFile("/usr/bin/scout", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	to, err := os.OpenFile("/usr/local/bin/scout", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("open destination file failed: %s", err)
 	}
@@ -154,13 +154,13 @@ func installBin() error {
 
 // creates systemd unit in system path
 func createSystemdUnit(config *bootstrapConfig) error {
-	log.Info().Msg("create systemd unit")
+	log.Info().Msg("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	f, err := os.Create("/etc/systemd/system/scout.service")
+	f, err := os.Create("/etc/systemd/system/scout-agent.service")
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
 	}
@@ -178,7 +178,7 @@ func createSystemdUnit(config *bootstrapConfig) error {
 
 // reloads systemd
 func reloadSystemd() error {
-	log.Info().Msg("reload systemd")
+	log.Info().Msg("Reload systemd")
 	cmd := exec.Command("systemctl", "daemon-reload")
 	err := cmd.Start()
 	if err != nil {
@@ -195,8 +195,8 @@ func reloadSystemd() error {
 
 // enables agent autostart
 func enableAutostart() error {
-	log.Info().Msg("enable autostart")
-	cmd := exec.Command("systemctl", "enable", "scout.service")
+	log.Info().Msg("Enable autostart")
+	cmd := exec.Command("systemctl", "enable", "scout-agent.service")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("enable agent service failed: %s ", err)
@@ -212,8 +212,8 @@ func enableAutostart() error {
 
 // run agent systemd unit
 func runAgent() error {
-	log.Info().Msg("run agent")
-	cmd := exec.Command("systemctl", "start", "scout.service")
+	log.Info().Msg("Run agent")
+	cmd := exec.Command("systemctl", "start", "scout-agent.service")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("start agent service failed: %s ", err)
@@ -230,19 +230,19 @@ func runAgent() error {
 
 // delete self executable
 func deleteSelf() error {
-	log.Info().Msg("cleanup")
+	log.Info().Msg("Cleanup")
 	return os.Remove("scout")
 }
 
 // bootstrapFailed signales bootstrap failed with error
 func bootstrapFailed(e error) int {
-	log.Error().Err(e).Msg("stop bootstrap: %s")
+	log.Error().Err(e).Msg("Stop bootstrap: %s")
 	return 1
 }
 
 // bootstrapSuccessful signales bootstrap finished successfully
 func bootstrapSuccessful() int {
-	log.Info().Msg("bootstrap successful")
+	log.Info().Msg("Bootstrap successful")
 	return 0
 }
 
