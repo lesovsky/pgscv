@@ -29,24 +29,14 @@ type Instance struct {
 }
 
 type InstanceRepo struct {
-	Instances        map[int32]Instance
-	chRemoveInstance chan int32
-	appConfig        *Config
+	Instances map[int32]Instance
+	appConfig *Config
 }
-
-//var (
-//	// Instances is the map with all discovered services
-//	Instances = make(map[int32]Instance)
-//
-//	chRemoveInstance  = make(chan int32) // канал для удаления инстансов
-//	discoveryInterval = 60 * time.Second
-//)
 
 func NewInstanceRepo(config *Config) *InstanceRepo {
 	return &InstanceRepo{
-		Instances:        make(map[int32]Instance),
-		chRemoveInstance: make(chan int32),
-		appConfig:        config,
+		Instances: make(map[int32]Instance),
+		appConfig: config,
 	}
 }
 
@@ -68,8 +58,6 @@ func (repo *InstanceRepo) StartBackgroundDiscovery() {
 	// TODO: нет кейса для выхода
 	for {
 		select {
-		case pid := <-repo.chRemoveInstance:
-			repo.removeInstance(pid)
 		case <-time.After(60 * time.Second):
 			if err := repo.lookupInstances(); err != nil {
 				log.Warnf("auto-discovery failed: %s, skip", err)

@@ -476,7 +476,7 @@ func (e *Exporter) collectPgMetrics(ch chan<- prometheus.Metric, instance Instan
 		}
 		if err := PQstatus(conn, instance.InstanceType); err != nil {
 			log.Warnf("skip collecting stats for %s, failed to check status: %s", instance.ServiceId, err.Error())
-			e.InstanceRepo.chRemoveInstance <- instance.Pid // удаляем инстанс их хэш карты
+			e.InstanceRepo.removeInstance(instance.Pid) // удаляем инстанс их хэш карты   // TODO: удаление не работает (проверено с баунсером) PQstatus выполняется успешно несмотря на то что баунсер выключен
 			return 0
 		}
 		// адаптируем запросы под конкретную версию
