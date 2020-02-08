@@ -23,6 +23,7 @@ type PrometheusExporter struct {
 	ServiceID   string                      // unique ID across all services
 	AllDesc     map[string]*prometheus.Desc // metrics assigned to this exporter
 	ServiceRepo ServiceRepo                 // service repository
+	TotalFailed int                         // total number of collecting failures
 }
 
 // StatDesc is the statistics descriptor, with detailed info about particular kind of stats
@@ -41,6 +42,9 @@ type StatDesc struct {
 const (
 	// regexp describes raw block devices except their partitions, but including stacked devices, such as device-mapper and mdraid
 	regexpBlockDevicesExtended = `((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`
+
+	// how many failures should occur before unregistering exporter
+	exporterFailureLimit int = 10
 )
 
 var (
@@ -202,6 +206,12 @@ func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
 				metricsCnt += e.collectPgMetrics(ch, service)
 			case model.ServiceTypeSystem:
 				metricsCnt += e.collectSystemMetrics(ch)
+			}
+
+			// check total number of failures, if too many errors then unregister exporter
+			if e.TotalFailed >= exporterFailureLimit {
+				prometheus.Unregister(e)
+				e.ServiceRepo.RemoveService(service.Pid)
 			}
 		}
 	}
@@ -467,13 +477,13 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 	if service.ServiceType == model.ServiceTypePostgresql {
 		conn, err := CreateConn(&service)
 		if err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to connect", service.ServiceId)
+			e.TotalFailed++
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceId)
 			return 0
 		}
 		if err := PQstatus(conn, service.ServiceType); err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to check status", service.ServiceId)
-			prometheus.Unregister(e)
-			e.ServiceRepo.RemoveService(service.Pid) // удаляем инстанс их хэш карты   // TODO: удаление не работает (проверено с баунсером) PQstatus выполняется успешно несмотря на то что баунсер выключен
+			e.TotalFailed++
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to check status", e.TotalFailed, exporterFailureLimit, service.ServiceId)
 			return 0
 		}
 		// адаптируем запросы под конкретную версию
@@ -507,7 +517,8 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 
 		conn, err := CreateConn(&service) // открываем коннект к базе
 		if err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting stats for database %s/%s, failed to connect", service.ServiceId, dbname)
+			e.TotalFailed++
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for database %s/%s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceId, dbname)
 			continue
 		}
 
@@ -641,6 +652,7 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			continue
 		}
 		desc.collectDone = true
+		e.TotalFailed = 0
 		e.Logger.Debug().Msgf("%s collected", desc.Name)
 	}
 }
