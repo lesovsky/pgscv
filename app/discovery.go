@@ -1,10 +1,11 @@
 //
-package discovery
+package app
 
 import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/process"
@@ -20,17 +21,11 @@ import (
 type ServiceRepo struct {
 	Logger   zerolog.Logger
 	Services map[int32]model.Service
-	Config   *DiscoveryConfig
-}
-
-type DiscoveryConfig struct {
-	Logger          zerolog.Logger
-	ProjectIdStr    string
-	ScheduleEnabled bool
+	Config   *Config
 }
 
 // NewServiceRepo creates new services repository
-func NewServiceRepo(config *DiscoveryConfig) *ServiceRepo {
+func NewServiceRepo(config *Config) *ServiceRepo {
 	return &ServiceRepo{
 		Logger:   config.Logger.With().Str("service", "discovery").Logger(),
 		Services: make(map[int32]model.Service),
@@ -120,7 +115,6 @@ func (repo *ServiceRepo) lookupServices() error {
 			continue // others are not interesting
 		}
 	}
-
 	return nil
 }
 
@@ -140,7 +134,20 @@ func (repo *ServiceRepo) setupServices() error {
 				// nothing to do
 			}
 
-			// put update service copy into repo
+			// create exporter for the service
+			exporter, err := NewExporter(newService, repo)
+			if err != nil {
+				return err
+			}
+			newService.Exporter = exporter
+
+			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
+			if repo.Config.MetricServiceBaseURL == "" {
+				prometheus.MustRegister(newService.Exporter)
+				repo.Logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", newService.ServiceId, newService.Pid)
+			}
+
+			// put updated service copy into repo
 			repo.Services[i] = newService
 		}
 	}

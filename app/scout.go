@@ -3,13 +3,11 @@ package app
 import (
 	"crypto/md5"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
 	"github.com/rs/zerolog"
 	"net/http"
 	"os"
-	"scout/app/discovery"
 	"time"
 )
 
@@ -17,36 +15,13 @@ import (
 func Start(c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
-	dc := &discovery.DiscoveryConfig{
-		Logger:          logger,
-		ProjectIdStr:    c.ProjectIdStr,
-		ScheduleEnabled: c.ScheduleEnabled,
-	}
-
-	instanceRepo := discovery.NewServiceRepo(dc)
+	instanceRepo := NewServiceRepo(c)
 	if err := instanceRepo.StartInitialDiscovery(); err != nil {
 		return err
 	}
 
 	// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
 	go instanceRepo.StartBackgroundDiscovery()
-
-	// создаем экспортер для экземпляра инстанса, затем помещаем созданный экспортер в экземпляр
-	var err error
-	for i, service := range instanceRepo.Services {
-		exporter, err := NewExporter(service, instanceRepo)
-		if err != nil {
-			return err
-		}
-
-		// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
-		if c.MetricServiceBaseURL == "" {
-			prometheus.MustRegister(exporter)
-			logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", service.ServiceId, service.Pid)
-		}
-		service.Exporter = exporter
-		instanceRepo.Services[i] = service
-	}
 
 	if c.MetricServiceBaseURL == "" {
 		logger.Info().Msg("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")

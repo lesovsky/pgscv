@@ -27,6 +27,8 @@ func main() {
 	kingpin.Parse()
 
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
 	var sc = &app.Config{
 		Logger:               log.Logger,
 		MetricServiceBaseURL: *metricServiceBaseURL,

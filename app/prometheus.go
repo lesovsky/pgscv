@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"scout/app/discovery"
 	"scout/app/model"
 	"scout/app/stat"
 	"strconv"
@@ -23,7 +22,7 @@ type PrometheusExporter struct {
 	Logger      zerolog.Logger              // logging
 	ServiceID   string                      // unique ID across all services
 	AllDesc     map[string]*prometheus.Desc // metrics assigned to this exporter
-	ServiceRepo discovery.ServiceRepo       // service repository
+	ServiceRepo ServiceRepo                 // service repository
 }
 
 // StatDesc is the statistics descriptor, with detailed info about particular kind of stats
@@ -149,7 +148,7 @@ func adjustQueries(descs []*StatDesc, pgVersion int) {
 }
 
 // NewExporter creates a new configured exporter
-func NewExporter(service model.Service, repo *discovery.ServiceRepo) (*PrometheusExporter, error) {
+func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -462,7 +461,7 @@ func (e *PrometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (c
 // После того как стата собрана, на основе данных хранилища формируем метрики для прометеуса. Учитывая что шаредная стата уже собрана, в последующих циклам собираем только приватную стату. И так пока на дойдем до конца списка баз
 func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, service model.Service) (cnt int) {
 	var dblist []string
-	var version int // version of Postgres or Pgbouncer or something else?
+	var version int // version of Postgres or Pgbouncer or whatever else
 
 	// формируем список баз -- как минимум в этот список будет входить база из автодискавери
 	if service.ServiceType == model.ServiceTypePostgresql {
