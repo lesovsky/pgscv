@@ -3,13 +3,11 @@ package main
 
 import (
 	"fmt"
-	"time"
-
-	//"github.com/prometheus/common/log"
 	"github.com/rs/zerolog"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"scout/app"
+	"time"
 )
 
 var (
@@ -69,15 +67,7 @@ func main() {
 		sc.ScheduleEnabled = true
 	}
 
-	instanceRepo := app.NewInstanceRepo(sc)
-	if err := instanceRepo.StartInitialDiscovery(); err != nil {
-		logger.Fatal().Err(err).Msg("initial discovery failed")
-	}
-
-	// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-	go instanceRepo.StartBackgroundDiscovery()
-
-	if err := app.Start(sc, instanceRepo); err != nil {
+	if err := app.Start(sc); err != nil {
 		logger.Error().Err(err)
 	}
 

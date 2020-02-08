@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/prometheus/common/log"
+	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"os/exec"
@@ -13,7 +13,7 @@ import (
 
 const unitTemplate = `
 [Unit]
-Description=pgSCV is the Weaponry platform agent for PostgreSQL ecosystem
+Description=Scout is the Weaponry platform agent for PostgreSQL ecosystem
 After=syslog.target network.target
 
 [Service]
@@ -22,25 +22,25 @@ Type=simple
 User=postgres
 Group=postgres
 
-Environment="PGSCV_PROJECTID={{ .ProjectId }}"
-Environment="PGSCV_METRIC_GATEWAY=https://push.wpnr.brcd.pro"
-Environment="PGSCV_SEND_INTERVAL=60s"
+Environment="PROJECTID={{ .ProjectId }}"
+Environment="METRIC_SERVICE_BASE_URL=https://push.wpnr.brcd.pro"
+Environment="SEND_INTERVAL=60s"
 
 WorkingDirectory=~
 
-# Start the pgscv process
-ExecStart=/usr/bin/pgscv
+# Start the agent process
+ExecStart=/usr/bin/scout
 
-# Only kill the pgscv process
+# Only kill the agent process
 KillMode=process
 
-# Wait reasonable amount of time for pgSCV up/down
+# Wait reasonable amount of time for agent up/down
 TimeoutSec=5
 
-# Restart pgSCV if it crashes
+# Restart agent if it crashes
 Restart=on-failure
 
-# pgSCV might leak during long period of time, let him to be the first person for eviction
+# if agent leaks during long period of time, let him to be the first person for eviction
 OOMScoreAdjust=1000
 
 [Install]
@@ -69,7 +69,7 @@ func newBootstrapConfig(configHash string) (*bootstrapConfig, error) {
 
 // RunBootstrap is the main bootstrap entry point
 func RunBootstrap(configHash string) int {
-	log.Info("Running bootstrap")
+	log.Info().Msg("Running bootstrap")
 	if err := preCheck(configHash); err != nil {
 		return bootstrapFailed(err)
 	}
@@ -97,7 +97,7 @@ func RunBootstrap(configHash string) int {
 		}
 	}
 
-	if err := runPgscv(); err != nil {
+	if err := runAgent(); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -110,7 +110,7 @@ func RunBootstrap(configHash string) int {
 
 // run pre-bootstrap checks
 func preCheck(configHash string) error {
-	log.Info("pre-bootstrap checks")
+	log.Info().Msg("pre-bootstrap checks")
 	if configHash == "" {
 		return fmt.Errorf("empty config passed")
 	}
@@ -127,40 +127,40 @@ func preCheck(configHash string) error {
 	return nil
 }
 
-// installs pgscv binary
+// installs agent binary
 func installBin() error {
-	log.Info("install pgscv")
-	from, err := os.Open("./pgscv")
+	log.Info().Msg("install agent")
+	from, err := os.Open("./scout")
 	if err != nil {
-		return fmt.Errorf("open pgscv file failed: %s", err)
+		return fmt.Errorf("open file failed: %s", err)
 
 	}
-	to, err := os.OpenFile("/usr/bin/pgscv", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	to, err := os.OpenFile("/usr/bin/scout", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("open destination file failed: %s", err)
 	}
 	_, err = io.Copy(to, from)
 	if err != nil {
-		return fmt.Errorf("copy pgscv file failed: %s", err)
+		return fmt.Errorf("copy file failed: %s", err)
 	}
 	if err = from.Close(); err != nil {
-		log.Warnf("close source pgscv file failed: %s, ignore it ", err)
+		log.Warn().Err(err).Msg("close source file failed, ignore it")
 	}
 	if err = to.Close(); err != nil {
-		log.Warnf("close destination pgscv file failed: %s, ignore it ", err)
+		log.Warn().Err(err).Msg("close destination file failed, ignore it")
 	}
 	return nil
 }
 
 // creates systemd unit in system path
 func createSystemdUnit(config *bootstrapConfig) error {
-	log.Info("create systemd unit")
+	log.Info().Msg("create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	f, err := os.Create("/etc/systemd/system/pgscv.service")
+	f, err := os.Create("/etc/systemd/system/scout.service")
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
 	}
@@ -171,21 +171,21 @@ func createSystemdUnit(config *bootstrapConfig) error {
 	}
 
 	if err = f.Close(); err != nil {
-		log.Warnf("close file failed: %s, ignore it ", err)
+		log.Warn().Err(err).Msg("close file failed, ignore it")
 	}
 	return nil
 }
 
 // reloads systemd
 func reloadSystemd() error {
-	log.Info("reload systemd")
+	log.Info().Msg("reload systemd")
 	cmd := exec.Command("systemctl", "daemon-reload")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("systemd reload failed: %s ", err)
 	}
-	log.Info("bootstrap: waiting until systemd daemon-reload to finish...")
 
+	log.Info().Msg("bootstrap: waiting until systemd daemon-reload to finish...")
 	err = cmd.Wait()
 	if err != nil {
 		return fmt.Errorf("systemd reload failed: %s ", err)
@@ -193,15 +193,15 @@ func reloadSystemd() error {
 	return nil
 }
 
-// enables pgscv autostart
+// enables agent autostart
 func enableAutostart() error {
-	log.Info("enable autostart")
-	cmd := exec.Command("systemctl", "enable", "pgscv.service")
+	log.Info().Msg("enable autostart")
+	cmd := exec.Command("systemctl", "enable", "scout.service")
 	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("enable pgscv service failed: %s ", err)
+		return fmt.Errorf("enable agent service failed: %s ", err)
 	}
-	log.Info("bootstrap: waiting until systemd enables pgscv service...")
+	log.Info().Msg("bootstrap: waiting until systemd enables agent service...")
 
 	err = cmd.Wait()
 	if err != nil {
@@ -210,16 +210,16 @@ func enableAutostart() error {
 	return nil
 }
 
-// run pgscv systemd unit
-func runPgscv() error {
-	log.Info("run pgscv")
-	cmd := exec.Command("systemctl", "start", "pgscv.service")
+// run agent systemd unit
+func runAgent() error {
+	log.Info().Msg("run agent")
+	cmd := exec.Command("systemctl", "start", "scout.service")
 	err := cmd.Start()
 	if err != nil {
-		return fmt.Errorf("start pgscv service failed: %s ", err)
+		return fmt.Errorf("start agent service failed: %s ", err)
 
 	}
-	log.Info("bootstrap: waiting until systemd starts pgscv service...")
+	log.Info().Msg("bootstrap: waiting until systemd starts agent service...")
 
 	err = cmd.Wait()
 	if err != nil {
@@ -230,19 +230,19 @@ func runPgscv() error {
 
 // delete self executable
 func deleteSelf() error {
-	log.Info("cleanup")
-	return os.Remove("pgscv")
+	log.Info().Msg("cleanup")
+	return os.Remove("scout")
 }
 
 // bootstrapFailed signales bootstrap failed with error
 func bootstrapFailed(e error) int {
-	log.Errorf("stop bootstrap: %s", e)
+	log.Error().Err(e).Msg("stop bootstrap: %s")
 	return 1
 }
 
 // bootstrapSuccessful signales bootstrap finished successfully
 func bootstrapSuccessful() int {
-	log.Info("bootstrap successful")
+	log.Info().Msg("bootstrap successful")
 	return 0
 }
 

@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/prometheus/common/log"
+	"github.com/rs/zerolog/log"
 	"time"
 )
 
@@ -28,7 +28,7 @@ func (s *StatDesc) IsScheduleExpired() bool {
 	if elapsed < s.Interval {
 		return false
 	}
-	log.Debugf("time for %s, elapsed: %v > %v", s.Name, elapsed, s.Interval)
+	log.Debug().Msgf("time for %s, elapsed: %v > %v", s.Name, elapsed, s.Interval)
 	return true
 }
 

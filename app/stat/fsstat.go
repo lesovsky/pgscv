@@ -6,7 +6,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/prometheus/common/log"
+	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"
 	"os"
@@ -152,7 +152,7 @@ func ReadMounts() map[string]string {
 func resolveDeviceMapperName(device string) string {
 	device, err := os.Readlink(device)
 	if err != nil {
-		log.Warnf("failed to resolve symlink '%s' to origin: %s\n", device, err)
+		log.Warn().Err(err).Msgf("failed to resolve symlink '%s' to origin", device)
 		return ""
 	}
 	return strings.Replace(device, "..", "/dev", 1)

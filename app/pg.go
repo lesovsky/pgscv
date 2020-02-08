@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	log "github.com/prometheus/common/log"
+	"scout/app/model"
 )
 
 const (
@@ -43,8 +44,8 @@ const (
 )
 
 // CreateConn assembles 'libpq' connection string, connects to Postgres and returns 'connection' object
-func CreateConn(c *Instance) (conn *sql.DB, err error) {
-	if c.InstanceType != stypePostgresql && c.InstanceType != stypePgbouncer {
+func CreateConn(c *model.Service) (conn *sql.DB, err error) {
+	if c.ServiceType != model.ServiceTypePostgresql && c.ServiceType != model.ServiceTypePgbouncer {
 		return nil, nil
 	}
 
@@ -56,7 +57,7 @@ func CreateConn(c *Instance) (conn *sql.DB, err error) {
 	}
 
 	// Check connection accepts commands
-	if err := PQstatus(conn, c.InstanceType); err != nil {
+	if err := PQstatus(conn, c.ServiceType); err != nil {
 		return nil, err
 	}
 
@@ -66,7 +67,7 @@ func CreateConn(c *Instance) (conn *sql.DB, err error) {
 	}
 
 	// Set session's safe settings for PostgreSQL conns
-	if c.InstanceType == stypePostgresql {
+	if c.ServiceType == model.ServiceTypePostgresql {
 		setSafeSession(conn)
 	}
 
@@ -74,7 +75,7 @@ func CreateConn(c *Instance) (conn *sql.DB, err error) {
 }
 
 // Build connection string using connection settings
-func assembleConnstr(c *Instance) string {
+func assembleConnstr(c *model.Service) string {
 	s := "sslmode=disable application_name=pgscv "
 	if c.Host != "" {
 		s = fmt.Sprintf("%s host=%s ", s, c.Host)
@@ -92,7 +93,7 @@ func assembleConnstr(c *Instance) string {
 }
 
 // PQconnectdb connects to Postgres
-func PQconnectdb(c *Instance, connstr string) (conn *sql.DB, err error) {
+func PQconnectdb(c *model.Service, connstr string) (conn *sql.DB, err error) {
 	conn, err = sql.Open(dbDriver, connstr)
 	if err != nil {
 		return nil, err
@@ -101,7 +102,7 @@ func PQconnectdb(c *Instance, connstr string) (conn *sql.DB, err error) {
 }
 
 // Fill empty connection settings by normal values.
-func replaceEmptySettings(c *Instance, conn *sql.DB) (err error) {
+func replaceEmptySettings(c *model.Service, conn *sql.DB) (err error) {
 	if c.Host == "" {
 		c.Host, err = PQhost(conn)
 		if err != nil {
@@ -189,9 +190,9 @@ func PQstatus(c *sql.DB, itype int) error {
 	var q string
 
 	switch itype {
-	case stypePostgresql:
+	case model.ServiceTypePostgresql:
 		q = PQstatusQueryPostgres
-	case stypePgbouncer:
+	case model.ServiceTypePgbouncer:
 		q = PQstatusQueryBouncer
 	}
 
