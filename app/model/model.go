@@ -18,6 +18,7 @@ type Service struct {
 	Host        string   // Hostname used as part of a connection string (related to postgresql, pgbouncer)
 	Port        int      // Port used as part of a connection string (related to postgresql, pgbouncer)
 	User        string   // Username used as part of a connection string (related to postgresql, pgbouncer)
+	Password    string   // Password used as part of a connection string (related to postgresql, pgbouncer)
 	Dbname      string   // Database name used as part of a connection string (related to postgresql, pgbouncer)
 	Exporter    Exporter // Exporter associated with instance
 }

@@ -76,7 +76,7 @@ func CreateConn(c *model.Service) (conn *sql.DB, err error) {
 
 // Build connection string using connection settings
 func assembleConnstr(c *model.Service) string {
-	s := "sslmode=disable application_name=pgscv "
+	s := "sslmode=disable application_name=scout "
 	if c.Host != "" {
 		s = fmt.Sprintf("%s host=%s ", s, c.Host)
 	}
@@ -85,6 +85,9 @@ func assembleConnstr(c *model.Service) string {
 	}
 	if c.User != "" {
 		s = fmt.Sprintf("%s user=%s ", s, c.User)
+	}
+	if c.Password != "" {
+		s = fmt.Sprintf("%s password=%s ", s, c.Password)
 	}
 	if c.Dbname != "" {
 		s = fmt.Sprintf("%s dbname=%s ", s, c.Dbname)

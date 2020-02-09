@@ -103,6 +103,8 @@ func (repo *ServiceRepo) lookupServices() error {
 				if err != nil {
 					return err
 				}
+				postgres.User = repo.Config.Credentials.PostgresUser
+				postgres.Password = repo.Config.Credentials.PostgresPass
 				repo.Services[pid] = postgres // add postgresql service to the repo
 			}
 		case "pgbouncer":
@@ -110,6 +112,8 @@ func (repo *ServiceRepo) lookupServices() error {
 			if err != nil {
 				return err
 			}
+			pgbouncer.User = repo.Config.Credentials.PgbouncerUser
+			pgbouncer.Password = repo.Config.Credentials.PgbouncerPass
 			repo.Services[pid] = pgbouncer // add pgbouncer service to the repo
 		default:
 			continue // others are not interesting
@@ -225,6 +229,8 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 }
 
 // discoverPostgres
+// Postgres discovering works through looking for Postgres's UNIX socket. Potentially Postgres might be configured
+// without listening on UNIX socket, thus agent should foresee additional methods for such case.
 func discoverPostgres(proc *process.Process) (model.Service, error) {
 	// надо найти сокет для коннекта
 	cmdline, err := proc.CmdlineSlice()
@@ -251,11 +257,14 @@ func discoverPostgres(proc *process.Process) (model.Service, error) {
 				if err == io.EOF {
 					break
 				} else if err != nil {
-					return model.Service{}, fmt.Errorf("failed to content of postmaster.pid: %s", err)
+					return model.Service{}, fmt.Errorf("failed reading content of postmaster.pid: %s", err)
 				}
 				switch i {
 				case 3:
-					port, _ = strconv.Atoi(string(line))
+					port, err = strconv.Atoi(string(line))
+					if err != nil {
+						return model.Service{}, fmt.Errorf("failed reading content of postmaster.pid: %s", err)
+					}
 				case 4:
 					unixsocketdir = string(line)
 					//case 5:
@@ -264,6 +273,7 @@ func discoverPostgres(proc *process.Process) (model.Service, error) {
 			}
 		}
 	}
+
 	log.Info().Msgf("auto-discovery: postgresql service has been found, pid %d, available through %s, port %d", proc.Pid, unixsocketdir, port)
-	return model.Service{ServiceType: model.ServiceTypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: port}, nil
+	return model.Service{ServiceType: model.ServiceTypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: port, Dbname: "postgres"}, nil
 }

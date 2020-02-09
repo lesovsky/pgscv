@@ -21,6 +21,10 @@ func main() {
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		projectIdStr         = kingpin.Flag("projectid", "Project identifier string").Envar("PROJECTID").String()
 		bootstrapKey         = kingpin.Flag("bootstrap-key", "Run bootstrap using specified key, requires root privileges").Envar("BOOTSTRAP_KEY").String()
+		postgresUsername     = kingpin.Flag("pg-username", "Username used for connecting to Postgres services").Default("scout").Envar("PG_USERNAME").String()
+		postgresPassword     = kingpin.Flag("pg-password", "Password used for connecting to Postgres services").Default("").Envar("PG_PASSWORD").String()
+		pgbouncerUsername    = kingpin.Flag("pgb-username", "Username used for connecting to Pgbouncer services").Default("scout").Envar("PGB_USERNAME").String()
+		pgbouncerPassword    = kingpin.Flag("pgb-password", "Password used for connecting to Pgbouncer services").Default("").Envar("PGB_PASSWORD").String()
 		showver              = kingpin.Flag("version", "show version and exit").Default().Bool()
 		logLevel             = kingpin.Flag("log-level", "set log level: debug, info, warn, error").Default("info").Envar("LOG_LEVEL").String()
 	)
@@ -36,6 +40,12 @@ func main() {
 		ProjectIdStr:         *projectIdStr,
 		ScheduleEnabled:      false,
 		BootstrapKey:         *bootstrapKey,
+		Credentials: app.Credentials{
+			PostgresUser:  *postgresUsername,
+			PostgresPass:  *postgresPassword,
+			PgbouncerUser: *pgbouncerUsername,
+			PgbouncerPass: *pgbouncerPassword,
+		},
 	}
 
 	switch *logLevel {
