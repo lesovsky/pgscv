@@ -9,27 +9,34 @@ import (
 	"os"
 	"os/exec"
 	"text/template"
+	"time"
 )
+
+const envFileTemplate = `PROJECTID={{ .ProjectId }}
+METRIC_SERVICE_BASE_URL={{ .MetricServiceBaseURL }}
+SEND_INTERVAL={{ .SendInterval }}
+PG_USERNAME={{ .Credentials.PostgresUser }}
+PG_PASSWORD={{ .Credentials.PostgresPass }}
+PGB_USERNAME={{ .Credentials.PgbouncerUser }}
+PGB_PASSWORD={{ .Credentials.PgbouncerPass }}
+`
 
 const unitTemplate = `
 [Unit]
-Description=Scout is the Weaponry platform agent for PostgreSQL ecosystem
+Description={{ .AgentBinaryName }} is the Weaponry platform agent for PostgreSQL ecosystem
 After=syslog.target network.target
 
 [Service]
 Type=simple
 
-User=postgres
-Group=postgres
+User=root
+Group=root
 
-Environment="PROJECTID={{ .ProjectId }}"
-Environment="METRIC_SERVICE_BASE_URL=https://push.wpnr.brcd.pro"
-Environment="SEND_INTERVAL=60s"
-
+EnvironmentFile=/etc/environment.d/weaponry-agent.conf
 WorkingDirectory=~
 
 # Start the agent process
-ExecStart=/usr/local/bin/scout
+ExecStart=/usr/local/bin/{{ .AgentBinaryName }}
 
 # Only kill the agent process
 KillMode=process
@@ -45,41 +52,51 @@ OOMScoreAdjust=1000
 
 [Install]
 WantedBy=multi-user.target
-
 `
 
 type bootstrapConfig struct {
-	ProjectId int64 `json:"project_id"`
-	AutoStart bool  `json:"autostart"`
+	AgentBinaryName      string
+	MetricServiceBaseURL string        `json:"metric_service_base_url"`
+	SendInterval         time.Duration `json:"send_interval"`
+	ProjectId            int64         `json:"project_id"`
+	AutoStart            bool          `json:"autostart"`
+	Credentials
 }
 
-func newBootstrapConfig(configHash string) (*bootstrapConfig, error) {
+func newBootstrapConfig(appconfig *Config) (*bootstrapConfig, error) {
 	// parse confighash string to config struct
-	data, err := base64.StdEncoding.DecodeString(configHash)
+	data, err := base64.StdEncoding.DecodeString(appconfig.BootstrapKey)
 	if err != nil {
 		return nil, fmt.Errorf("decode failed: %s", err)
 	}
 	var c bootstrapConfig
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, fmt.Errorf("json unmarshalling failed: %s", err)
-
 	}
+	c.AgentBinaryName = appconfig.BootstrapBinaryName
+	c.MetricServiceBaseURL = appconfig.MetricServiceBaseURL
+	c.SendInterval = appconfig.MetricsSendInterval
+	c.Credentials = appconfig.Credentials
 	return &c, nil
 }
 
 // RunBootstrap is the main bootstrap entry point
-func RunBootstrap(configHash string) int {
+func RunBootstrap(appconfig *Config) int {
 	log.Info().Msg("Running bootstrap")
-	if err := preCheck(configHash); err != nil {
+	if err := preCheck(appconfig.BootstrapKey); err != nil {
 		return bootstrapFailed(err)
 	}
 
-	config, err := newBootstrapConfig(configHash)
+	config, err := newBootstrapConfig(appconfig)
 	if err != nil {
 		return bootstrapFailed(err)
 	}
 
-	if err := installBin(); err != nil {
+	if err := installBin(config); err != nil {
+		return bootstrapFailed(err)
+	}
+
+	if err := createEnvironmentFile(config); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -92,16 +109,16 @@ func RunBootstrap(configHash string) int {
 	}
 
 	if config.AutoStart {
-		if err := enableAutostart(); err != nil {
+		if err := enableAutostart(config); err != nil {
 			return bootstrapFailed(err)
 		}
 	}
 
-	if err := runAgent(); err != nil {
+	if err := runAgent(config); err != nil {
 		return bootstrapFailed(err)
 	}
 
-	if err := deleteSelf(); err != nil {
+	if err := deleteSelf(config); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -128,14 +145,17 @@ func preCheck(configHash string) error {
 }
 
 // installs agent binary
-func installBin() error {
+func installBin(config *bootstrapConfig) error {
 	log.Info().Msg("Install agent")
-	from, err := os.Open("./scout")
+	fromFilename := fmt.Sprintf("./%s", config.AgentBinaryName)
+	toFilename := fmt.Sprintf("/usr/local/bin/%s", config.AgentBinaryName)
+
+	from, err := os.Open(fromFilename)
 	if err != nil {
 		return fmt.Errorf("open file failed: %s", err)
 
 	}
-	to, err := os.OpenFile("/usr/local/bin/scout", os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	to, err := os.OpenFile(toFilename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
 	if err != nil {
 		return fmt.Errorf("open destination file failed: %s", err)
 	}
@@ -153,6 +173,31 @@ func installBin() error {
 }
 
 // creates systemd unit in system path
+func createEnvironmentFile(config *bootstrapConfig) error {
+	log.Info().Msg("Create environment file")
+	t, err := template.New("envconf").Parse(envFileTemplate)
+	if err != nil {
+		return fmt.Errorf("parse template failed: %s", err)
+	}
+
+	envfile := fmt.Sprintf("/etc/environment.d/%s.conf", config.AgentBinaryName)
+	f, err := os.Create(envfile)
+	if err != nil {
+		return fmt.Errorf("create environment file failed: %s ", err)
+	}
+
+	err = t.Execute(f, config)
+	if err != nil {
+		return fmt.Errorf("execute template failed: %s ", err)
+	}
+
+	if err = f.Close(); err != nil {
+		log.Warn().Err(err).Msg("close file failed, ignore it")
+	}
+	return nil
+}
+
+// creates systemd unit in system path
 func createSystemdUnit(config *bootstrapConfig) error {
 	log.Info().Msg("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
@@ -160,7 +205,8 @@ func createSystemdUnit(config *bootstrapConfig) error {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	f, err := os.Create("/etc/systemd/system/scout-agent.service")
+	unitfile := fmt.Sprintf("/etc/systemd/system/%s.service", config.AgentBinaryName)
+	f, err := os.Create(unitfile)
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
 	}
@@ -194,9 +240,11 @@ func reloadSystemd() error {
 }
 
 // enables agent autostart
-func enableAutostart() error {
+func enableAutostart(config *bootstrapConfig) error {
 	log.Info().Msg("Enable autostart")
-	cmd := exec.Command("systemctl", "enable", "scout-agent.service")
+
+	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
+	cmd := exec.Command("systemctl", "enable", servicename)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("enable agent service failed: %s ", err)
@@ -211,9 +259,11 @@ func enableAutostart() error {
 }
 
 // run agent systemd unit
-func runAgent() error {
+func runAgent(config *bootstrapConfig) error {
 	log.Info().Msg("Run agent")
-	cmd := exec.Command("systemctl", "start", "scout-agent.service")
+
+	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
+	cmd := exec.Command("systemctl", "start", servicename)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("start agent service failed: %s ", err)
@@ -229,9 +279,10 @@ func runAgent() error {
 }
 
 // delete self executable
-func deleteSelf() error {
+func deleteSelf(config *bootstrapConfig) error {
 	log.Info().Msg("Cleanup")
-	return os.Remove("scout")
+	filename := fmt.Sprintf("./%s", config.AgentBinaryName)
+	return os.Remove(filename)
 }
 
 // bootstrapFailed signales bootstrap failed with error

@@ -11,7 +11,7 @@ import (
 	"github.com/shirou/gopsutil/process"
 	"io"
 	"io/ioutil"
-	"scout/app/model"
+	"pgscv/app/model"
 	"strconv"
 	"strings"
 	"time"

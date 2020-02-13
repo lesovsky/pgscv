@@ -13,6 +13,7 @@ type Config struct {
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
 	BootstrapKey         string
+	BootstrapBinaryName  string
 	Credentials          Credentials
 }
 

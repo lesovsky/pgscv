@@ -1,12 +1,13 @@
 DOCKER_ACCOUNT = barcodepro
 SITENAME = weaponry
-APPNAME = scout
+APPNAME = agent
+BINNAME = ${SITENAME}-${APPNAME}
 IMAGENAME = ${APPNAME}-distribution
 
 COMMIT=$(shell git rev-parse --short HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
-LDFLAGS = -a -installsuffix cgo -ldflags "-X main.appName=${APPNAME} -X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
+LDFLAGS = -a -installsuffix cgo -ldflags "-X main.binName=${BINNAME} -X main.appName=${APPNAME} -X main.COMMIT=${COMMIT} -X main.BRANCH=${BRANCH}"
 DESTDIR ?=
 
 .PHONY: help clean build docker-build docker-push deploy
@@ -22,12 +23,12 @@ help:
 	@echo "  * deploy -e ENV=env     deploy to Kubernetes"
 
 clean:
-	rm -f ${APPNAME} ${APPNAME}.tar.gz
+	rm -f bin/${BINNAME} bin/${BINNAME}.tar.gz
 
 build:
 	go mod download
-	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o ${APPNAME} ./cmd/app
-	tar czf ${APPNAME}.tar.gz ${APPNAME}
+	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${BINNAME} ./cmd/app
+	tar czf ./bin/${BINNAME}.tar.gz -C ./bin ${BINNAME}
 
 docker-build:
 	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT} .

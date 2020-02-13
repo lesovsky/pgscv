@@ -7,31 +7,34 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
-	"scout/app"
+	"os/user"
+	"pgscv/app"
+	"strings"
 	"time"
 )
 
 var (
-	appName, gitCommit, gitBranch string
+	binName, appName, gitCommit, gitBranch string
 )
 
 func main() {
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+
 	var (
+		username             = serviceUsername()
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").String()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		projectIdStr         = kingpin.Flag("projectid", "Project identifier string").Envar("PROJECTID").String()
 		bootstrapKey         = kingpin.Flag("bootstrap-key", "Run bootstrap using specified key, requires root privileges").Envar("BOOTSTRAP_KEY").String()
-		postgresUsername     = kingpin.Flag("pg-username", "Username used for connecting to Postgres services").Default("scout").Envar("PG_USERNAME").String()
+		postgresUsername     = kingpin.Flag("pg-username", "Username used for connecting to Postgres services").Default(username).Envar("PG_USERNAME").String()
 		postgresPassword     = kingpin.Flag("pg-password", "Password used for connecting to Postgres services").Default("").Envar("PG_PASSWORD").String()
-		pgbouncerUsername    = kingpin.Flag("pgb-username", "Username used for connecting to Pgbouncer services").Default("scout").Envar("PGB_USERNAME").String()
+		pgbouncerUsername    = kingpin.Flag("pgb-username", "Username used for connecting to Pgbouncer services").Default(username).Envar("PGB_USERNAME").String()
 		pgbouncerPassword    = kingpin.Flag("pgb-password", "Password used for connecting to Pgbouncer services").Default("").Envar("PGB_PASSWORD").String()
 		showver              = kingpin.Flag("version", "show version and exit").Default().Bool()
 		logLevel             = kingpin.Flag("log-level", "set log level: debug, info, warn, error").Default("info").Envar("LOG_LEVEL").String()
 	)
 	kingpin.Parse()
-
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	var sc = &app.Config{
 		Logger:               log.Logger,
@@ -40,6 +43,7 @@ func main() {
 		ProjectIdStr:         *projectIdStr,
 		ScheduleEnabled:      false,
 		BootstrapKey:         *bootstrapKey,
+		BootstrapBinaryName:  binName,
 		Credentials: app.Credentials{
 			PostgresUser:  *postgresUsername,
 			PostgresPass:  *postgresPassword,
@@ -67,7 +71,7 @@ func main() {
 	}
 
 	if sc.BootstrapKey != "" {
-		os.Exit(app.RunBootstrap(sc.BootstrapKey))
+		os.Exit(app.RunBootstrap(sc))
 	}
 
 	// обязательно должен быть
@@ -85,4 +89,15 @@ func main() {
 	}
 
 	log.Info().Msg("Graceful shutdown")
+}
+
+// serviceUsername provides default username used for connecting to services, if no usernames provided by EnvVars.
+func serviceUsername() string {
+	var username = strings.ToLower(strings.Replace(binName, "-", "_", -1))
+	u, err := user.Current()
+	if err != nil {
+		log.Warn().Err(err).Msgf("failed getting current username, use fallback username: %s", username)
+		return username
+	}
+	return u.Username
 }

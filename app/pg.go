@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/lib/pq"
 	log "github.com/prometheus/common/log"
-	"scout/app/model"
+	"pgscv/app/model"
 )
 
 const (
@@ -76,7 +76,7 @@ func CreateConn(c *model.Service) (conn *sql.DB, err error) {
 
 // Build connection string using connection settings
 func assembleConnstr(c *model.Service) string {
-	s := "sslmode=disable application_name=scout "
+	s := fmt.Sprintf("sslmode=disable application_name=%s ", c.User)
 	if c.Host != "" {
 		s = fmt.Sprintf("%s host=%s ", s, c.Host)
 	}
