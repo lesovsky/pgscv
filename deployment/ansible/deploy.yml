@@ -2,7 +2,7 @@
 - hosts: localhost
   vars:
     cleanup: 1
-    appname: pgscv-distribution
+    appname: agent-distribution
   vars_files:
     - ./vars/{{ env }}.yml
   tasks:

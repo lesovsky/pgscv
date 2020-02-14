@@ -12,8 +12,8 @@ FROM nginx:1.17.8
 RUN rm /etc/nginx/nginx.conf
 RUN rm /etc/nginx/conf.d/default.conf
 COPY ./extras/nginx.conf /etc/nginx/nginx.conf
-COPY ./extras/pgscv.conf /etc/nginx/conf.d/pgscv.conf
-COPY --from=build-stage /app/pgscv.tar.gz /var/www/html/pgscv.tar.gz
+COPY ./extras/agent.conf /etc/nginx/conf.d/agent.conf
+COPY --from=build-stage /app/bin/weaponry-agent.tar.gz /var/www/html/weaponry-agent.tar.gz
 EXPOSE 1080
 STOPSIGNAL SIGTERM
 CMD ["nginx", "-g", "daemon off;"]
