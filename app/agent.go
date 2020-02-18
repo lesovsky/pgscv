@@ -41,10 +41,19 @@ func Start(c *Config) error {
 	var pusher *push.Pusher
 
 	for {
+		// TODO: не должно ли создание pusher/client вынесено из цикла?
+
 		// A garbage label is the special one which provides metrics uniqueness across several hosts and guarantees
 		// metrics will not be overwritten on Pushgateway side. There is no other use-cases for this label, hence
 		// before ingesting by Prometheus this label should be removed with 'metric_relabel_config' rule.
 		pusher = push.New(c.MetricServiceBaseURL, garbageLabel)
+
+		// if api-key specified use custom http-client and attach api-key to http requests
+		if c.ApiKey != "" {
+			client := NewHttpClient(c.ApiKey)
+			pusher.Client(client)
+		}
+
 		for _, service := range instanceRepo.Services {
 			pusher.Collector(service.Exporter)
 		}

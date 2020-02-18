@@ -11,6 +11,7 @@ require (
 	github.com/prometheus/common v0.8.0
 	github.com/rs/zerolog v1.17.2
 	github.com/shirou/gopsutil v2.19.12+incompatible
+	github.com/stretchr/testify v1.4.0
 	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1 // indirect
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect

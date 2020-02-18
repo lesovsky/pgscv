@@ -16,11 +16,11 @@ DESTDIR ?=
 
 help:
 	@echo "Makefile available targets:"
-	@echo "  * clean                 remove program executable"
-	@echo "  * build                 build program executable"
-	@echo "  * docker-build          build Docker image"
-	@echo "  * docker-push           push Docker image to Registry"
-	@echo "  * deploy -e ENV=env     deploy to Kubernetes"
+	@echo "  * clean                      remove program executable"
+	@echo "  * build                      build program executable"
+	@echo "  * docker-build -e ENV=env    build Docker image"
+	@echo "  * docker-push                push Docker image to Registry"
+	@echo "  * deploy -e ENV=env          deploy to Kubernetes"
 
 clean:
 	rm -f bin/${BINNAME} bin/${BINNAME}.tar.gz
@@ -31,8 +31,10 @@ build:
 	tar czf ./bin/${BINNAME}.tar.gz -C ./bin ${BINNAME}
 
 docker-build:
+	./extras/genscript.sh ${ENV} > ./bin/install.sh
 	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT} .
 	docker image prune --force --filter label=stage=intermediate
+	rm ./bin/install.sh
 
 docker-push:
 	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}

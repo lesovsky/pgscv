@@ -1,8 +1,6 @@
 package app
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"github.com/rs/zerolog/log"
 	"io"
@@ -12,7 +10,7 @@ import (
 	"time"
 )
 
-const envFileTemplate = `PROJECTID={{ .ProjectId }}
+const envFileTemplate = `API_KEY={{ .ApiKey }}
 METRIC_SERVICE_BASE_URL={{ .MetricServiceBaseURL }}
 SEND_INTERVAL={{ .SendInterval }}
 PG_USERNAME={{ .Credentials.PostgresUser }}
@@ -58,39 +56,29 @@ type bootstrapConfig struct {
 	AgentBinaryName      string
 	MetricServiceBaseURL string        `json:"metric_service_base_url"`
 	SendInterval         time.Duration `json:"send_interval"`
-	ProjectId            int64         `json:"project_id"`
+	ApiKey               string        `json:"api_key"`
 	AutoStart            bool          `json:"autostart"`
 	Credentials
 }
 
-func newBootstrapConfig(appconfig *Config) (*bootstrapConfig, error) {
-	// parse confighash string to config struct
-	data, err := base64.StdEncoding.DecodeString(appconfig.BootstrapKey)
-	if err != nil {
-		return nil, fmt.Errorf("decode failed: %s", err)
+func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
+	return &bootstrapConfig{
+		ApiKey:               appconfig.ApiKey,
+		AgentBinaryName:      appconfig.BootstrapBinaryName,
+		MetricServiceBaseURL: appconfig.MetricServiceBaseURL,
+		SendInterval:         appconfig.MetricsSendInterval,
+		Credentials:          appconfig.Credentials,
 	}
-	var c bootstrapConfig
-	if err := json.Unmarshal(data, &c); err != nil {
-		return nil, fmt.Errorf("json unmarshalling failed: %s", err)
-	}
-	c.AgentBinaryName = appconfig.BootstrapBinaryName
-	c.MetricServiceBaseURL = appconfig.MetricServiceBaseURL
-	c.SendInterval = appconfig.MetricsSendInterval
-	c.Credentials = appconfig.Credentials
-	return &c, nil
 }
 
 // RunBootstrap is the main bootstrap entry point
 func RunBootstrap(appconfig *Config) int {
 	log.Info().Msg("Running bootstrap")
-	if err := preCheck(appconfig.BootstrapKey); err != nil {
+	if err := preCheck(); err != nil {
 		return bootstrapFailed(err)
 	}
 
-	config, err := newBootstrapConfig(appconfig)
-	if err != nil {
-		return bootstrapFailed(err)
-	}
+	config := newBootstrapConfig(appconfig)
 
 	if err := installBin(config); err != nil {
 		return bootstrapFailed(err)
@@ -126,11 +114,8 @@ func RunBootstrap(appconfig *Config) int {
 }
 
 // run pre-bootstrap checks
-func preCheck(configHash string) error {
+func preCheck() error {
 	log.Info().Msg("Run pre-bootstrap checks")
-	if configHash == "" {
-		return fmt.Errorf("empty config passed")
-	}
 
 	// check is system systemd-aware
 	if !isRunningSystemd() {

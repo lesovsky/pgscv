@@ -25,8 +25,8 @@ func main() {
 		username             = serviceUsername()
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").String()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
-		projectIdStr         = kingpin.Flag("projectid", "Project identifier string").Envar("PROJECTID").String()
-		bootstrapKey         = kingpin.Flag("bootstrap-key", "Run bootstrap using specified key, requires root privileges").Envar("BOOTSTRAP_KEY").String()
+		doBootstrap          = kingpin.Flag("bootstrap", "Run bootstrap, requires root privileges").Default("false").Envar("BOOTSTRAP").Bool()
+		apiKey               = kingpin.Flag("api-key", "Use api key").Default("").Envar("API_KEY").String()
 		postgresUsername     = kingpin.Flag("pg-username", "Username used for connecting to Postgres services").Default(username).Envar("PG_USERNAME").String()
 		postgresPassword     = kingpin.Flag("pg-password", "Password used for connecting to Postgres services").Default("").Envar("PG_PASSWORD").String()
 		pgbouncerUsername    = kingpin.Flag("pgb-username", "Username used for connecting to Pgbouncer services").Default(username).Envar("PGB_USERNAME").String()
@@ -40,9 +40,9 @@ func main() {
 		Logger:               log.Logger,
 		MetricServiceBaseURL: *metricServiceBaseURL,
 		MetricsSendInterval:  *metricsSendInterval,
-		ProjectIdStr:         *projectIdStr,
+		ProjectIdStr:         app.DecodeProjectIdStr(*apiKey),
 		ScheduleEnabled:      false,
-		BootstrapKey:         *bootstrapKey,
+		ApiKey:               *apiKey,
 		BootstrapBinaryName:  binName,
 		Credentials: app.Credentials{
 			PostgresUser:  *postgresUsername,
@@ -51,6 +51,8 @@ func main() {
 			PgbouncerPass: *pgbouncerPassword,
 		},
 	}
+
+	// TODO: add config validations, for: 1) api-key 2) send-interval 3) etc...
 
 	switch *logLevel {
 	case "debug":
@@ -70,13 +72,13 @@ func main() {
 		os.Exit(0)
 	}
 
-	if sc.BootstrapKey != "" {
+	if *doBootstrap {
 		os.Exit(app.RunBootstrap(sc))
 	}
 
-	// обязательно должен быть
-	if sc.ProjectIdStr == "" {
-		log.Fatal().Msg("project identifier is not specified")
+	// если указан апи-ключ, то из него по-любому должен быть вытащен ид проекта
+	if sc.ApiKey != "" && sc.ProjectIdStr == "" {
+		log.Fatal().Msg("unknown project identifier")
 	}
 
 	// use schedulers in push mode
@@ -93,11 +95,11 @@ func main() {
 
 // serviceUsername provides default username used for connecting to services, if no usernames provided by EnvVars.
 func serviceUsername() string {
-	var username = strings.ToLower(strings.Replace(binName, "-", "_", -1))
+	var usernameFallback = strings.ToLower(strings.Replace(binName, "-", "_", -1))
 	u, err := user.Current()
 	if err != nil {
-		log.Warn().Err(err).Msgf("failed getting current username, use fallback username: %s", username)
-		return username
+		log.Warn().Err(err).Msgf("failed getting current username, use fallback username: %s", usernameFallback)
+		return usernameFallback
 	}
 	return u.Username
 }

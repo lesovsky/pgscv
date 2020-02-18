@@ -2,6 +2,9 @@ package app
 
 import (
 	"github.com/rs/zerolog"
+	"regexp"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -12,7 +15,7 @@ type Config struct {
 	MetricServiceBaseURL string
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
-	BootstrapKey         string
+	ApiKey               string
 	BootstrapBinaryName  string
 	Credentials          Credentials
 }
@@ -23,4 +26,26 @@ type Credentials struct {
 	PostgresPass  string
 	PgbouncerUser string
 	PgbouncerPass string
+}
+
+func DecodeProjectIdStr(s string) string {
+	reAlpha, err := regexp.Compile("[A-Z]+")
+	if err != nil {
+		return ""
+	}
+	// split api key
+	parts := strings.Split(s, "-")
+	if len(parts) != 4 {
+		return ""
+	}
+
+	// extract project_id from last part
+	id := reAlpha.ReplaceAllString(parts[3], "")
+
+	// check extracted value is convertable to int64
+	_, err = strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return ""
+	}
+	return id
 }
