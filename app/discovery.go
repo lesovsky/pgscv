@@ -35,7 +35,10 @@ func NewServiceRepo(config *Config) *ServiceRepo {
 
 // StartInitialDiscovery performs initial service discovery required at application startup
 func (repo *ServiceRepo) StartInitialDiscovery() error {
+	repo.Logger.Debug().Msg("starting initial discovery")
+
 	// add pseudo-service for system metrics
+	repo.Logger.Debug().Msg("adding system service")
 	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem, ServiceId: "system"}
 
 	// search services and add them to the repo
@@ -47,11 +50,14 @@ func (repo *ServiceRepo) StartInitialDiscovery() error {
 	if err := repo.setupServices(); err != nil {
 		return err
 	}
+
+	repo.Logger.Debug().Msgf("finish initial discovery: found %d services", len(repo.Services))
 	return nil
 }
 
 // StartBackgroundDiscovery is periodically searches new services
 func (repo *ServiceRepo) StartBackgroundDiscovery() {
+	repo.Logger.Debug().Msg("starting background discovery")
 	// TODO: нет кейса для выхода
 	for {
 		select {
@@ -101,7 +107,8 @@ func (repo *ServiceRepo) lookupServices() error {
 			if ppid == 1 {
 				postgres, err := discoverPostgres(proc)
 				if err != nil {
-					return err
+					repo.Logger.Warn().Err(err).Msg("postgresql service has been found, but skipped due to:")
+					break
 				}
 				postgres.User = repo.Config.Credentials.PostgresUser
 				postgres.Password = repo.Config.Credentials.PostgresPass
@@ -110,7 +117,8 @@ func (repo *ServiceRepo) lookupServices() error {
 		case "pgbouncer":
 			pgbouncer, err := discoverPgbouncer(proc)
 			if err != nil {
-				return err
+				repo.Logger.Warn().Err(err).Msg("pgbouncer service has been found, but skipped due to:")
+				break
 			}
 			pgbouncer.User = repo.Config.Credentials.PgbouncerUser
 			pgbouncer.Password = repo.Config.Credentials.PgbouncerPass
@@ -167,6 +175,8 @@ func (repo *ServiceRepo) RemoveService(pid int32) {
 
 // discoverPgbouncer
 func discoverPgbouncer(proc *process.Process) (model.Service, error) {
+	log.Debug().Msg("looking for pgbouncer services")
+
 	// пока тупо возвращаем значение без всякого дискавери
 	// надо взять конфиг из cmdline прочитать его и найти параметры порта и адреса
 	cmdline, err := proc.CmdlineSlice()
@@ -232,6 +242,7 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 // Postgres discovering works through looking for Postgres's UNIX socket. Potentially Postgres might be configured
 // without listening on UNIX socket, thus agent should foresee additional methods for such case.
 func discoverPostgres(proc *process.Process) (model.Service, error) {
+	log.Debug().Msg("looking for postgresql services")
 	// надо найти сокет для коннекта
 	cmdline, err := proc.CmdlineSlice()
 	if err != nil {

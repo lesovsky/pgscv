@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/lib/pq"
-	log "github.com/prometheus/common/log"
+	"github.com/rs/zerolog/log"
 	"pgscv/app/model"
 )
 
@@ -131,7 +131,7 @@ func setSafeSession(conn *sql.DB) {
 		// Trying to SET superuser-only parameters for NOSUPERUSER will lead to error, but it's not critical.
 		// Notice about occurred error, clear it and go on.
 		if err, ok := err.(*pq.Error); ok {
-			log.Warnf("%s: %s\nSTATEMENT: %s\n", err.Severity, err.Message, query)
+			log.Warn().Msgf("%s: %s\nSTATEMENT: %s\n", err.Severity, err.Message, query)
 		}
 	}
 }

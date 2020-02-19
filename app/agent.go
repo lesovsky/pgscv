@@ -14,6 +14,7 @@ import (
 // TODO: слишком длинная функция
 func Start(c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
+	logger.Debug().Msg("start application")
 
 	instanceRepo := NewServiceRepo(c)
 	if err := instanceRepo.StartInitialDiscovery(); err != nil {
@@ -23,6 +24,7 @@ func Start(c *Config) error {
 	// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
 	go instanceRepo.StartBackgroundDiscovery()
 
+	logger.Debug().Msg("selecting mode")
 	if c.MetricServiceBaseURL == "" {
 		logger.Info().Msg("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
 

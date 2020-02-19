@@ -87,7 +87,7 @@ func main() {
 	}
 
 	if err := app.Start(sc); err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("error occurred:")
 	}
 
 	log.Info().Msg("Graceful shutdown")
