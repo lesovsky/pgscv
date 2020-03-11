@@ -19,7 +19,8 @@ help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  * \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 clean: ## Clean
-	rm -f bin/${BINNAME} bin/${BINNAME}.tar.gz
+	rm -f ./bin/${BINNAME} ./bin/${BINNAME}.tar.gz
+	rmdir ./bin
 
 dep: ## Get the dependencies
 	go mod download
@@ -35,14 +36,17 @@ race: dep ## Run data race detector
 	go test -race -short -timeout 300s ./...
 
 build: dep ## Build
+	mkdir -p ./bin
 	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${BINNAME} ./cmd/app
 	tar czf ./bin/${BINNAME}.tar.gz -C ./bin ${BINNAME}
 
 docker-build: ## Build docker image
+	mkdir -p ./bin
 	./extras/genscript.sh ${ENV} > ./bin/install.sh
 	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}-${ENV} .
 	docker image prune --force --filter label=stage=intermediate
 	rm ./bin/install.sh
+	rmdir ./bin
 
 docker-push: ## Push docker image
 	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}-${ENV}
