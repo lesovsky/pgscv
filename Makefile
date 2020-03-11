@@ -40,12 +40,12 @@ build: dep ## Build
 
 docker-build: ## Build docker image
 	./extras/genscript.sh ${ENV} > ./bin/install.sh
-	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT} .
+	docker build -t ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}-${ENV} .
 	docker image prune --force --filter label=stage=intermediate
 	rm ./bin/install.sh
 
 docker-push: ## Push docker image
-	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}
+	docker push ${DOCKER_ACCOUNT}/${SITENAME}-${IMAGENAME}:${COMMIT}-${ENV}
 
 deploy: ## Deploy
 	ansible-playbook deployment/ansible/deploy.yml -e env=${ENV}

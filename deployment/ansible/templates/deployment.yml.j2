@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: {{ appname }}
-          image: barcodepro/weaponry-{{ appname }}:{{ app_version }}
+          image: barcodepro/weaponry-{{ appname }}:{{ app_version }}-{{ env }}
           ports:
             - containerPort: 1080
           readinessProbe:
