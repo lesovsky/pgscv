@@ -60,10 +60,8 @@ build_staging:
     DOCKER_HOST: tcp://docker:2376
     DOCKER_TLS_CERTDIR: "/certs"
   script:
-    - apk add git make
+    - apk add git make bash
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - ls -l .
-    - ls -l ./extras
     - make docker-build -e ENV=staging
     - make docker-push -e ENV=staging
 
