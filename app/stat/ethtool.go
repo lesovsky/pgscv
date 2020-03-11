@@ -60,13 +60,13 @@ type ifreq struct {
 }
 
 const (
-	ethtoolGset          = 0x00000001 /* get settings -- DEPRECATED */
-	ethtoolGlinkSettings = 0x0000004c /* get ethtool_link_settings, should be used instead of ethtool_cmd and ETHTOOL_GSET */
-	ifNameSize           = 16         /* maximum size of an interface name */
-	siocEthtool          = 0x8946     /* ioctl ethtool request */
-	duplexHalf           = 0
-	duplexFull           = 1
-	duplexUnknown        = 255
+	ethtoolGset = 0x00000001 /* get settings -- DEPRECATED */
+	//ethtoolGlinkSettings = 0x0000004c /* get ethtool_link_settings, should be used instead of ethtool_cmd and ETHTOOL_GSET */
+	ifNameSize  = 16     /* maximum size of an interface name */
+	siocEthtool = 0x8946 /* ioctl ethtool request */
+	//duplexHalf           = 0
+	//duplexFull           = 1
+	//duplexUnknown        = 255
 )
 
 // GetLinkSettings asks network interface settings using ethtool

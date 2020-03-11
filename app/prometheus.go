@@ -1,4 +1,3 @@
-//
 package app
 
 import (
@@ -159,8 +158,8 @@ func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter,
 	}
 	var (
 		itype     = service.ServiceType
-		projectid = service.ProjectId
-		sid       = service.ServiceId
+		projectid = service.ProjectID
+		sid       = service.ServiceID
 		logger    = repo.Logger.With().Str("service", "exporter").Logger()
 	)
 
@@ -197,7 +196,7 @@ func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
 	var metricsCnt int
 
 	for _, service := range e.ServiceRepo.Services {
-		if e.ServiceID == service.ServiceId {
+		if e.ServiceID == service.ServiceID {
 			e.Logger.Debug().Msgf("%s: start collecting metrics for %s", time.Now().Format("2006-01-02 15:04:05"), e.ServiceID)
 
 			// в зависимости от типа экспортера делаем соотв.проверки
@@ -221,14 +220,14 @@ func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
 // collectSystemMetrics is the wrapper for all system metrics collectors
 func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	funcs := map[string]func(chan<- prometheus.Metric) int{
-		"node_cpu_usage":                   e.collectCpuMetrics,
+		"node_cpu_usage":                   e.collectCPUMetrics,
 		"node_diskstats":                   e.collectDiskstatsMetrics,
 		"node_netdev":                      e.collectNetdevMetrics,
 		"node_memory":                      e.collectMemMetrics,
 		"node_filesystem":                  e.collectFsMetrics,
 		"node_settings":                    e.collectSysctlMetrics,
-		"node_hardware_cores":              e.collectCpuCoresState,
-		"node_hardware_scaling_governors":  e.collectCpuScalingGovernors,
+		"node_hardware_cores":              e.collectCPUCoresState,
+		"node_hardware_scaling_governors":  e.collectCPUScalingGovernors,
 		"node_hardware_numa":               e.collectNumaNodes,
 		"node_hardware_storage_rotational": e.collectStorageSchedulers,
 		"node_uptime_seconds":              e.collectSystemUptime,
@@ -248,13 +247,13 @@ func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 	return cnt
 }
 
-// collectCpuMetrics collects CPU usage metrics
-func (e *PrometheusExporter) collectCpuMetrics(ch chan<- prometheus.Metric) (cnt int) {
-	var cpuStat stat.CpuRawstat
+// collectCPUMetrics collects CPU usage metrics
+func (e *PrometheusExporter) collectCPUMetrics(ch chan<- prometheus.Metric) (cnt int) {
+	var cpuStat stat.CPURawstat
 	cpuStat.ReadLocal()
 	for _, mode := range []string{"user", "nice", "system", "idle", "iowait", "irq", "softirq", "steal", "guest", "guest_nice", "total"} {
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_cpu_usage_time"], prometheus.CounterValue, cpuStat.SingleStat(mode), mode)
-		cnt += 1
+		cnt++
 	}
 	return cnt
 }
@@ -267,7 +266,7 @@ func (e *PrometheusExporter) collectMemMetrics(ch chan<- prometheus.Metric) (cnt
 	meminfoStat.ReadLocal()
 	for _, usage := range usages {
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_memory_usage_bytes"], prometheus.GaugeValue, float64(meminfoStat.SingleStat(usage)), usage)
-		cnt += 1
+		cnt++
 	}
 	return cnt
 }
@@ -291,7 +290,7 @@ func (e *PrometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric
 			for _, v := range diskstatsValueNames {
 				var desc = "node_diskstats_" + v
 				ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.CounterValue, s.SingleStat(v), s.Device)
-				cnt += 1
+				cnt++
 			}
 		}
 	}
@@ -321,12 +320,12 @@ func (e *PrometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 				// TODO: вроде эти метрики не нужны -- нужны, пригодятся для 'capacity planning' проверок
 				if (desc == "speed" || desc == "duplex") && s.Speed > 0 {
 					ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.GaugeValue, s.SingleStat(v), s.Ifname)
-					cnt += 1
+					cnt++
 					continue
 				}
 
 				ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.CounterValue, s.SingleStat(v), s.Ifname)
-				cnt += 1
+				cnt++
 			}
 		}
 	}
@@ -346,11 +345,11 @@ func (e *PrometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt 
 		for _, usage := range []string{"total_bytes", "free_bytes", "available_bytes", "used_bytes", "reserved_bytes", "reserved_pct"} {
 			// TODO: добавить fstype
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_filesystem_bytes"], prometheus.CounterValue, float64(fs.SingleStat(usage)), usage, fs.Device, fs.Mountpoint, fs.Mountflags)
-			cnt += 1
+			cnt++
 		}
 		for _, usage := range []string{"total_inodes", "free_inodes", "used_inodes"} {
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_filesystem_inodes"], prometheus.CounterValue, float64(fs.SingleStat(usage)), usage, fs.Device, fs.Mountpoint, fs.Mountflags)
-			cnt += 1
+			cnt++
 		}
 	}
 	return cnt
@@ -365,15 +364,15 @@ func (e *PrometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
-		cnt += 1
+		cnt++
 	}
 	return cnt
 }
 
-// collectCpuCoresState collects CPU cores operational states' metrics
-func (e *PrometheusExporter) collectCpuCoresState(ch chan<- prometheus.Metric) (cnt int) {
+// collectCPUCoresState collects CPU cores operational states' metrics
+func (e *PrometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (cnt int) {
 	// Collect total number of CPU cores
-	online, offline, err := stat.CountCpu()
+	online, offline, err := stat.CountCPU()
 	if err != nil {
 		e.Logger.Error().Err(err).Msg("failed counting CPUs")
 		return 0
@@ -386,8 +385,8 @@ func (e *PrometheusExporter) collectCpuCoresState(ch chan<- prometheus.Metric) (
 	return cnt
 }
 
-// collectCpuScalingGovernors collects metrics about CPUs scaling governors
-func (e *PrometheusExporter) collectCpuScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
+// collectCPUScalingGovernors collects metrics about CPUs scaling governors
+func (e *PrometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
 	sg, err := stat.CountScalingGovernors()
 	if err != nil {
 		e.Logger.Error().Err(err).Msg("failed counting scaling governors")
@@ -478,17 +477,17 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		conn, err := CreateConn(&service)
 		if err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceId)
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceID)
 			return 0
 		}
 		if err := PQstatus(conn, service.ServiceType); err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to check status", e.TotalFailed, exporterFailureLimit, service.ServiceId)
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to check status", e.TotalFailed, exporterFailureLimit, service.ServiceID)
 			return 0
 		}
 		// адаптируем запросы под конкретную версию
 		if err := conn.QueryRow(pgVersionNumQuery).Scan(&version); err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to obtain postgresql version", service.ServiceId)
+			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to obtain postgresql version", service.ServiceID)
 			return 0
 		}
 		adjustQueries(statdesc, version)
@@ -518,7 +517,7 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		conn, err := CreateConn(&service) // открываем коннект к базе
 		if err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for database %s/%s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceId, dbname)
+			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for database %s/%s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceID, dbname)
 			continue
 		}
 
@@ -669,7 +668,7 @@ func IsPGSSAvailable(conn *sql.DB) bool {
 		log.Debug().Msg("failed to check pg_stat_statements view in information_schema")
 		return false // failed to query information_schema
 	}
-	if vExists == false {
+	if !vExists {
 		log.Debug().Msg("pg_stat_statements is not available in this database")
 		return false // pg_stat_statements is not available
 	}
@@ -722,7 +721,7 @@ func getPostgresDirInfo(e *PrometheusExporter, conn *sql.DB, ch chan<- prometheu
 			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, err := os.Readlink(subpath)
 				if err != nil {
-					return fmt.Errorf("failed to resolve symlink %s: %s\n", subpath, err)
+					return fmt.Errorf("failed to resolve symlink %s: %s", subpath, err)
 				}
 
 				if _, ok := mountpoints[resolvedLink]; ok {

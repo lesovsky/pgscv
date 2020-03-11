@@ -158,5 +158,5 @@ func GetDeviceScheduler(devpath string) (sched string, err error) {
 		return string(sched), nil
 	}
 
-	return "", fmt.Errorf("Failed to recognize scheduler of %s\n", strings.TrimPrefix(devpath, "/sys/block/"))
+	return "", fmt.Errorf("failed to recognize scheduler of %s", strings.TrimPrefix(devpath, "/sys/block/"))
 }

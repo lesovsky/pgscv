@@ -14,8 +14,8 @@ import (
 	"strings"
 )
 
-// CpuRawstat is a container for raw values collected from cpu-stat source
-type CpuRawstat struct {
+// CPURawstat is a container for raw values collected from cpu-stat source
+type CPURawstat struct {
 	Entry   string
 	User    float64
 	Nice    float64
@@ -32,11 +32,11 @@ type CpuRawstat struct {
 
 const (
 	procStatFile    = "/proc/stat"
-	sysfsCpuPattern = "/sys/devices/system/cpu/cpu*"
+	sysfsCPUPattern = "/sys/devices/system/cpu/cpu*"
 )
 
 // ReadLocal reads CPU raw stats from local 'procfs' filesystem
-func (s *CpuRawstat) ReadLocal() {
+func (s *CPURawstat) ReadLocal() {
 	content, err := ioutil.ReadFile(procStatFile)
 	if err != nil {
 		return
@@ -64,11 +64,10 @@ func (s *CpuRawstat) ReadLocal() {
 			}
 		}
 	}
-	return
 }
 
 // SingleStat returns number of ticks for particular mode
-func (s *CpuRawstat) SingleStat(mode string) (ticks float64) {
+func (s *CPURawstat) SingleStat(mode string) (ticks float64) {
 	switch mode {
 	case "user":
 		ticks = s.User
@@ -98,11 +97,11 @@ func (s *CpuRawstat) SingleStat(mode string) (ticks float64) {
 	return ticks
 }
 
-// CountCpu returns number of online and offline CPU cores
-func CountCpu() (online, offline int, err error) {
+// CountCPU returns number of online and offline CPU cores
+func CountCPU() (online, offline int, err error) {
 	var onlineCnt, offlineCnt int
 
-	dirs, err := filepath.Glob(sysfsCpuPattern)
+	dirs, err := filepath.Glob(sysfsCPUPattern)
 	if err != nil {
 		return 0, 0, fmt.Errorf("failed counting CPUs, malformed pattern: %s", err)
 	}
@@ -141,7 +140,7 @@ func CountCpu() (online, offline int, err error) {
 // CountScalingGovernors returns map with scaling governors and number of cores that use specific governor
 func CountScalingGovernors() (g map[string]int, err error) {
 	g = make(map[string]int)
-	dirs, err := filepath.Glob(sysfsCpuPattern)
+	dirs, err := filepath.Glob(sysfsCPUPattern)
 	if err != nil {
 		return nil, fmt.Errorf("failed couning CPUs governors, malformed pattern: %s", err)
 	}

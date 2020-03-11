@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestDecodeProjectIdStr(t *testing.T) {
+func TestDecodeProjectIDStr(t *testing.T) {
 	testcases := []struct {
 		key string
 		id  string
@@ -41,7 +41,7 @@ func TestDecodeProjectIdStr(t *testing.T) {
 	}
 	for _, tc := range testcases {
 		t.Run(tc.key, func(t *testing.T) {
-			got := DecodeProjectIdStr(tc.key)
+			got := DecodeProjectIDStr(tc.key)
 			assert.Equal(t, tc.id, got)
 		})
 	}

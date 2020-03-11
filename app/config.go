@@ -11,11 +11,11 @@ import (
 // Config struct describes the application's configuration
 type Config struct {
 	Logger               zerolog.Logger
-	ProjectIdStr         string
+	ProjectIDStr         string
 	MetricServiceBaseURL string
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
-	ApiKey               string
+	APIKey               string
 	BootstrapBinaryName  string
 	Credentials          Credentials
 }
@@ -28,7 +28,8 @@ type Credentials struct {
 	PgbouncerPass string
 }
 
-func DecodeProjectIdStr(s string) string {
+// DecodeProjectIDStr ...
+func DecodeProjectIDStr(s string) string {
 	reAlpha, err := regexp.Compile("[A-Z]+")
 	if err != nil {
 		return ""

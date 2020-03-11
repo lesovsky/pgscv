@@ -40,9 +40,9 @@ func main() {
 		Logger:               log.Logger,
 		MetricServiceBaseURL: *metricServiceBaseURL,
 		MetricsSendInterval:  *metricsSendInterval,
-		ProjectIdStr:         app.DecodeProjectIdStr(*apiKey),
+		ProjectIDStr:         app.DecodeProjectIDStr(*apiKey),
 		ScheduleEnabled:      false,
-		ApiKey:               *apiKey,
+		APIKey:               *apiKey,
 		BootstrapBinaryName:  binName,
 		Credentials: app.Credentials{
 			PostgresUser:  *postgresUsername,
@@ -77,7 +77,7 @@ func main() {
 	}
 
 	// если указан апи-ключ, то из него по-любому должен быть вытащен ид проекта
-	if sc.ApiKey != "" && sc.ProjectIdStr == "" {
+	if sc.APIKey != "" && sc.ProjectIDStr == "" {
 		log.Fatal().Msg("unknown project identifier")
 	}
 

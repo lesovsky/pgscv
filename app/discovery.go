@@ -1,4 +1,3 @@
-//
 package app
 
 import (
@@ -39,7 +38,7 @@ func (repo *ServiceRepo) StartInitialDiscovery() error {
 
 	// add pseudo-service for system metrics
 	repo.Logger.Debug().Msg("adding system service")
-	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem, ServiceId: "system"}
+	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 
 	// search services and add them to the repo
 	if err := repo.lookupServices(); err != nil {
@@ -59,17 +58,28 @@ func (repo *ServiceRepo) StartInitialDiscovery() error {
 func (repo *ServiceRepo) StartBackgroundDiscovery() {
 	repo.Logger.Debug().Msg("starting background discovery")
 	// TODO: нет кейса для выхода
+	//for {
+	//	select {
+	//	case <-time.After(60 * time.Second):
+	//		if err := repo.lookupServices(); err != nil {
+	//			repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
+	//			continue
+	//		}
+	//		if err := repo.setupServices(); err != nil {
+	//			repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
+	//			continue
+	//		}
+	//	}
+	//}
 	for {
-		select {
-		case <-time.After(60 * time.Second):
-			if err := repo.lookupServices(); err != nil {
-				repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
-				continue
-			}
-			if err := repo.setupServices(); err != nil {
-				repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
-				continue
-			}
+		<-time.After(60 * time.Second)
+		if err := repo.lookupServices(); err != nil {
+			repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
+			continue
+		}
+		if err := repo.setupServices(); err != nil {
+			repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
+			continue
 		}
 	}
 }
@@ -135,13 +145,13 @@ func (repo *ServiceRepo) setupServices() error {
 	for i, service := range repo.Services {
 		if service.Exporter == nil {
 			var newService = service
-			newService.ProjectId = repo.Config.ProjectIdStr
+			newService.ProjectID = repo.Config.ProjectIDStr
 
 			switch service.ServiceType {
 			case model.ServiceTypePostgresql:
-				newService.ServiceId = "postgres:" + strconv.Itoa(service.Port)
+				newService.ServiceID = "postgres:" + strconv.Itoa(service.Port)
 			case model.ServiceTypePgbouncer:
-				newService.ServiceId = "pgbouncer:" + strconv.Itoa(service.Port)
+				newService.ServiceID = "pgbouncer:" + strconv.Itoa(service.Port)
 			case model.ServiceTypeSystem:
 				// nothing to do
 			}
@@ -156,7 +166,7 @@ func (repo *ServiceRepo) setupServices() error {
 			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
 			if repo.Config.MetricServiceBaseURL == "" {
 				prometheus.MustRegister(newService.Exporter)
-				repo.Logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", newService.ServiceId, newService.Pid)
+				repo.Logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", newService.ServiceID, newService.Pid)
 			}
 
 			// put updated service copy into repo
@@ -169,7 +179,7 @@ func (repo *ServiceRepo) setupServices() error {
 // RemoveService removes service from the list (in case of its unavailability)
 func (repo *ServiceRepo) RemoveService(pid int32) {
 	//prometheus.Unregister(repo.Services[pid].Exporter)
-	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, process %d", repo.Services[pid].ServiceId, pid)
+	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, process %d", repo.Services[pid].ServiceID, pid)
 	delete(repo.Services, pid)
 }
 

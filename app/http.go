@@ -8,12 +8,13 @@ type httpClient struct {
 	apiKey string
 }
 
-func NewHttpClient(key string) *httpClient {
+// newHTTPClient ...
+func newHTTPClient(key string) *httpClient {
 	c := http.Client{}
 	return &httpClient{client: c, apiKey: key}
 }
 
-// кастомная реализация метода для отправки запросов
+// Do is the customizable way for sending HTTP requests
 func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Add("X-Weaponry-Api-Key", c.apiKey)
 	return c.client.Do(req)

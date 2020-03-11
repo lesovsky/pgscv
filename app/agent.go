@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// Start ...
 // TODO: слишком длинная функция
 func Start(c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
@@ -51,8 +52,8 @@ func Start(c *Config) error {
 		pusher = push.New(c.MetricServiceBaseURL, garbageLabel)
 
 		// if api-key specified use custom http-client and attach api-key to http requests
-		if c.ApiKey != "" {
-			client := NewHttpClient(c.ApiKey)
+		if c.APIKey != "" {
+			client := newHTTPClient(c.APIKey)
 			pusher.Client(client)
 		}
 
@@ -68,5 +69,5 @@ func Start(c *Config) error {
 	}
 
 	// TODO: тупиковый for сверху, из него никак не выйти
-	return nil
+	//return nil
 }

@@ -28,7 +28,7 @@ func init() {
 	}
 }
 
-// Read uptime value from local procfile, and return value in seconds
+// Uptime reads uptime value from local procfile, and return value in seconds
 func Uptime() (float64, error) {
 	var uptime, idletime float64
 
@@ -51,7 +51,7 @@ func Uptime() (float64, error) {
 	return uptime, nil
 }
 
-// Read uptime value from local procfile, and return value in milliseconds
+// UptimeMs reads uptime value from local procfile, and return value in milliseconds
 func UptimeMs() (float64, error) {
 	uptime, err := Uptime()
 	if err != nil {
