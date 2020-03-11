@@ -30,13 +30,11 @@ lint_code:
 unit_tests:
   stage: test
   script:
-    - make migrate -e URI="postgres://postgres@postgres/accounts_db_test?sslmode=disable"
     - make test
 
 race_detector:
   stage: test
   script:
-    - make migrate -e URI="postgres://postgres@postgres/accounts_db_test?sslmode=disable"
     - make race
 
 #code_coverage:
