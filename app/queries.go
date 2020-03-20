@@ -79,7 +79,7 @@ var (
 
 	pgStatStatementsQuery = `SELECT
 					    pg_get_userbyid(p.userid) AS usename, d.datname AS datname, p.queryid,
-					    regexp_replace(left(p.query, 1024),E'\\s+', ' ', 'g') AS query,
+					    left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024) AS query,
 						p.calls, p.rows,
 						p.total_time, p.blk_read_time, p.blk_write_time,
     					p.shared_blks_hit, p.shared_blks_read, p.shared_blks_dirtied, p.shared_blks_written,
