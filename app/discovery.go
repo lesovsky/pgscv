@@ -157,7 +157,7 @@ func (repo *ServiceRepo) setupServices() error {
 			}
 
 			// create exporter for the service
-			exporter, err := NewExporter(newService, repo)
+			exporter, err := newExporter(newService, repo)
 			if err != nil {
 				return err
 			}

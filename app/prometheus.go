@@ -170,8 +170,8 @@ func adjustQueries(descs []statDescriptor, pgVersion int) {
 	}
 }
 
-// NewExporter creates a new configured exporter
-func NewExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter, error) {
+// newExporter creates a new configured exporter
+func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err

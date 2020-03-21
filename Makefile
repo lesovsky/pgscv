@@ -26,8 +26,7 @@ dep: ## Get the dependencies
 	go mod download
 
 lint: ## Lint the source files
-	golint -set_exit_status ./...
-	golangci-lint run --timeout 5m
+	golangci-lint run --timeout 5m -E golint -e '(method|func) [a-zA-Z]+ should be [a-zA-Z]+'
 
 test: dep ## Run unittests
 	go test -short -timeout 300s ./...
