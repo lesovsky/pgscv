@@ -16,21 +16,21 @@ import (
 	"time"
 )
 
-// PrometheusExporter is the realization of prometheus.Collector
-type PrometheusExporter struct {
-	Logger       zerolog.Logger              // logging
-	ServiceID    string                      // unique ID across all services
-	AllDesc      map[string]*prometheus.Desc // metrics assigned to this exporter
-	ServiceRepo  ServiceRepo                 // service repository
-	TotalFailed  int                         // total number of collecting failures
-	localCatalog []StatDesc                  // каталог дескрипторов принадлежащий только этому экспортеру
+// prometheusExporter is the realization of prometheus.Collector
+type prometheusExporter struct {
+	Logger      zerolog.Logger              // logging
+	ServiceID   string                      // unique ID across all services
+	AllDesc     map[string]*prometheus.Desc // metrics assigned to this exporter
+	ServiceRepo ServiceRepo                 // service repository
+	TotalFailed int                         // total number of collecting failures
+	statCatalog statCatalog                 // catalog of stat descriptors that belong only to that exporter
 }
 
-// StatDesc is the statistics descriptor, with detailed info about particular kind of stats
-type StatDesc struct {
+// statDescriptor is the statistics descriptor, with detailed info about particular kind of stats
+type statDescriptor struct {
 	Name           string                          // имя источника откуда берется стата, выбирается произвольно и может быть как именем вьюхи, таблицы, функции, так и каким-то придуманным
-	Stype          int                             // тип источника статы - постгрес, баунсер, система и т.п.
-	Query          string                          // запрос с помощью которого вытягивается стата из источника
+	StatType       int                             // тип источника статы - постгрес, баунсер, система и т.п.
+	QueryText      string                          // запрос с помощью которого вытягивается стата из источника
 	ValueNames     []string                        // названия полей которые будут использованы как значения метрик
 	ValueTypes     map[string]prometheus.ValueType //теоретически мапа нужна для хренения карты метрика <-> тип, например xact_commit <-> Counter/Gauge. Но пока поле не используется никак
 	LabelNames     []string                        // названия полей которые будут использованы как метки
@@ -38,6 +38,9 @@ type StatDesc struct {
 	collectOneshot bool                            // стату собирать только один раз за раунд, (например всякие шаредные статы тип pg_stat_database)
 	Schedule                                       // расписание по которому осуществляется сбор метрик
 }
+
+// statCatalog is the set of statDescriptors
+type statCatalog []statDescriptor
 
 const (
 	// default size of the catalog slice used for storing stats descriptors
@@ -67,8 +70,8 @@ func sysctlList() []string {
 		"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
 }
 
-// newStatCatalog provides catalog with all available statistics
-func newStatCatalog() []StatDesc {
+// globalStatCatalog provides catalog with all available statistics
+func globalStatCatalog() []statDescriptor {
 	var (
 		pgStatDatabasesValueNames         = []string{"xact_commit", "xact_rollback", "blks_read", "blks_hit", "tup_returned", "tup_fetched", "tup_inserted", "tup_updated", "tup_deleted", "conflicts", "temp_files", "temp_bytes", "deadlocks", "blk_read_time", "blk_write_time", "db_size", "stats_age_seconds"}
 		pgStatUserTablesValueNames        = []string{"seq_scan", "seq_tup_read", "idx_scan", "idx_tup_fetch", "n_tup_ins", "n_tup_upd", "n_tup_del", "n_tup_hot_upd", "n_live_tup", "n_dead_tup", "n_mod_since_analyze", "vacuum_count", "autovacuum_count", "analyze_count", "autoanalyze_count"}
@@ -88,88 +91,88 @@ func newStatCatalog() []StatDesc {
 		pgbouncerStatsVN                  = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
 	)
 
-	return []StatDesc{
+	return []statDescriptor{
 		// collect oneshot -- these Postgres statistics are collected once per round
-		{Name: "pg_stat_database", Stype: model.ServiceTypePostgresql, Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
-		{Name: "pg_stat_bgwriter", Stype: model.ServiceTypePostgresql, Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_user_functions", Stype: model.ServiceTypePostgresql, Query: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
-		{Name: "pg_stat_activity", Stype: model.ServiceTypePostgresql, Query: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_activity", Stype: model.ServiceTypePostgresql, Query: pgStatActivityDurationsQuery, collectOneshot: true, ValueNames: pgStatActivityDurationsNames, LabelNames: []string{}},
-		{Name: "pg_stat_activity_autovac", Stype: model.ServiceTypePostgresql, Query: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_statements", Stype: model.ServiceTypePostgresql, Query: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
-		{Name: "pg_stat_replication", Stype: model.ServiceTypePostgresql, Query: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
-		{Name: "pg_replication_slots_restart_lag", Stype: model.ServiceTypePostgresql, Query: pgReplicationSlotsQuery, collectOneshot: true, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
-		{Name: "pg_replication_slots", Stype: model.ServiceTypePostgresql, Query: pgReplicationSlotsCountQuery, collectOneshot: true, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
-		{Name: "pg_replication_standby", Stype: model.ServiceTypePostgresql, Query: pgReplicationStandbyCount, collectOneshot: true, ValueNames: []string{"count"}, LabelNames: []string{}},
-		{Name: "pg_recovery", Stype: model.ServiceTypePostgresql, Query: pgRecoveryStatusQuery, collectOneshot: true, ValueNames: []string{"status"}},
-		{Name: "pg_stat_database_conflicts", Stype: model.ServiceTypePostgresql, Query: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
-		{Name: "pg_stat_basebackup", Stype: model.ServiceTypePostgresql, Query: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
-		{Name: "pg_stat_current_temp", Stype: model.ServiceTypePostgresql, Query: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
-		{Name: "pg_data_directory", Stype: model.ServiceTypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_wal_directory", Stype: model.ServiceTypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_log_directory", Stype: model.ServiceTypePostgresql, Query: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_wal_directory", Stype: model.ServiceTypePostgresql, Query: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_log_directory", Stype: model.ServiceTypePostgresql, Query: pgLogdirSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_catalog_size", Stype: model.ServiceTypePostgresql, Query: pgCatalogSizeQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_settings", Stype: model.ServiceTypePostgresql, Query: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_stat_database", StatType: model.ServiceTypePostgresql, QueryText: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
+		{Name: "pg_stat_bgwriter", StatType: model.ServiceTypePostgresql, QueryText: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_user_functions", StatType: model.ServiceTypePostgresql, QueryText: pgStatUserFunctionsQuery, ValueNames: pgStatUserFunctionsValueNames, LabelNames: []string{"funcid", "datname", "schemaname", "funcname"}},
+		{Name: "pg_stat_activity", StatType: model.ServiceTypePostgresql, QueryText: pgStatActivityQuery, collectOneshot: true, ValueNames: pgStatActivityValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_activity", StatType: model.ServiceTypePostgresql, QueryText: pgStatActivityDurationsQuery, collectOneshot: true, ValueNames: pgStatActivityDurationsNames, LabelNames: []string{}},
+		{Name: "pg_stat_activity_autovac", StatType: model.ServiceTypePostgresql, QueryText: pgStatActivityAutovacQuery, collectOneshot: true, ValueNames: pgStatActivityAutovacValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_statements", StatType: model.ServiceTypePostgresql, QueryText: pgStatStatementsQuery, collectOneshot: true, ValueNames: pgStatStatementsValueNames, LabelNames: []string{"usename", "datname", "queryid", "query"}},
+		{Name: "pg_stat_replication", StatType: model.ServiceTypePostgresql, QueryText: pgStatReplicationQuery, collectOneshot: true, ValueNames: pgStatReplicationValueNames, LabelNames: []string{"client_addr", "application_name"}},
+		{Name: "pg_replication_slots_restart_lag", StatType: model.ServiceTypePostgresql, QueryText: pgReplicationSlotsQuery, collectOneshot: true, ValueNames: []string{"bytes"}, LabelNames: []string{"slot_name", "active"}},
+		{Name: "pg_replication_slots", StatType: model.ServiceTypePostgresql, QueryText: pgReplicationSlotsCountQuery, collectOneshot: true, ValueNames: []string{"conn"}, LabelNames: []string{"state"}},
+		{Name: "pg_replication_standby", StatType: model.ServiceTypePostgresql, QueryText: pgReplicationStandbyCount, collectOneshot: true, ValueNames: []string{"count"}, LabelNames: []string{}},
+		{Name: "pg_recovery", StatType: model.ServiceTypePostgresql, QueryText: pgRecoveryStatusQuery, collectOneshot: true, ValueNames: []string{"status"}},
+		{Name: "pg_stat_database_conflicts", StatType: model.ServiceTypePostgresql, QueryText: pgStatDatabaseConflictsQuery, collectOneshot: true, ValueNames: pgStatDatabaseConflictsValueNames, LabelNames: []string{}},
+		{Name: "pg_stat_basebackup", StatType: model.ServiceTypePostgresql, QueryText: pgStatBasebackupQuery, collectOneshot: true, ValueNames: []string{"count", "duration_seconds_max"}, LabelNames: []string{}},
+		{Name: "pg_stat_current_temp", StatType: model.ServiceTypePostgresql, QueryText: pgStatCurrentTempFilesQuery, collectOneshot: true, ValueNames: pgStatCurrentTempFilesVN, LabelNames: []string{"tablespace"}},
+		{Name: "pg_data_directory", StatType: model.ServiceTypePostgresql, QueryText: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_wal_directory", StatType: model.ServiceTypePostgresql, QueryText: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_log_directory", StatType: model.ServiceTypePostgresql, QueryText: "", collectOneshot: true, LabelNames: []string{"device", "mountpoint", "path"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_wal_directory", StatType: model.ServiceTypePostgresql, QueryText: pgStatWalSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_log_directory", StatType: model.ServiceTypePostgresql, QueryText: pgLogdirSizeQuery, collectOneshot: true, ValueNames: []string{"size_bytes"}, LabelNames: []string{}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_catalog_size", StatType: model.ServiceTypePostgresql, QueryText: pgCatalogSizeQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_settings", StatType: model.ServiceTypePostgresql, QueryText: pgSettingsGucQuery, collectOneshot: true, ValueNames: []string{"guc"}, LabelNames: []string{"name", "unit", "secondary"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// collect always -- these Postgres statistics are collected every time in all databases
-		{Name: "pg_stat_user_tables", Stype: model.ServiceTypePostgresql, Query: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_statio_user_tables", Stype: model.ServiceTypePostgresql, Query: pgStatioUserTablesQuery, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
-		{Name: "pg_stat_user_indexes", Stype: model.ServiceTypePostgresql, Query: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_statio_user_indexes", Stype: model.ServiceTypePostgresql, Query: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
-		{Name: "pg_schema_non_pk_table", Stype: model.ServiceTypePostgresql, Query: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_invalid_index", Stype: model.ServiceTypePostgresql, Query: pgSchemaInvalidIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_non_indexed_fkey", Stype: model.ServiceTypePostgresql, Query: pgSchemaNonIndexedFKQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_redundant_index", Stype: model.ServiceTypePostgresql, Query: pgSchemaRedundantIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_sequence_fullness", Stype: model.ServiceTypePostgresql, Query: pgSchemaSequencesFullnessQuery, ValueNames: []string{"ratio"}, LabelNames: []string{"datname", "schemaname", "seqname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "pg_schema_fkey_columns_mismatch", Stype: model.ServiceTypePostgresql, Query: pgSchemaFkeyColumnsMismatch, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_stat_user_tables", StatType: model.ServiceTypePostgresql, QueryText: pgStatUserTablesQuery, ValueNames: pgStatUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_statio_user_tables", StatType: model.ServiceTypePostgresql, QueryText: pgStatioUserTablesQuery, ValueNames: pgStatioUserTablesValueNames, LabelNames: []string{"datname", "schemaname", "relname"}},
+		{Name: "pg_stat_user_indexes", StatType: model.ServiceTypePostgresql, QueryText: pgStatUserIndexesQuery, ValueNames: pgStatUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_statio_user_indexes", StatType: model.ServiceTypePostgresql, QueryText: pgStatioUserIndexesQuery, ValueNames: pgStatioUserIndexesValueNames, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}},
+		{Name: "pg_schema_non_pk_table", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaNonPrimaryKeyTablesQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_invalid_index", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaInvalidIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_non_indexed_fkey", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaNonIndexedFKQuery, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_redundant_index", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaRedundantIndexesQuery, ValueNames: []string{"bytes"}, LabelNames: []string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_sequence_fullness", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaSequencesFullnessQuery, ValueNames: []string{"ratio"}, LabelNames: []string{"datname", "schemaname", "seqname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "pg_schema_fkey_columns_mismatch", StatType: model.ServiceTypePostgresql, QueryText: pgSchemaFkeyColumnsMismatch, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// system metrics are always oneshot, there is no 'database' entity
-		{Name: "node_cpu_usage", Stype: model.ServiceTypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
-		{Name: "node_diskstats", Stype: model.ServiceTypeSystem, ValueNames: diskstatsValueNames(), LabelNames: []string{"device"}},
-		{Name: "node_netdev", Stype: model.ServiceTypeSystem, ValueNames: netdevValueNames(), LabelNames: []string{"interface"}},
-		{Name: "node_memory", Stype: model.ServiceTypeSystem, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
-		{Name: "node_filesystem", Stype: model.ServiceTypeSystem, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
-		{Name: "node_settings", Stype: model.ServiceTypeSystem, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "node_hardware_cores", Stype: model.ServiceTypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"state"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "node_hardware_scaling_governors", Stype: model.ServiceTypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"governor"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "node_hardware_numa", Stype: model.ServiceTypeSystem, ValueNames: []string{"nodes"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "node_hardware_storage_rotational", Stype: model.ServiceTypeSystem, LabelNames: []string{"device", "scheduler"}, Schedule: Schedule{Interval: 5 * time.Minute}},
-		{Name: "node_uptime_seconds", Stype: model.ServiceTypeSystem},
+		{Name: "node_cpu_usage", StatType: model.ServiceTypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
+		{Name: "node_diskstats", StatType: model.ServiceTypeSystem, ValueNames: diskstatsValueNames(), LabelNames: []string{"device"}},
+		{Name: "node_netdev", StatType: model.ServiceTypeSystem, ValueNames: netdevValueNames(), LabelNames: []string{"interface"}},
+		{Name: "node_memory", StatType: model.ServiceTypeSystem, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
+		{Name: "node_filesystem", StatType: model.ServiceTypeSystem, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
+		{Name: "node_settings", StatType: model.ServiceTypeSystem, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_hardware_cores", StatType: model.ServiceTypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"state"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_hardware_scaling_governors", StatType: model.ServiceTypeSystem, ValueNames: []string{"total"}, LabelNames: []string{"governor"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_hardware_numa", StatType: model.ServiceTypeSystem, ValueNames: []string{"nodes"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_hardware_storage_rotational", StatType: model.ServiceTypeSystem, LabelNames: []string{"device", "scheduler"}, Schedule: Schedule{Interval: 5 * time.Minute}},
+		{Name: "node_uptime_seconds", StatType: model.ServiceTypeSystem},
 		// pgbouncer metrics are always oneshot, there is only one 'database' entity
-		{Name: "pgbouncer_pool", Stype: model.ServiceTypePgbouncer, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
-		{Name: "pgbouncer_stats", Stype: model.ServiceTypePgbouncer, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
+		{Name: "pgbouncer_pool", StatType: model.ServiceTypePgbouncer, QueryText: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
+		{Name: "pgbouncer_stats", StatType: model.ServiceTypePgbouncer, QueryText: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
 	}
 }
 
 // adjustQueries adjusts queries depending on PostgreSQL version
-func adjustQueries(descs []StatDesc, pgVersion int) {
+func adjustQueries(descs []statDescriptor, pgVersion int) {
 	for _, desc := range descs {
 		switch desc.Name {
 		case "pg_stat_replication":
 			switch {
 			case pgVersion < 100000:
-				desc.Query = pgStatReplicationQuery96
+				desc.QueryText = pgStatReplicationQuery96
 			}
 		case "pg_replication_slots":
 			switch {
 			case pgVersion < 100000:
-				desc.Query = pgReplicationSlotsQuery96
+				desc.QueryText = pgReplicationSlotsQuery96
 			}
 		case "pg_wal_directory":
 			switch {
 			case pgVersion < 100000:
-				desc.Query = pgStatWalSizeQuery96
+				desc.QueryText = pgStatWalSizeQuery96
 			}
 		case "pg_schema_sequence_fullness":
 			if pgVersion < 100000 {
-				desc.Stype = model.ServiceTypeDisabled
+				desc.StatType = model.ServiceTypeDisabled
 			}
 		}
 	}
 }
 
 // NewExporter creates a new configured exporter
-func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter, error) {
+func NewExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
@@ -182,13 +185,13 @@ func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter,
 	)
 
 	var e = make(map[string]*prometheus.Desc)
-	var catalog = newStatCatalog()
-	var localCatalog = make([]StatDesc, localCatalogDefaultSize)
+	var globalCatalog = globalStatCatalog()
+	var localCatalog = make([]statDescriptor, localCatalogDefaultSize)
 
 	// walk through the stats descriptor catalog, select appropriate stats depending on service type and add the to local
 	// catalog which will belong to service
-	for _, descriptor := range catalog {
-		if itype == descriptor.Stype {
+	for _, descriptor := range globalCatalog {
+		if itype == descriptor.StatType {
 			if len(descriptor.ValueNames) > 0 {
 				for _, suffix := range descriptor.ValueNames {
 					var metricName = descriptor.Name + "_" + suffix
@@ -205,18 +208,18 @@ func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter,
 		}
 	}
 
-	return &PrometheusExporter{Logger: logger, ServiceID: sid, AllDesc: e, ServiceRepo: *repo, localCatalog: localCatalog}, nil
+	return &prometheusExporter{Logger: logger, ServiceID: sid, AllDesc: e, ServiceRepo: *repo, statCatalog: localCatalog}, nil
 }
 
 // Describe method describes all metrics specified in the exporter
-func (e *PrometheusExporter) Describe(ch chan<- *prometheus.Desc) {
+func (e *prometheusExporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, desc := range e.AllDesc {
 		ch <- desc
 	}
 }
 
 // Collect method collects all metrics specified in the exporter
-func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
+func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 	var metricsCnt int
 
 	for _, service := range e.ServiceRepo.Services {
@@ -240,7 +243,7 @@ func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
 }
 
 // collectSystemMetrics is the wrapper for all system metrics collectors
-func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	funcs := map[string]func(chan<- prometheus.Metric) int{
 		"node_cpu_usage":                   e.collectCPUMetrics,
 		"node_diskstats":                   e.collectDiskstatsMetrics,
@@ -255,8 +258,8 @@ func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 		"node_uptime_seconds":              e.collectSystemUptime,
 	}
 
-	for i, desc := range e.localCatalog {
-		if desc.Stype != model.ServiceTypeSystem {
+	for i, desc := range e.statCatalog {
+		if desc.StatType != model.ServiceTypeSystem {
 			continue
 		}
 		if desc.IsScheduleActive() && !desc.IsScheduleExpired() {
@@ -264,13 +267,13 @@ func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 		}
 		// execute the method
 		cnt += funcs[desc.Name](ch)
-		e.localCatalog[i].ScheduleUpdateExpired()
+		e.statCatalog[i].ScheduleUpdateExpired()
 	}
 	return cnt
 }
 
 // collectCPUMetrics collects CPU usage metrics
-func (e *PrometheusExporter) collectCPUMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectCPUMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var cpuStat stat.CPURawstat
 	cpuStat.ReadLocal()
 	for _, mode := range []string{"user", "nice", "system", "idle", "iowait", "irq", "softirq", "steal", "guest", "guest_nice", "total"} {
@@ -281,7 +284,7 @@ func (e *PrometheusExporter) collectCPUMetrics(ch chan<- prometheus.Metric) (cnt
 }
 
 // collectMemMetrics collects memory/swap usage metrics
-func (e *PrometheusExporter) collectMemMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectMemMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var meminfoStat stat.Meminfo
 	var usages = []string{"mem_total", "mem_free", "mem_used", "swap_total", "swap_free", "swap_used", "mem_cached", "mem_dirty",
 		"mem_writeback", "mem_buffers", "mem_available", "mem_slab", "hp_total", "hp_free", "hp_rsvd", "hp_surp", "hp_pagesize"}
@@ -294,7 +297,7 @@ func (e *PrometheusExporter) collectMemMetrics(ch chan<- prometheus.Metric) (cnt
 }
 
 // collectDiskstatsMetrics collects block devices usage metrics
-func (e *PrometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var diskUtilStat stat.Diskstats
 	bdevCnt, err := stat.CountLinesLocal(stat.ProcDiskstats)
 	if err == nil {
@@ -320,7 +323,7 @@ func (e *PrometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric
 }
 
 // collectNetdevMetrics collects network interfaces usage metrics
-func (e *PrometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var netdevUtil stat.Netdevs
 	ifsCnt, err := stat.CountLinesLocal(stat.ProcNetdev)
 	if err == nil {
@@ -355,7 +358,7 @@ func (e *PrometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 }
 
 // collectFsMetrics collects mounted filesystems' usage metrics
-func (e *PrometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	var fsStats = make(stat.FsStats, 0, 10)
 	err := fsStats.ReadLocal()
 	if err != nil {
@@ -378,7 +381,7 @@ func (e *PrometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt 
 }
 
 // collectSysctlMetrics collects sysctl metrics
-func (e *PrometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
 	for _, sysctl := range sysctlList() {
 		value, err := stat.GetSysctl(sysctl)
 		if err != nil {
@@ -392,7 +395,7 @@ func (e *PrometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (
 }
 
 // collectCPUCoresState collects CPU cores operational states' metrics
-func (e *PrometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (cnt int) {
 	// Collect total number of CPU cores
 	online, offline, err := stat.CountCPU()
 	if err != nil {
@@ -408,7 +411,7 @@ func (e *PrometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (
 }
 
 // collectCPUScalingGovernors collects metrics about CPUs scaling governors
-func (e *PrometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
 	sg, err := stat.CountScalingGovernors()
 	if err != nil {
 		e.Logger.Error().Err(err).Msg("failed counting scaling governors")
@@ -427,7 +430,7 @@ func (e *PrometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Met
 }
 
 // collectNumaNodes collect metrics about configured NUMA nodes
-func (e *PrometheusExporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt int) {
 	numa, err := stat.CountNumaNodes()
 	if err != nil {
 		e.Logger.Error().Err(err).Msg("failed counting NUMA nodes")
@@ -439,7 +442,7 @@ func (e *PrometheusExporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt 
 }
 
 // collectStorageSchedulers collect metrics about attached block devices, such as HDD, SSD, NVMe, etc.
-func (e *PrometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt int) {
 	dirs, err := filepath.Glob("/sys/block/*")
 	if err != nil {
 		fmt.Println(err)
@@ -471,7 +474,7 @@ func (e *PrometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metri
 }
 
 // collectSystemUptime collects metric about system uptime
-func (e *PrometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (cnt int) {
+func (e *prometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (cnt int) {
 	uptime, err := stat.Uptime()
 	if err != nil {
 		fmt.Println(err)
@@ -490,7 +493,7 @@ func (e *PrometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (c
 // Начинаем с того что проходимся в цикле по списку баз, устанавливаем соединение с этой базой, смотрим ее версию, адаптируем запросы под конкретную версию и запускаем сбор статы.
 // При первой итерации сбора статы всегда собираем всю стату - и шаредную и приватную. После сбора закрываем соединение.
 // После того как стата собрана, на основе данных хранилища формируем метрики для прометеуса. Учитывая что шаредная стата уже собрана, в последующих циклам собираем только приватную стату. И так пока на дойдем до конца списка баз
-func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, service model.Service) (cnt int) {
+func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, service model.Service) (cnt int) {
 	var dblist []string
 	var version int // version of Postgres or Pgbouncer or whatever else
 
@@ -512,7 +515,7 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to obtain postgresql version", service.ServiceID)
 			return 0
 		}
-		adjustQueries(e.localCatalog, version)
+		adjustQueries(e.statCatalog, version)
 
 		dblist, err = getDBList(conn)
 		if err != nil {
@@ -528,8 +531,8 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 	}
 
 	// Before start the collecting, resetting all 'collectDone' flags
-	for i := range e.localCatalog {
-		e.localCatalog[i].collectDone = false
+	for i := range e.statCatalog {
+		e.statCatalog[i].collectDone = false
 	}
 
 	// Run collecting round, go through databases and collect required statistics
@@ -550,9 +553,9 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		}
 	}
 	// After collecting, update expired schedules. Don't update schedules inside the collecting round, because that might cancel collecting non-oneshot statistics
-	for i, desc := range e.localCatalog {
+	for i, desc := range e.statCatalog {
 		if desc.collectDone {
-			e.localCatalog[i].ScheduleUpdateExpired()
+			e.statCatalog[i].ScheduleUpdateExpired()
 		}
 	}
 	return cnt
@@ -563,10 +566,10 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 // Шаредная стата описывает кластер целиком, приватная относится к конкретной базе и описывает таблицы/индексы/функции которые принадлежат этой базе
 // Для сбора статы обходим все имеющиеся источники и пропускаем ненужные. Далее выполняем запрос ассоциированный с источником и делаем его в подключение.
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
-func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) {
+func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) {
 	// обходим по всем источникам
-	for i, desc := range e.localCatalog {
-		if desc.Stype != itype {
+	for i, desc := range e.statCatalog {
+		if desc.StatType != itype {
 			continue
 		}
 		// Check the schedule, skip if not expired
@@ -581,12 +584,12 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 		e.Logger.Debug().Msgf("start collecting %s", desc.Name)
 
 		// обрабатываем статки с пустым запросом
-		if desc.Query == "" {
+		if desc.QueryText == "" {
 			if err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
 				e.Logger.Warn().Err(err).Msgf("skip collecting %s", desc.Name)
 			} else {
-				e.localCatalog[i].ScheduleUpdateExpired()
-				e.localCatalog[i].collectDone = true
+				e.statCatalog[i].ScheduleUpdateExpired()
+				e.statCatalog[i].collectDone = true
 			}
 			continue
 		}
@@ -597,7 +600,7 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			continue
 		}
 
-		rows, err := conn.Query(desc.Query)
+		rows, err := conn.Query(desc.QueryText)
 		if err != nil {
 			e.Logger.Warn().Err(err).Msgf("skip collecting %s, failed to execute query", desc.Name)
 			continue
@@ -672,7 +675,7 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			e.Logger.Debug().Msgf("no rows returned for %s", desc.Name)
 			continue
 		}
-		e.localCatalog[i].collectDone = true
+		e.statCatalog[i].collectDone = true
 		e.TotalFailed = 0
 		e.Logger.Debug().Msgf("%s collected", desc.Name)
 	}
@@ -702,7 +705,7 @@ func IsPGSSAvailable(conn *sql.DB) bool {
 }
 
 // getPostgresDirInfo evaluates mountpoint of Postgres directory
-func getPostgresDirInfo(e *PrometheusExporter, conn *sql.DB, ch chan<- prometheus.Metric, target string, version int) (err error) {
+func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheus.Metric, target string, version int) (err error) {
 	var dirpath string
 	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dirpath); err != nil {
 		return err

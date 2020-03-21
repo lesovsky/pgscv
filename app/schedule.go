@@ -13,17 +13,17 @@ type Schedule struct {
 }
 
 // ActivateSchedule method activates existing schedule
-func (s *StatDesc) ActivateSchedule() {
+func (s *statDescriptor) ActivateSchedule() {
 	s.Active = true
 }
 
 // IsScheduleActive method returns true if the schedule is active
-func (s *StatDesc) IsScheduleActive() bool {
+func (s *statDescriptor) IsScheduleActive() bool {
 	return s.Active
 }
 
 // IsScheduleExpired method returns true if schedule's time is up
-func (s *StatDesc) IsScheduleExpired() bool {
+func (s *statDescriptor) IsScheduleExpired() bool {
 	elapsed := time.Since(s.LastFired)
 	if elapsed < s.Interval {
 		return false
@@ -33,7 +33,7 @@ func (s *StatDesc) IsScheduleExpired() bool {
 }
 
 // ScheduleUpdateExpired method updates schedule when it's expired
-func (s *StatDesc) ScheduleUpdateExpired() {
+func (s *statDescriptor) ScheduleUpdateExpired() {
 	if s.Active && s.IsScheduleExpired() {
 		s.LastFired = time.Now()
 	}
