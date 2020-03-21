@@ -493,7 +493,6 @@ func (e *prometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (c
 // При первой итерации сбора статы всегда собираем всю стату - и шаредную и приватную. После сбора закрываем соединение.
 // После того как стата собрана, на основе данных хранилища формируем метрики для прометеуса. Учитывая что шаредная стата уже собрана, в последующих циклам собираем только приватную стату. И так пока на дойдем до конца списка баз
 func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, service model.Service) (cnt int) {
-	// TODO: функция не умеет возвращать количество собранных метрик -- cnt
 	var dblist []string
 	var version int // version of Postgres or Pgbouncer or whatever else
 
@@ -547,7 +546,8 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		}
 
 		// собираем стату БД, в зависимости от типа это может быть баунсерная или постгресовая стата
-		e.getDBStat(conn, ch, service.ServiceType, version)
+		n := e.getDBStat(conn, ch, service.ServiceType, version)
+		cnt += n
 		if err := conn.Close(); err != nil {
 			e.Logger.Warn().Err(err).Msgf("failed to close the connection %s@%s:%d/%s", service.User, service.Host, service.Port, service.Dbname)
 		}
@@ -566,7 +566,7 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 // Шаредная стата описывает кластер целиком, приватная относится к конкретной базе и описывает таблицы/индексы/функции которые принадлежат этой базе
 // Для сбора статы обходим все имеющиеся источники и пропускаем ненужные. Далее выполняем запрос ассоциированный с источником и делаем его в подключение.
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
-func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) {
+func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) (cnt int) {
 	// обходим по всем источникам
 	for i, desc := range e.statCatalog {
 		if desc.StatType != itype {
@@ -585,9 +585,10 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 
 		// обрабатываем статки с пустым запросом
 		if desc.QueryText == "" {
-			if err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
+			if n, err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
 				e.Logger.Warn().Err(err).Msgf("skip collecting %s", desc.Name)
 			} else {
+				cnt += n
 				e.statCatalog[i].ScheduleUpdateExpired()
 				e.statCatalog[i].collectDone = true
 			}
@@ -665,6 +666,7 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 						v,                                // значение метрики
 						labelValues...,                   // массив меток
 					)
+					cnt++
 				}
 			}
 		}
@@ -679,6 +681,7 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 		e.TotalFailed = 0
 		e.Logger.Debug().Msgf("%s collected", desc.Name)
 	}
+	return cnt
 }
 
 // IsPGSSAvailable returns true if pg_stat_statements exists and available
@@ -705,10 +708,10 @@ func IsPGSSAvailable(conn *sql.DB) bool {
 }
 
 // getPostgresDirInfo evaluates mountpoint of Postgres directory
-func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheus.Metric, target string, version int) (err error) {
+func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheus.Metric, target string, version int) (cnt int, err error) {
 	var dirpath string
 	if err := conn.QueryRow(`SELECT current_setting('data_directory')`).Scan(&dirpath); err != nil {
-		return err
+		return cnt, err
 	}
 	switch target {
 	case "pg_wal_directory":
@@ -720,7 +723,7 @@ func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheu
 	case "pg_log_directory":
 		var logpath string
 		if err := conn.QueryRow(`SELECT current_setting('log_directory') WHERE current_setting('logging_collector') = 'on'`).Scan(&logpath); err != nil {
-			return err
+			return cnt, err
 		}
 		if strings.HasPrefix(logpath, "/") {
 			dirpath = logpath
@@ -732,7 +735,7 @@ func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheu
 	mountpoints := stat.ReadMounts()
 	realpath, err := stat.RewritePath(dirpath)
 	if err != nil {
-		return err
+		return cnt, err
 	}
 
 	parts := strings.Split(realpath, "/")
@@ -741,12 +744,12 @@ func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheu
 			// check is subpath a symlink? if symlink - dereference and replace it
 			fi, err := os.Lstat(subpath)
 			if err != nil {
-				return err
+				return cnt, err
 			}
 			if fi.Mode()&os.ModeSymlink != 0 {
 				resolvedLink, err := os.Readlink(subpath)
 				if err != nil {
-					return fmt.Errorf("failed to resolve symlink %s: %s", subpath, err)
+					return cnt, fmt.Errorf("failed to resolve symlink %s: %s", subpath, err)
 				}
 
 				if _, ok := mountpoints[resolvedLink]; ok {
@@ -755,13 +758,15 @@ func getPostgresDirInfo(e *prometheusExporter, conn *sql.DB, ch chan<- prometheu
 			}
 			if device, ok := mountpoints[subpath]; ok {
 				ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, subpath, realpath)
-				return nil
+				cnt++
+				return cnt, nil
 			}
 		} else {
 			device := mountpoints["/"]
 			ch <- prometheus.MustNewConstMetric(e.AllDesc[target], prometheus.GaugeValue, 1, device, "/", realpath)
-			return nil
+			cnt++
+			return cnt, nil
 		}
 	}
-	return nil
+	return cnt, nil
 }
