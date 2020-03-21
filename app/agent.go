@@ -47,7 +47,7 @@ func Start(c *Config) error {
 	var jobLabel = "db_system_" + fmt.Sprintf("%x", md5.Sum([]byte(hostname)))
 
 	for {
-		logger.Info().Msgf("start job")
+		logger.Debug().Msgf("start job")
 		var start = time.Now()
 
 		var pusher = push.New(c.MetricServiceBaseURL, jobLabel)
@@ -70,7 +70,7 @@ func Start(c *Config) error {
 		}
 
 		// sleep now
-		logger.Info().Msg("job is finished, going to sleep")
+		logger.Debug().Msg("job is finished, going to sleep")
 		time.Sleep(time.Until(start.Add(c.MetricsSendInterval)))
 	}
 

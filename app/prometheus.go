@@ -236,7 +236,7 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 				prometheus.Unregister(e)
 				e.ServiceRepo.RemoveService(service.Pid)
 			}
-			e.Logger.Info().Msgf("%s: %d metrics generated", service.ServiceID, metricsCnt)
+			e.Logger.Debug().Msgf("%s: %d metrics generated", service.ServiceID, metricsCnt)
 		}
 	}
 }
