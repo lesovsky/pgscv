@@ -50,33 +50,44 @@ const (
 	exporterFailureLimit int = 10
 )
 
-var (
-	diskstatsValueNames               = []string{"rcompleted", "rmerged", "rsectors", "rspent", "wcompleted", "wmerged", "wsectors", "wspent", "ioinprogress", "tspent", "tweighted", "uptime"}
-	netdevValueNames                  = []string{"rbytes", "rpackets", "rerrs", "rdrop", "rfifo", "rframe", "rcompressed", "rmulticast", "tbytes", "tpackets", "terrs", "tdrop", "tfifo", "tcolls", "tcarrier", "tcompressed", "saturation", "uptime", "speed", "duplex"}
-	pgStatDatabasesValueNames         = []string{"xact_commit", "xact_rollback", "blks_read", "blks_hit", "tup_returned", "tup_fetched", "tup_inserted", "tup_updated", "tup_deleted", "conflicts", "temp_files", "temp_bytes", "deadlocks", "blk_read_time", "blk_write_time", "db_size", "stats_age_seconds"}
-	pgStatUserTablesValueNames        = []string{"seq_scan", "seq_tup_read", "idx_scan", "idx_tup_fetch", "n_tup_ins", "n_tup_upd", "n_tup_del", "n_tup_hot_upd", "n_live_tup", "n_dead_tup", "n_mod_since_analyze", "vacuum_count", "autovacuum_count", "analyze_count", "autoanalyze_count"}
-	pgStatioUserTablesValueNames      = []string{"heap_blks_read", "heap_blks_hit", "idx_blks_read", "idx_blks_hit", "toast_blks_read", "toast_blks_hit", "tidx_blks_read", "tidx_blks_hit"}
-	pgStatUserIndexesValueNames       = []string{"idx_scan", "idx_tup_read", "idx_tup_fetch"}
-	pgStatioUserIndexesValueNames     = []string{"idx_blks_read", "idx_blks_hit"}
-	pgStatBgwriterValueNames          = []string{"checkpoints_timed", "checkpoints_req", "checkpoint_write_time", "checkpoint_sync_time", "buffers_checkpoint", "buffers_clean", "maxwritten_clean", "buffers_backend", "buffers_backend_fsync", "buffers_alloc"}
-	pgStatUserFunctionsValueNames     = []string{"calls", "total_time", "self_time"}
-	pgStatActivityValueNames          = []string{"conn_total", "conn_idle_total", "conn_idle_xact_total", "conn_active_total", "conn_waiting_total", "conn_others_total", "conn_prepared_total"}
-	pgStatActivityDurationsNames      = []string{"max_seconds", "idle_xact_max_seconds", "wait_max_seconds"}
-	pgStatActivityAutovacValueNames   = []string{"workers_total", "antiwraparound_workers_total", "user_vacuum_total", "max_duration"}
-	pgStatStatementsValueNames        = []string{"calls", "rows", "total_time", "blk_read_time", "blk_write_time", "shared_blks_hit", "shared_blks_read", "shared_blks_dirtied", "shared_blks_written", "local_blks_hit", "local_blks_read", "local_blks_dirtied", "local_blks_written", "temp_blks_read", "temp_blks_written"}
-	pgStatReplicationValueNames       = []string{"pg_wal_bytes", "pending_lag_bytes", "write_lag_bytes", "flush_lag_bytes", "replay_lag_bytes", "total_lag_bytes", "write_lag_sec", "flush_lag_sec", "replay_lag_sec"}
-	pgStatDatabaseConflictsValueNames = []string{"total", "tablespace", "lock", "snapshot", "bufferpin", "deadlock"}
-	pgStatCurrentTempFilesVN          = []string{"files_total", "bytes_total", "oldest_file_age_seconds_max"}
-	pgbouncerPoolsVN                  = []string{"cl_active", "cl_waiting", "sv_active", "sv_idle", "sv_used", "sv_tested", "sv_login", "maxwait", "maxwait_us"}
-	pgbouncerStatsVN                  = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
+// diskstatsValueNames returns fields of diskstat
+func diskstatsValueNames() []string {
+	return []string{"rcompleted", "rmerged", "rsectors", "rspent", "wcompleted", "wmerged", "wsectors", "wspent", "ioinprogress", "tspent", "tweighted", "uptime"}
+}
 
-	sysctlList = []string{"kernel.sched_migration_cost_ns", "kernel.sched_autogroup_enabled",
+// netdevValueNames returns fields of netdev stats
+func netdevValueNames() []string {
+	return []string{"rbytes", "rpackets", "rerrs", "rdrop", "rfifo", "rframe", "rcompressed", "rmulticast", "tbytes", "tpackets", "terrs", "tdrop", "tfifo", "tcolls", "tcarrier", "tcompressed", "saturation", "uptime", "speed", "duplex"}
+}
+
+// sysctlList returns sysctl list
+func sysctlList() []string {
+	return []string{"kernel.sched_migration_cost_ns", "kernel.sched_autogroup_enabled",
 		"vm.dirty_background_bytes", "vm.dirty_bytes", "vm.overcommit_memory", "vm.overcommit_ratio", "vm.swappiness", "vm.min_free_kbytes",
 		"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
-)
+}
 
 // newStatCatalog provides catalog with all available statistics
 func newStatCatalog() []StatDesc {
+	var (
+		pgStatDatabasesValueNames         = []string{"xact_commit", "xact_rollback", "blks_read", "blks_hit", "tup_returned", "tup_fetched", "tup_inserted", "tup_updated", "tup_deleted", "conflicts", "temp_files", "temp_bytes", "deadlocks", "blk_read_time", "blk_write_time", "db_size", "stats_age_seconds"}
+		pgStatUserTablesValueNames        = []string{"seq_scan", "seq_tup_read", "idx_scan", "idx_tup_fetch", "n_tup_ins", "n_tup_upd", "n_tup_del", "n_tup_hot_upd", "n_live_tup", "n_dead_tup", "n_mod_since_analyze", "vacuum_count", "autovacuum_count", "analyze_count", "autoanalyze_count"}
+		pgStatioUserTablesValueNames      = []string{"heap_blks_read", "heap_blks_hit", "idx_blks_read", "idx_blks_hit", "toast_blks_read", "toast_blks_hit", "tidx_blks_read", "tidx_blks_hit"}
+		pgStatUserIndexesValueNames       = []string{"idx_scan", "idx_tup_read", "idx_tup_fetch"}
+		pgStatioUserIndexesValueNames     = []string{"idx_blks_read", "idx_blks_hit"}
+		pgStatBgwriterValueNames          = []string{"checkpoints_timed", "checkpoints_req", "checkpoint_write_time", "checkpoint_sync_time", "buffers_checkpoint", "buffers_clean", "maxwritten_clean", "buffers_backend", "buffers_backend_fsync", "buffers_alloc"}
+		pgStatUserFunctionsValueNames     = []string{"calls", "total_time", "self_time"}
+		pgStatActivityValueNames          = []string{"conn_total", "conn_idle_total", "conn_idle_xact_total", "conn_active_total", "conn_waiting_total", "conn_others_total", "conn_prepared_total"}
+		pgStatActivityDurationsNames      = []string{"max_seconds", "idle_xact_max_seconds", "wait_max_seconds"}
+		pgStatActivityAutovacValueNames   = []string{"workers_total", "antiwraparound_workers_total", "user_vacuum_total", "max_duration"}
+		pgStatStatementsValueNames        = []string{"calls", "rows", "total_time", "blk_read_time", "blk_write_time", "shared_blks_hit", "shared_blks_read", "shared_blks_dirtied", "shared_blks_written", "local_blks_hit", "local_blks_read", "local_blks_dirtied", "local_blks_written", "temp_blks_read", "temp_blks_written"}
+		pgStatReplicationValueNames       = []string{"pg_wal_bytes", "pending_lag_bytes", "write_lag_bytes", "flush_lag_bytes", "replay_lag_bytes", "total_lag_bytes", "write_lag_sec", "flush_lag_sec", "replay_lag_sec"}
+		pgStatDatabaseConflictsValueNames = []string{"total", "tablespace", "lock", "snapshot", "bufferpin", "deadlock"}
+		pgStatCurrentTempFilesVN          = []string{"files_total", "bytes_total", "oldest_file_age_seconds_max"}
+		pgbouncerPoolsVN                  = []string{"cl_active", "cl_waiting", "sv_active", "sv_idle", "sv_used", "sv_tested", "sv_login", "maxwait", "maxwait_us"}
+		pgbouncerStatsVN                  = []string{"xact_count", "query_count", "bytes_received", "bytes_sent", "xact_time", "query_time", "wait_time"}
+	)
+
 	return []StatDesc{
 		// collect oneshot -- these Postgres statistics are collected once per round
 		{Name: "pg_stat_database", Stype: model.ServiceTypePostgresql, Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
@@ -114,8 +125,8 @@ func newStatCatalog() []StatDesc {
 		{Name: "pg_schema_fkey_columns_mismatch", Stype: model.ServiceTypePostgresql, Query: pgSchemaFkeyColumnsMismatch, ValueNames: []string{"exists"}, LabelNames: []string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, Schedule: Schedule{Interval: 5 * time.Minute}},
 		// system metrics are always oneshot, there is no 'database' entity
 		{Name: "node_cpu_usage", Stype: model.ServiceTypeSystem, ValueNames: []string{"time"}, LabelNames: []string{"mode"}},
-		{Name: "node_diskstats", Stype: model.ServiceTypeSystem, ValueNames: diskstatsValueNames, LabelNames: []string{"device"}},
-		{Name: "node_netdev", Stype: model.ServiceTypeSystem, ValueNames: netdevValueNames, LabelNames: []string{"interface"}},
+		{Name: "node_diskstats", Stype: model.ServiceTypeSystem, ValueNames: diskstatsValueNames(), LabelNames: []string{"device"}},
+		{Name: "node_netdev", Stype: model.ServiceTypeSystem, ValueNames: netdevValueNames(), LabelNames: []string{"interface"}},
 		{Name: "node_memory", Stype: model.ServiceTypeSystem, ValueNames: []string{"usage_bytes"}, LabelNames: []string{"usage"}},
 		{Name: "node_filesystem", Stype: model.ServiceTypeSystem, ValueNames: []string{"bytes", "inodes"}, LabelNames: []string{"usage", "device", "mountpoint", "flags"}},
 		{Name: "node_settings", Stype: model.ServiceTypeSystem, ValueNames: []string{"sysctl"}, LabelNames: []string{"sysctl"}, Schedule: Schedule{Interval: 5 * time.Minute}},
@@ -298,7 +309,7 @@ func (e *PrometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric
 			if s.Rcompleted == 0 && s.Wcompleted == 0 {
 				continue // skip devices which never doing IOs
 			}
-			for _, v := range diskstatsValueNames {
+			for _, v := range diskstatsValueNames() {
 				var desc = "node_diskstats_" + v
 				ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.CounterValue, s.SingleStat(v), s.Device)
 				cnt++
@@ -325,7 +336,7 @@ func (e *PrometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 				continue // skip interfaces which never seen packets
 			}
 
-			for _, v := range netdevValueNames {
+			for _, v := range netdevValueNames() {
 				var desc = "node_netdev_" + v
 
 				// TODO: вроде эти метрики не нужны -- нужны, пригодятся для 'capacity planning' проверок
@@ -368,7 +379,7 @@ func (e *PrometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt 
 
 // collectSysctlMetrics collects sysctl metrics
 func (e *PrometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (cnt int) {
-	for _, sysctl := range sysctlList {
+	for _, sysctl := range sysctlList() {
 		value, err := stat.GetSysctl(sysctl)
 		if err != nil {
 			e.Logger.Error().Err(err).Msg("failed to obtain sysctl")
