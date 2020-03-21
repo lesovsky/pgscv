@@ -18,11 +18,12 @@ import (
 
 // PrometheusExporter is the realization of prometheus.Collector
 type PrometheusExporter struct {
-	Logger      zerolog.Logger              // logging
-	ServiceID   string                      // unique ID across all services
-	AllDesc     map[string]*prometheus.Desc // metrics assigned to this exporter
-	ServiceRepo ServiceRepo                 // service repository
-	TotalFailed int                         // total number of collecting failures
+	Logger       zerolog.Logger              // logging
+	ServiceID    string                      // unique ID across all services
+	AllDesc      map[string]*prometheus.Desc // metrics assigned to this exporter
+	ServiceRepo  ServiceRepo                 // service repository
+	TotalFailed  int                         // total number of collecting failures
+	localCatalog []StatDesc                  // каталог дескрипторов принадлежащий только этому экспортеру
 }
 
 // StatDesc is the statistics descriptor, with detailed info about particular kind of stats
@@ -39,6 +40,9 @@ type StatDesc struct {
 }
 
 const (
+	// default size of the catalog slice used for storing stats descriptors
+	localCatalogDefaultSize = 10
+
 	// regexp describes raw block devices except their partitions, but including stacked devices, such as device-mapper and mdraid
 	regexpBlockDevicesExtended = `((s|xv|v)d[a-z])|(nvme[0-9]n[0-9])|(dm-[0-9]+)|(md[0-9]+)`
 
@@ -69,8 +73,11 @@ var (
 	sysctlList = []string{"kernel.sched_migration_cost_ns", "kernel.sched_autogroup_enabled",
 		"vm.dirty_background_bytes", "vm.dirty_bytes", "vm.overcommit_memory", "vm.overcommit_ratio", "vm.swappiness", "vm.min_free_kbytes",
 		"vm.zone_reclaim_mode", "kernel.numa_balancing", "vm.nr_hugepages", "vm.nr_overcommit_hugepages"}
+)
 
-	statdesc = []*StatDesc{
+// newStatCatalog provides catalog with all available statistics
+func newStatCatalog() []StatDesc {
+	return []StatDesc{
 		// collect oneshot -- these Postgres statistics are collected once per round
 		{Name: "pg_stat_database", Stype: model.ServiceTypePostgresql, Query: pgStatDatabaseQuery, collectOneshot: true, ValueNames: pgStatDatabasesValueNames, LabelNames: []string{"datid", "datname"}},
 		{Name: "pg_stat_bgwriter", Stype: model.ServiceTypePostgresql, Query: pgStatBgwriterQuery, collectOneshot: true, ValueNames: pgStatBgwriterValueNames, LabelNames: []string{}},
@@ -121,10 +128,10 @@ var (
 		{Name: "pgbouncer_pool", Stype: model.ServiceTypePgbouncer, Query: "SHOW POOLS", ValueNames: pgbouncerPoolsVN, LabelNames: []string{"database", "user", "pool_mode"}},
 		{Name: "pgbouncer_stats", Stype: model.ServiceTypePgbouncer, Query: "SHOW STATS_TOTALS", ValueNames: pgbouncerStatsVN, LabelNames: []string{"database"}},
 	}
-)
+}
 
 // adjustQueries adjusts queries depending on PostgreSQL version
-func adjustQueries(descs []*StatDesc, pgVersion int) {
+func adjustQueries(descs []StatDesc, pgVersion int) {
 	for _, desc := range descs {
 		switch desc.Name {
 		case "pg_stat_replication":
@@ -164,24 +171,30 @@ func NewExporter(service model.Service, repo *ServiceRepo) (*PrometheusExporter,
 	)
 
 	var e = make(map[string]*prometheus.Desc)
-	for _, desc := range statdesc {
-		if itype == desc.Stype {
-			if len(desc.ValueNames) > 0 {
-				for _, suffix := range desc.ValueNames {
-					var metricName = desc.Name + "_" + suffix
-					e[metricName] = prometheus.NewDesc(metricName, metricsHelp[metricName], desc.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
+	var catalog = newStatCatalog()
+	var localCatalog = make([]StatDesc, localCatalogDefaultSize)
+
+	// walk through the stats descriptor catalog, select appropriate stats depending on service type and add the to local
+	// catalog which will belong to service
+	for _, descriptor := range catalog {
+		if itype == descriptor.Stype {
+			if len(descriptor.ValueNames) > 0 {
+				for _, suffix := range descriptor.ValueNames {
+					var metricName = descriptor.Name + "_" + suffix
+					e[metricName] = prometheus.NewDesc(metricName, metricsHelp[metricName], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 				}
 			} else {
-				e[desc.Name] = prometheus.NewDesc(desc.Name, metricsHelp[desc.Name], desc.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
+				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, metricsHelp[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
-			// activate schedule if requested
-			if repo.Config.ScheduleEnabled && desc.Schedule.Interval != 0 {
-				desc.ActivateSchedule()
+			// activate schedule if requested (only in push-mode)
+			if repo.Config.ScheduleEnabled && descriptor.Schedule.Interval != 0 {
+				descriptor.ActivateSchedule()
 			}
+			localCatalog = append(localCatalog, descriptor)
 		}
 	}
 
-	return &PrometheusExporter{Logger: logger, ServiceID: sid, AllDesc: e, ServiceRepo: *repo}, nil
+	return &PrometheusExporter{Logger: logger, ServiceID: sid, AllDesc: e, ServiceRepo: *repo, localCatalog: localCatalog}, nil
 }
 
 // Describe method describes all metrics specified in the exporter
@@ -197,8 +210,6 @@ func (e *PrometheusExporter) Collect(ch chan<- prometheus.Metric) {
 
 	for _, service := range e.ServiceRepo.Services {
 		if e.ServiceID == service.ServiceID {
-			e.Logger.Debug().Msgf("%s: start collecting metrics for %s", time.Now().Format("2006-01-02 15:04:05"), e.ServiceID)
-
 			// в зависимости от типа экспортера делаем соотв.проверки
 			switch service.ServiceType {
 			case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
@@ -233,7 +244,7 @@ func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 		"node_uptime_seconds":              e.collectSystemUptime,
 	}
 
-	for _, desc := range statdesc {
+	for i, desc := range e.localCatalog {
 		if desc.Stype != model.ServiceTypeSystem {
 			continue
 		}
@@ -242,7 +253,7 @@ func (e *PrometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 		}
 		// execute the method
 		cnt += funcs[desc.Name](ch)
-		desc.ScheduleUpdateExpired()
+		e.localCatalog[i].ScheduleUpdateExpired()
 	}
 	return cnt
 }
@@ -490,7 +501,7 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to obtain postgresql version", service.ServiceID)
 			return 0
 		}
-		adjustQueries(statdesc, version)
+		adjustQueries(e.localCatalog, version)
 
 		dblist, err = getDBList(conn)
 		if err != nil {
@@ -506,8 +517,8 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 	}
 
 	// Before start the collecting, resetting all 'collectDone' flags
-	for _, desc := range statdesc {
-		desc.collectDone = false
+	for i := range e.localCatalog {
+		e.localCatalog[i].collectDone = false
 	}
 
 	// Run collecting round, go through databases and collect required statistics
@@ -528,9 +539,9 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		}
 	}
 	// After collecting, update expired schedules. Don't update schedules inside the collecting round, because that might cancel collecting non-oneshot statistics
-	for _, desc := range statdesc {
+	for i, desc := range e.localCatalog {
 		if desc.collectDone {
-			desc.ScheduleUpdateExpired()
+			e.localCatalog[i].ScheduleUpdateExpired()
 		}
 	}
 	return cnt
@@ -543,7 +554,7 @@ func (e *PrometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 // Полученный ответ от базы оформляем в массив данных и складываем в общее хранилище в котором собраны данные от всех ответов, когда все источники обшарены возвращаем наружу общее хранилище с собранными данными
 func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric, itype int, version int) {
 	// обходим по всем источникам
-	for _, desc := range statdesc {
+	for i, desc := range e.localCatalog {
 		if desc.Stype != itype {
 			continue
 		}
@@ -563,8 +574,8 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			if err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
 				e.Logger.Warn().Err(err).Msgf("skip collecting %s", desc.Name)
 			} else {
-				desc.ScheduleUpdateExpired()
-				desc.collectDone = true
+				e.localCatalog[i].ScheduleUpdateExpired()
+				e.localCatalog[i].collectDone = true
 			}
 			continue
 		}
@@ -650,7 +661,7 @@ func (e *PrometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			e.Logger.Debug().Msgf("no rows returned for %s", desc.Name)
 			continue
 		}
-		desc.collectDone = true
+		e.localCatalog[i].collectDone = true
 		e.TotalFailed = 0
 		e.Logger.Debug().Msgf("%s collected", desc.Name)
 	}
