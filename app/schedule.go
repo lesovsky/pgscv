@@ -12,6 +12,15 @@ type Schedule struct {
 	LastFired time.Time     // timestamp of last collect
 }
 
+const defaultScheduleInterval = 5 * time.Minute
+
+func newSchedule(interval time.Duration) Schedule {
+	if interval == 0 {
+		interval = defaultScheduleInterval
+	}
+	return Schedule{Interval: interval}
+}
+
 // ActivateSchedule method activates existing schedule
 func (s *statDescriptor) ActivateSchedule() {
 	s.Active = true
