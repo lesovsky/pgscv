@@ -40,16 +40,17 @@ func Start(c *Config) error {
 	if err != nil {
 		return err
 	}
-	var garbageLabel = "db_system_" + fmt.Sprintf("%x", md5.Sum([]byte(hostname)))
-	var pusher *push.Pusher
+
+	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
+	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
+	// this label should be removed with 'metric_relabel_config' rule.
+	var jobLabel = "db_system_" + fmt.Sprintf("%x", md5.Sum([]byte(hostname)))
 
 	for {
-		// TODO: не должно ли создание pusher/client вынесено из цикла?
+		logger.Info().Msgf("start job")
+		var start = time.Now()
 
-		// A garbage label is the special one which provides metrics uniqueness across several hosts and guarantees
-		// metrics will not be overwritten on Pushgateway side. There is no other use-cases for this label, hence
-		// before ingesting by Prometheus this label should be removed with 'metric_relabel_config' rule.
-		pusher = push.New(c.MetricServiceBaseURL, garbageLabel)
+		var pusher = push.New(c.MetricServiceBaseURL, jobLabel)
 
 		// if api-key specified use custom http-client and attach api-key to http requests
 		if c.APIKey != "" {
@@ -57,15 +58,20 @@ func Start(c *Config) error {
 			pusher.Client(client)
 		}
 
+		// collect metrics for all discovered services
 		for _, service := range instanceRepo.Services {
 			pusher.Collector(service.Exporter)
 		}
 
+		// push metrics
 		if err := pusher.Add(); err != nil {
 			// it is not critical error, just show it and continue
 			logger.Warn().Err(err).Msg("could not push metrics")
 		}
-		time.Sleep(c.MetricsSendInterval)
+
+		// sleep now
+		logger.Info().Msg("job is finished, going to sleep")
+		time.Sleep(time.Until(start.Add(c.MetricsSendInterval)))
 	}
 
 	// TODO: тупиковый for сверху, из него никак не выйти

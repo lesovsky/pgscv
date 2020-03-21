@@ -13,7 +13,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 )
 
 // prometheusExporter is the realization of prometheus.Collector
@@ -237,9 +236,9 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 				prometheus.Unregister(e)
 				e.ServiceRepo.RemoveService(service.Pid)
 			}
+			e.Logger.Info().Msgf("%s: %d metrics generated", service.ServiceID, metricsCnt)
 		}
 	}
-	e.Logger.Debug().Msgf("%s: generated %d metrics\n", time.Now().Format("2006-01-02 15:04:05"), metricsCnt)
 }
 
 // collectSystemMetrics is the wrapper for all system metrics collectors
@@ -494,6 +493,7 @@ func (e *prometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (c
 // При первой итерации сбора статы всегда собираем всю стату - и шаредную и приватную. После сбора закрываем соединение.
 // После того как стата собрана, на основе данных хранилища формируем метрики для прометеуса. Учитывая что шаредная стата уже собрана, в последующих циклам собираем только приватную стату. И так пока на дойдем до конца списка баз
 func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, service model.Service) (cnt int) {
+	// TODO: функция не умеет возвращать количество собранных метрик -- cnt
 	var dblist []string
 	var version int // version of Postgres or Pgbouncer or whatever else
 
