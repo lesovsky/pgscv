@@ -159,18 +159,32 @@ func installBin(config *bootstrapConfig) error {
 
 // creates systemd unit in system path
 func createEnvironmentFile(config *bootstrapConfig) error {
+	var envdir = "/etc/environment.d"
 	log.Info().Msg("Create environment file")
-	t, err := template.New("envconf").Parse(envFileTemplate)
-	if err != nil {
-		return fmt.Errorf("parse template failed: %s", err)
+
+	// check directory exists and create if not exists
+	if _, err := os.Stat(envdir); os.IsNotExist(err) {
+		err = os.Mkdir(envdir, os.ModeDir)
+		if err != nil {
+			return fmt.Errorf("create environment directory failed: %s ", err)
+		}
 	}
 
-	envfile := fmt.Sprintf("/etc/environment.d/%s.conf", config.AgentBinaryName)
+	// create environment config-file with proper permissions
+	envfile := fmt.Sprintf("%s/%s.conf", envdir, config.AgentBinaryName)
 	f, err := os.Create(envfile)
 	if err != nil {
 		return fmt.Errorf("create environment file failed: %s ", err)
 	}
+	if err = f.Chmod(0600); err != nil {
+		log.Warn().Err(err).Msg("change file permissions failed, leave defaults")
+	}
 
+	// write content using template
+	t, err := template.New("envconf").Parse(envFileTemplate)
+	if err != nil {
+		return fmt.Errorf("parse template failed: %s", err)
+	}
 	err = t.Execute(f, config)
 	if err != nil {
 		return fmt.Errorf("execute template failed: %s ", err)
@@ -179,6 +193,7 @@ func createEnvironmentFile(config *bootstrapConfig) error {
 	if err = f.Close(); err != nil {
 		log.Warn().Err(err).Msg("close file failed, ignore it")
 	}
+
 	return nil
 }
 
