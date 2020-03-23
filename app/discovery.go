@@ -59,19 +59,6 @@ func (repo *ServiceRepo) StartInitialDiscovery() error {
 func (repo *ServiceRepo) StartBackgroundDiscovery() {
 	repo.Logger.Debug().Msg("starting background discovery")
 	// TODO: нет кейса для выхода
-	//for {
-	//	select {
-	//	case <-time.After(60 * time.Second):
-	//		if err := repo.lookupServices(); err != nil {
-	//			repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
-	//			continue
-	//		}
-	//		if err := repo.setupServices(); err != nil {
-	//			repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
-	//			continue
-	//		}
-	//	}
-	//}
 	for {
 		<-time.After(60 * time.Second)
 		if err := repo.lookupServices(); err != nil {
