@@ -7,9 +7,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
-	"os/user"
 	"pgscv/app"
-	"strings"
 	"time"
 )
 
@@ -22,14 +20,13 @@ func main() {
 	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	var (
-		username             = serviceUsername()
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").String()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		doBootstrap          = kingpin.Flag("bootstrap", "Run bootstrap, requires root privileges").Default("false").Envar("BOOTSTRAP").Bool()
 		apiKey               = kingpin.Flag("api-key", "Use api key").Default("").Envar("API_KEY").String()
-		postgresUsername     = kingpin.Flag("pg-username", "Default username used for connecting to all discovered Postgres services").Default(username).Envar("PG_USERNAME").String()
+		postgresUsername     = kingpin.Flag("pg-username", "Default username used for connecting to all discovered Postgres services").Default("weaponry_app").Envar("PG_USERNAME").String()
 		postgresPassword     = kingpin.Flag("pg-password", "Default password used for connecting to all discovered Postgres services").Default("").Envar("PG_PASSWORD").String()
-		pgbouncerUsername    = kingpin.Flag("pgb-username", "Default username used for connecting to all discovered Pgbouncer services").Default(username).Envar("PGB_USERNAME").String()
+		pgbouncerUsername    = kingpin.Flag("pgb-username", "Default username used for connecting to all discovered Pgbouncer services").Default("weaponry_app").Envar("PGB_USERNAME").String()
 		pgbouncerPassword    = kingpin.Flag("pgb-password", "Default password used for connecting to all discovered Pgbouncer services").Default("").Envar("PGB_PASSWORD").String()
 		urlStrings           = kingpin.Flag("url", "Postgres/Pgbouncer service URL, disables auto-discovery, can be used multiple times").Strings()
 		showver              = kingpin.Flag("version", "show version and exit").Default().Bool()
@@ -93,15 +90,4 @@ func main() {
 	}
 
 	log.Info().Msg("Graceful shutdown")
-}
-
-// serviceUsername provides default username used for connecting to services, if no usernames provided by EnvVars.
-func serviceUsername() string {
-	var usernameFallback = strings.ToLower(strings.Replace(binName, "-", "_", -1))
-	u, err := user.Current()
-	if err != nil {
-		log.Warn().Err(err).Msgf("failed getting current username, use fallback username: %s", usernameFallback)
-		return usernameFallback
-	}
-	return u.Username
 }
