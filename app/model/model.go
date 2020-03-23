@@ -20,7 +20,7 @@ type Service struct {
 	ProjectID   string   // Project identifier is unique key across all projects (project may have several instances)
 	Pid         int32    // Process identifier
 	Host        string   // Hostname used as part of a connection string (related to postgresql, pgbouncer)
-	Port        int      // Port used as part of a connection string (related to postgresql, pgbouncer)
+	Port        uint16   // Port used as part of a connection string (related to postgresql, pgbouncer)
 	User        string   // Username used as part of a connection string (related to postgresql, pgbouncer)
 	Password    string   // Password used as part of a connection string (related to postgresql, pgbouncer)
 	Dbname      string   // Database name used as part of a connection string (related to postgresql, pgbouncer)

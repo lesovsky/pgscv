@@ -18,12 +18,21 @@ func Start(c *Config) error {
 	logger.Debug().Msg("start application")
 
 	instanceRepo := NewServiceRepo(c)
-	if err := instanceRepo.StartInitialDiscovery(); err != nil {
-		return err
-	}
 
-	// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-	go instanceRepo.StartBackgroundDiscovery()
+	// if URLs specified use them instead of auto-discovery
+	if c.URLStrings != nil {
+		c.DiscoveryEnabled = false
+		if err := instanceRepo.ConfigureServices(); err != nil {
+			return err
+		}
+	} else {
+		c.DiscoveryEnabled = true
+		if err := instanceRepo.StartInitialDiscovery(); err != nil {
+			return err
+		}
+		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
+		go instanceRepo.StartBackgroundDiscovery()
+	}
 
 	logger.Debug().Msg("selecting mode")
 	if c.MetricServiceBaseURL == "" {

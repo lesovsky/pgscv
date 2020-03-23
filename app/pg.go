@@ -170,7 +170,7 @@ func PQhost(c *sql.DB) (_ string, err error) {
 }
 
 // PQport returns the port number to which pgSCV is connected
-func PQport(c *sql.DB) (i int, err error) {
+func PQport(c *sql.DB) (i uint16, err error) {
 	err = c.QueryRow(PQportQuery).Scan(&i)
 	return i, err
 }

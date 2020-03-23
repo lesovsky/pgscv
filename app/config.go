@@ -15,12 +15,14 @@ type Config struct {
 	MetricServiceBaseURL string
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
+	DiscoveryEnabled     bool
 	APIKey               string
 	BootstrapBinaryName  string
+	URLStrings           []string
 	Credentials          Credentials
 }
 
-// Credentials struct describes requisites defined by user and used for connecting to services
+// Credentials struct describes default requisites defined by user and used for connecting to services
 type Credentials struct {
 	PostgresUser  string
 	PostgresPass  string

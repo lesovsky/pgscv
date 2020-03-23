@@ -31,6 +31,7 @@ func main() {
 		postgresPassword     = kingpin.Flag("pg-password", "Password used for connecting to Postgres services").Default("").Envar("PG_PASSWORD").String()
 		pgbouncerUsername    = kingpin.Flag("pgb-username", "Username used for connecting to Pgbouncer services").Default(username).Envar("PGB_USERNAME").String()
 		pgbouncerPassword    = kingpin.Flag("pgb-password", "Password used for connecting to Pgbouncer services").Default("").Envar("PGB_PASSWORD").String()
+		urlStrings           = kingpin.Flag("url", "Postgres/Pgbouncer service URL, disables auto-discovery, can be used multiple times").Strings()
 		showver              = kingpin.Flag("version", "show version and exit").Default().Bool()
 		logLevel             = kingpin.Flag("log-level", "set log level: debug, info, warn, error").Default("info").Envar("LOG_LEVEL").String()
 	)
@@ -44,6 +45,7 @@ func main() {
 		ScheduleEnabled:      false,
 		APIKey:               *apiKey,
 		BootstrapBinaryName:  binName,
+		URLStrings:           *urlStrings,
 		Credentials: app.Credentials{
 			PostgresUser:  *postgresUsername,
 			PostgresPass:  *postgresPassword,

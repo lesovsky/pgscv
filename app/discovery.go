@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -84,6 +85,57 @@ func (repo *ServiceRepo) StartBackgroundDiscovery() {
 	}
 }
 
+// ConfigureServices creates service for each specified DSN
+func (repo *ServiceRepo) ConfigureServices() error {
+	repo.Logger.Debug().Msg("starting initialization using provided URL strings")
+
+	for i, url := range repo.Config.URLStrings {
+		var fields = strings.Split(url, "://")
+		if fields == nil {
+			repo.Logger.Warn().Msgf("schema delimiter not found in URL: %s, skip", url)
+			continue
+		}
+
+		var serviceType int
+		switch fields[0] {
+		case "postgres":
+			serviceType = model.ServiceTypePostgresql
+		case "pgbouncer":
+			serviceType = model.ServiceTypePgbouncer
+			url = strings.Replace(url, "pgbouncer://", "postgres://", 1) // replace 'pgbouncer://' because 'pgxpool' doesn't understand such prefix
+		default:
+			repo.Logger.Warn().Msgf("unknown schema in URL: %s, skip", url)
+			continue
+		}
+
+		config, err := pgxpool.ParseConfig(url)
+		if err != nil {
+			repo.Logger.Warn().Err(err).Msg("failed to parse URL, skip")
+			continue
+		}
+
+		var service = model.Service{
+			ServiceType: serviceType,
+			Pid:         int32(i),
+			Host:        config.ConnConfig.Host,
+			Port:        config.ConnConfig.Port,
+			User:        config.ConnConfig.User,
+			Password:    config.ConnConfig.Password,
+			Dbname:      config.ConnConfig.Database,
+		}
+
+		repo.Services[int32(i)] = service
+	}
+
+	// configure exporters for initialised services
+	if err := repo.setupServices(); err != nil {
+		return err
+	}
+
+	repo.Logger.Debug().Msgf("finish initialisation: setting up %d services", len(repo.Services))
+	return nil
+}
+
 // lookupServices scans PIDs and looking for required services
 // Current agent implementation searches services using local procfs filesystem
 func (repo *ServiceRepo) lookupServices() error {
@@ -149,9 +201,9 @@ func (repo *ServiceRepo) setupServices() error {
 
 			switch service.ServiceType {
 			case model.ServiceTypePostgresql:
-				newService.ServiceID = "postgres:" + strconv.Itoa(service.Port)
+				newService.ServiceID = "postgres:" + strconv.Itoa(int(service.Port))
 			case model.ServiceTypePgbouncer:
-				newService.ServiceID = "pgbouncer:" + strconv.Itoa(service.Port)
+				newService.ServiceID = "pgbouncer:" + strconv.Itoa(int(service.Port))
 			case model.ServiceTypeSystem:
 				// nothing to do
 			}
@@ -245,7 +297,7 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 	}
 
 	log.Info().Msgf("auto-discovery: pgbouncer service has been found, pid %d, available through %s, port %d", proc.Pid, sdir, 6432)
-	return model.Service{ServiceType: model.ServiceTypePgbouncer, Pid: proc.Pid, Host: sdir, Port: lport, User: "pgbouncer", Dbname: "pgbouncer"}, nil
+	return model.Service{ServiceType: model.ServiceTypePgbouncer, Pid: proc.Pid, Host: sdir, Port: uint16(lport), User: "pgbouncer", Dbname: "pgbouncer"}, nil
 }
 
 // discoverPostgres
@@ -296,5 +348,5 @@ func discoverPostgres(proc *process.Process) (model.Service, error) {
 	}
 
 	log.Info().Msgf("auto-discovery: postgresql service has been found, pid %d, available through %s, port %d", proc.Pid, unixsocketdir, port)
-	return model.Service{ServiceType: model.ServiceTypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: port, Dbname: "postgres"}, nil
+	return model.Service{ServiceType: model.ServiceTypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: uint16(port), Dbname: "postgres"}, nil
 }

@@ -232,7 +232,7 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			// check total number of failures, if too many errors then unregister exporter
-			if e.TotalFailed >= exporterFailureLimit {
+			if e.TotalFailed >= exporterFailureLimit && e.ServiceRepo.Config.DiscoveryEnabled {
 				prometheus.Unregister(e)
 				e.ServiceRepo.RemoveService(service.Pid)
 			}
