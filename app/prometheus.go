@@ -13,6 +13,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // prometheusExporter is the realization of prometheus.Collector
@@ -199,10 +200,6 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 			} else {
 				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, metricsHelp[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
-			// activate schedule if requested (only in push-mode)
-			if repo.Config.ScheduleEnabled && descriptor.Schedule.Interval != 0 {
-				descriptor.ActivateSchedule()
-			}
 			localCatalog = append(localCatalog, descriptor)
 		}
 	}
@@ -261,12 +258,12 @@ func (e *prometheusExporter) collectSystemMetrics(ch chan<- prometheus.Metric) (
 		if desc.StatType != model.ServiceTypeSystem {
 			continue
 		}
-		if desc.IsScheduleActive() && !desc.IsScheduleExpired() {
+		if !desc.IsDescriptorActive() {
 			continue
 		}
-		// execute the method
+		// execute the method and remember execution time
 		cnt += funcs[desc.Name](ch)
-		e.statCatalog[i].ScheduleUpdateExpired()
+		e.statCatalog[i].LastFired = time.Now()
 	}
 	return cnt
 }
@@ -534,6 +531,14 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		e.statCatalog[i].collectDone = false
 	}
 
+	// Activate all expired descriptors. Use now() snapshot to avoid partially enabled descriptors
+	var now = time.Now()
+	for i, desc := range e.statCatalog {
+		if desc.Interval > 0 && now.Sub(desc.LastFired) >= desc.Interval {
+			e.statCatalog[i].ActivateDescriptor()
+		}
+	}
+
 	// Run collecting round, go through databases and collect required statistics
 	for _, dbname := range dblist {
 		service.Dbname = dbname
@@ -552,10 +557,13 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 			e.Logger.Warn().Err(err).Msgf("failed to close the connection %s@%s:%d/%s", service.User, service.Host, service.Port, service.Dbname)
 		}
 	}
-	// After collecting, update expired schedules. Don't update schedules inside the collecting round, because that might cancel collecting non-oneshot statistics
+	// After collecting, update time of last executed.
+	// Don't update times inside the collecting round, because that might cancel collecting non-oneshot statistics.
+	// Use now() snapshot to use the single timestamp in all descriptors.
+	now = time.Now()
 	for i, desc := range e.statCatalog {
 		if desc.collectDone {
-			e.statCatalog[i].ScheduleUpdateExpired()
+			e.statCatalog[i].LastFired = now
 		}
 	}
 	return cnt
@@ -572,8 +580,8 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 		if desc.StatType != itype {
 			continue
 		}
-		// Check the schedule, skip if not expired
-		if desc.IsScheduleActive() && !desc.IsScheduleExpired() {
+		// Skip inactive descriptors (schedule is not expired yet)
+		if !desc.IsDescriptorActive() {
 			continue
 		}
 		// Skip collecting if statistics is oneshot and already collected (in the previous database)
@@ -589,7 +597,6 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 				e.Logger.Warn().Err(err).Msgf("skip collecting %s", desc.Name)
 			} else {
 				cnt += n
-				e.statCatalog[i].ScheduleUpdateExpired()
 				e.statCatalog[i].collectDone = true
 			}
 			continue
@@ -678,6 +685,12 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			continue
 		}
 		e.statCatalog[i].collectDone = true
+
+		// deactivate scheduler-based and oneshot descriptors (avoid getting the same stats in next loop iteration
+		if e.statCatalog[i].Interval > 0 && e.statCatalog[i].collectOneshot {
+			e.statCatalog[i].DeacivateDescriptor()
+		}
+
 		e.TotalFailed = 0
 		e.Logger.Debug().Msgf("%s collected", desc.Name)
 	}

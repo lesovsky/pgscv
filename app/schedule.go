@@ -21,13 +21,18 @@ func newSchedule(interval time.Duration) Schedule {
 	return Schedule{Interval: interval}
 }
 
-// ActivateSchedule method activates existing schedule
-func (s *statDescriptor) ActivateSchedule() {
+// ActivateDescriptor means to collect metric during the next round
+func (s *statDescriptor) ActivateDescriptor() {
 	s.Active = true
 }
 
+// DeactivateDescriptor means don'e collect metric during the next round
+func (s *statDescriptor) DeacivateDescriptor() {
+	s.Active = false
+}
+
 // IsScheduleActive method returns true if the schedule is active
-func (s *statDescriptor) IsScheduleActive() bool {
+func (s *statDescriptor) IsDescriptorActive() bool {
 	return s.Active
 }
 
