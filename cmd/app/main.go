@@ -51,6 +51,11 @@ func main() {
 		},
 	}
 
+	// disable auto-discovery if user specified URLs for connecting to services
+	if urlStrings != nil {
+		sc.DiscoveryEnabled = false
+	}
+
 	// TODO: add config validations, for: 1) api-key 2) send-interval 3) etc...
 
 	switch *logLevel {

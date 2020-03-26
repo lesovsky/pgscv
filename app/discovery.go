@@ -33,6 +33,23 @@ func NewServiceRepo(config *Config) *ServiceRepo {
 	}
 }
 
+// Configure performs initial service discovery using auto-discovery or service URLs provided by user
+func (repo *ServiceRepo) Configure(config *Config) error {
+	if config.DiscoveryEnabled {
+		if err := repo.StartInitialDiscovery(); err != nil {
+			return err
+		}
+
+		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
+		go repo.StartBackgroundDiscovery()
+	} else {
+		if err := repo.ConfigureServices(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // StartInitialDiscovery performs initial service discovery required at application startup
 func (repo *ServiceRepo) StartInitialDiscovery() error {
 	repo.Logger.Debug().Msg("starting initial discovery")

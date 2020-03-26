@@ -13,61 +13,67 @@ import (
 	"time"
 )
 
-// Start ...
-// TODO: слишком длинная функция
+// Start is the application's main entry point
 func Start(c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	logger.Debug().Msg("start application")
 
 	instanceRepo := NewServiceRepo(c)
 
-	// if URLs specified use them instead of auto-discovery
-	if c.URLStrings != nil {
-		c.DiscoveryEnabled = false
-		if err := instanceRepo.ConfigureServices(); err != nil {
-			return err
-		}
-	} else {
-		c.DiscoveryEnabled = true
-		if err := instanceRepo.StartInitialDiscovery(); err != nil {
-			return err
-		}
-		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-		go instanceRepo.StartBackgroundDiscovery()
+	if err := instanceRepo.Configure(c); err != nil {
+		return err
 	}
 
 	logger.Debug().Msg("selecting mode")
 	if c.MetricServiceBaseURL == "" {
-		logger.Info().Msg("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
+		if err := runPullMode(c); err != nil {
+			return err
+		}
+	}
+
+	if err := runPushMode(c, instanceRepo); err != nil {
+		return err
+	}
+	return nil
+}
+
+// runPullMode runs application in PULL mode (accepts requests for metrics via HTTP)
+func runPullMode(config *Config) error {
+	if config.MetricServiceBaseURL == "" {
+		config.Logger.Info().Msg("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
 
 		http.Handle("/metrics", promhttp.Handler())
 		if err := http.ListenAndServe("127.0.0.1:19090", nil); err != nil { // TODO: дефолтный порт должен быть другим
 			return err
 		}
 	}
+	return nil
+}
 
-	logger.Info().Msgf("use PUSH model, sending metrics to %s every %d seconds", c.MetricServiceBaseURL, c.MetricsSendInterval/time.Second)
+// runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
+func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
+	config.Logger.Info().Msgf("use PUSH model, sending metrics to %s every %d seconds", config.MetricServiceBaseURL, config.MetricsSendInterval/time.Second)
 
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
 	// this label should be removed with 'metric_relabel_config' rule.
-	jobLabelBase, err := getJobLabelBase(logger)
+	jobLabelBase, err := getJobLabelBase(config.Logger)
 	if err != nil {
 		return err
 	}
 
 	for {
-		logger.Debug().Msgf("start job")
+		config.Logger.Debug().Msgf("start job")
 		var start = time.Now()
 
 		// metrics for every discovered service is wrapped into a separate push
 		for _, service := range instanceRepo.Services {
 			jobLabel := fmt.Sprintf("db_system_%s_%s", jobLabelBase, service.ServiceID)
-			var pusher = push.New(c.MetricServiceBaseURL, jobLabel)
+			var pusher = push.New(config.MetricServiceBaseURL, jobLabel)
 
 			// if api-key specified use custom http-client and attach api-key to http requests
-			if c.APIKey != "" {
-				client := newHTTPClient(c.APIKey)
+			if config.APIKey != "" {
+				client := newHTTPClient(config.APIKey)
 				pusher.Client(client)
 			}
 
@@ -77,13 +83,13 @@ func Start(c *Config) error {
 			// push metrics
 			if err := pusher.Add(); err != nil {
 				// it is not critical error, just show it and continue
-				logger.Warn().Err(err).Msg("could not push metrics")
+				config.Logger.Warn().Err(err).Msg("could not push metrics")
 			}
 		}
 
 		// sleep now
-		logger.Debug().Msg("all jobs are finished, going to sleep")
-		time.Sleep(time.Until(start.Add(c.MetricsSendInterval)))
+		config.Logger.Debug().Msg("all jobs are finished, going to sleep")
+		time.Sleep(time.Until(start.Add(config.MetricsSendInterval)))
 	}
 
 	// TODO: тупиковый for сверху, из него никак не выйти
