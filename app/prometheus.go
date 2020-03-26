@@ -185,6 +185,7 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 	)
 
 	var e = make(map[string]*prometheus.Desc)
+	var globalHelpCatalog = globalHelpCatalog()
 	var globalCatalog = globalStatCatalog()
 	var localCatalog = make([]statDescriptor, localCatalogDefaultSize)
 
@@ -195,10 +196,10 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 			if len(descriptor.ValueNames) > 0 {
 				for _, suffix := range descriptor.ValueNames {
 					var metricName = descriptor.Name + "_" + suffix
-					e[metricName] = prometheus.NewDesc(metricName, metricsHelp[metricName], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
+					e[metricName] = prometheus.NewDesc(metricName, globalHelpCatalog[metricName], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 				}
 			} else {
-				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, metricsHelp[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
+				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, globalHelpCatalog[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
 			localCatalog = append(localCatalog, descriptor)
 		}

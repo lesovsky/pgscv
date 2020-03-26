@@ -1,7 +1,7 @@
 package app
 
-var (
-	metricsHelp = map[string]string{
+func globalHelpCatalog() map[string]string {
+	return map[string]string{
 		// pg_stat_database
 		"pg_stat_database_xact_commit":       "Number of transactions that have been committed",
 		"pg_stat_database_xact_rollback":     "Number of transactions that have been rolled back",
@@ -215,4 +215,4 @@ var (
 		"pgbouncer_stats_query_time":     "Total number of microseconds spent by pgbouncer when actively connected to PostgreSQL, executing queries",
 		"pgbouncer_stats_wait_time":      "Time spent by clients waiting for a server in microseconds",
 	}
-)
+}
