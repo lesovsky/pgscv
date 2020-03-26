@@ -2,6 +2,7 @@ package app
 
 import (
 	"github.com/rs/zerolog"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 type Config struct {
 	Logger               zerolog.Logger
 	ProjectIDStr         string
+	ListenAddress        net.TCPAddr
 	MetricServiceBaseURL string
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
@@ -28,6 +30,10 @@ type Credentials struct {
 	PostgresPass  string
 	PgbouncerUser string
 	PgbouncerPass string
+}
+
+func (c *Config) Validate() error {
+	return nil
 }
 
 // DecodeProjectIDStr ...

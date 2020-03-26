@@ -22,6 +22,7 @@ func main() {
 	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 
 	var (
+		listenAddress        = kingpin.Flag("listen-address", "Address to listen on for metrics").Default("127.0.0.1:10090").Envar("LISTEN_ADDRESS").TCP()
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").String()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		doBootstrap          = kingpin.Flag("bootstrap", "Run bootstrap, requires root privileges").Default("false").Envar("BOOTSTRAP").Bool()
@@ -38,6 +39,7 @@ func main() {
 
 	var sc = &app.Config{
 		Logger:               log.Logger,
+		ListenAddress:        **listenAddress,
 		MetricServiceBaseURL: *metricServiceBaseURL,
 		MetricsSendInterval:  *metricsSendInterval,
 		ProjectIDStr:         app.DecodeProjectIDStr(*apiKey),

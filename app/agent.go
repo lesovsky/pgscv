@@ -40,10 +40,10 @@ func Start(c *Config) error {
 // runPullMode runs application in PULL mode (accepts requests for metrics via HTTP)
 func runPullMode(config *Config) error {
 	if config.MetricServiceBaseURL == "" {
-		config.Logger.Info().Msg("use PULL model, accepting requests on http://127.0.0.1:19090/metrics")
+		config.Logger.Info().Msgf("use PULL model, accepting requests on http://%s/metrics", config.ListenAddress.String())
 
 		http.Handle("/metrics", promhttp.Handler())
-		return http.ListenAndServe("127.0.0.1:19090", nil) // TODO: дефолтный порт должен быть другим
+		return http.ListenAndServe(config.ListenAddress.String(), nil)
 	}
 
 	return nil
