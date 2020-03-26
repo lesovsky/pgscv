@@ -1,6 +1,6 @@
 package app
 
-var (
+const (
 	pgVersionNumQuery = "SELECT current_setting('server_version_num')"
 	//pgGetSysIdQuery   = "SELECT system_identifier FROM pg_control_system()"
 
