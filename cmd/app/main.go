@@ -85,7 +85,7 @@ func main() {
 	}
 
 	// enable auto-discovery if user doesn't specified URLs for connecting to services
-	if urlStrings == nil {
+	if sc.URLStrings == nil {
 		sc.DiscoveryEnabled = true
 	}
 

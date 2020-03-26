@@ -62,34 +62,33 @@ func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
 	}
 
 	for {
-		select {
-		case <-time.After(config.MetricsSendInterval):
-			config.Logger.Debug().Msgf("start job")
+		config.Logger.Debug().Msgf("start job")
+		var start = time.Now()
 
-			// metrics for every discovered service is wrapped into a separate push
-			for _, service := range instanceRepo.Services {
-				jobLabel := fmt.Sprintf("db_system_%s_%s", jobLabelBase, service.ServiceID)
-				var pusher = push.New(config.MetricServiceBaseURL, jobLabel)
+		// metrics for every discovered service is wrapped into a separate push
+		for _, service := range instanceRepo.Services {
+			jobLabel := fmt.Sprintf("db_system_%s_%s", jobLabelBase, service.ServiceID)
+			var pusher = push.New(config.MetricServiceBaseURL, jobLabel)
 
-				// if api-key specified use custom http-client and attach api-key to http requests
-				if config.APIKey != "" {
-					client := newHTTPClient(config.APIKey)
-					pusher.Client(client)
-				}
-
-				// collect metrics for all discovered services
-				pusher.Collector(service.Exporter)
-
-				// push metrics
-				if err := pusher.Add(); err != nil {
-					// it is not critical error, just show it and continue
-					config.Logger.Warn().Err(err).Msg("could not push metrics")
-				}
+			// if api-key specified use custom http-client and attach api-key to http requests
+			if config.APIKey != "" {
+				client := newHTTPClient(config.APIKey)
+				pusher.Client(client)
 			}
 
-			// sleep now
-			config.Logger.Debug().Msg("all jobs are finished, going to sleep")
+			// collect metrics for all discovered services
+			pusher.Collector(service.Exporter)
+
+			// push metrics
+			if err := pusher.Add(); err != nil {
+				// it is not critical error, just show it and continue
+				config.Logger.Warn().Err(err).Msg("could not push metrics")
+			}
 		}
+
+		// sleep now
+		config.Logger.Debug().Msg("all jobs are finished, going to sleep")
+		time.Sleep(time.Until(start.Add(config.MetricsSendInterval)))
 	}
 }
 

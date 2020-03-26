@@ -201,6 +201,7 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 			} else {
 				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, globalHelpCatalog[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
+			descriptor.Active = true
 			localCatalog = append(localCatalog, descriptor)
 		}
 	}
