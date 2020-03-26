@@ -7,7 +7,9 @@ import (
 	"github.com/rs/zerolog/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
+	"os/signal"
 	"pgscv/app"
+	"syscall"
 	"time"
 )
 
@@ -51,13 +53,6 @@ func main() {
 		},
 	}
 
-	// disable auto-discovery if user specified URLs for connecting to services
-	if urlStrings != nil {
-		sc.DiscoveryEnabled = false
-	}
-
-	// TODO: add config validations, for: 1) api-key 2) send-interval 3) etc...
-
 	switch *logLevel {
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
@@ -80,9 +75,16 @@ func main() {
 		os.Exit(app.RunBootstrap(sc))
 	}
 
+	// TODO: add config validations, for: 1) api-key 2) send-interval 3) etc...
+
 	// если указан апи-ключ, то из него по-любому должен быть вытащен ид проекта
 	if sc.APIKey != "" && sc.ProjectIDStr == "" {
 		log.Fatal().Msg("unknown project identifier")
+	}
+
+	// enable auto-discovery if user doesn't specified URLs for connecting to services
+	if urlStrings == nil {
+		sc.DiscoveryEnabled = true
 	}
 
 	// use schedulers in push mode
@@ -90,9 +92,20 @@ func main() {
 		sc.ScheduleEnabled = true
 	}
 
-	if err := app.Start(sc); err != nil {
-		log.Error().Err(err).Msg("error occurred:")
-	}
+	var doExit = make(chan error, 2)
+	go func() {
+		doExit <- listenSignals()
+	}()
 
-	log.Info().Msg("Graceful shutdown")
+	go func() {
+		doExit <- app.Start(sc)
+	}()
+
+	log.Info().Msgf("graceful shutdown: %s", <-doExit)
+}
+
+func listenSignals() error {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT|syscall.SIGTERM)
+	return fmt.Errorf("got %s", <-c)
 }
