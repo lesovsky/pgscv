@@ -232,8 +232,8 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 
 			// check total number of failures, if too many errors then unregister exporter
 			if e.TotalFailed >= exporterFailureLimit && e.ServiceRepo.Config.DiscoveryEnabled {
-				prometheus.Unregister(e)
-				e.ServiceRepo.RemoveService(service.Pid)
+				//prometheus.Unregister(e)  // this done in removeService method
+				e.ServiceRepo.removeService(service.Pid)
 			}
 			e.Logger.Debug().Msgf("%s: %d metrics generated", service.ServiceID, metricsCnt)
 		}
@@ -340,8 +340,7 @@ func (e *prometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 			for _, v := range netdevValueNames() {
 				var desc = "node_netdev_" + v
 
-				// TODO: вроде эти метрики не нужны -- нужны, пригодятся для 'capacity planning' проверок
-				if (desc == "speed" || desc == "duplex") && s.Speed > 0 {
+				if (desc == "node_netdev_speed" || desc == "node_netdev_duplex") && s.Speed > 0 {
 					ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.GaugeValue, s.SingleStat(v), s.Ifname)
 					cnt++
 					continue

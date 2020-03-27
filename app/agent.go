@@ -39,14 +39,10 @@ func Start(c *Config) error {
 
 // runPullMode runs application in PULL mode (accepts requests for metrics via HTTP)
 func runPullMode(config *Config) error {
-	if config.MetricServiceBaseURL == "" {
-		config.Logger.Info().Msgf("use PULL model, accepting requests on http://%s/metrics", config.ListenAddress.String())
+	config.Logger.Info().Msgf("use PULL model, accepting requests on http://%s/metrics", config.ListenAddress.String())
 
-		http.Handle("/metrics", promhttp.Handler())
-		return http.ListenAndServe(config.ListenAddress.String(), nil)
-	}
-
-	return nil
+	http.Handle("/metrics", promhttp.Handler())
+	return http.ListenAndServe(config.ListenAddress.String(), nil)
 }
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service

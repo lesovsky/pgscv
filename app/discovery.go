@@ -36,27 +36,24 @@ func NewServiceRepo(config *Config) *ServiceRepo {
 // Configure performs initial service discovery using auto-discovery or service URLs provided by user
 func (repo *ServiceRepo) Configure(config *Config) error {
 	if config.DiscoveryEnabled {
-		if err := repo.StartInitialDiscovery(); err != nil {
+		if err := repo.createServicesFromDiscovery(); err != nil {
 			return err
 		}
-
 		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-		go repo.StartBackgroundDiscovery()
+		go repo.startBackgroundDiscovery()
 	} else {
-		if err := repo.ConfigureServices(); err != nil {
-			return err
-		}
+		return repo.createServicesFromURL()
 	}
 	return nil
 }
 
-// StartInitialDiscovery performs initial service discovery required at application startup
-func (repo *ServiceRepo) StartInitialDiscovery() error {
+// startInitialDiscovery performs initial service discovery required at application startup
+func (repo *ServiceRepo) createServicesFromDiscovery() error {
 	repo.Logger.Debug().Msg("starting initial discovery")
 
 	// add pseudo-service for system metrics
 	repo.Logger.Debug().Msg("adding system service")
-	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
+	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem}
 
 	// search services and add them to the repo
 	if err := repo.lookupServices(); err != nil {
@@ -72,8 +69,8 @@ func (repo *ServiceRepo) StartInitialDiscovery() error {
 	return nil
 }
 
-// StartBackgroundDiscovery is periodically searches new services
-func (repo *ServiceRepo) StartBackgroundDiscovery() {
+// startBackgroundDiscovery is periodically searches new services
+func (repo *ServiceRepo) startBackgroundDiscovery() {
 	repo.Logger.Debug().Msg("starting background discovery")
 	// TODO: нет кейса для выхода
 	for {
@@ -89,8 +86,8 @@ func (repo *ServiceRepo) StartBackgroundDiscovery() {
 	}
 }
 
-// ConfigureServices creates service for each specified DSN
-func (repo *ServiceRepo) ConfigureServices() error {
+// configureServicesWithURL creates service for each specified DSN
+func (repo *ServiceRepo) createServicesFromURL() error {
 	repo.Logger.Debug().Msg("starting initialization using provided URL strings")
 
 	for i, url := range repo.Config.URLStrings {
@@ -209,7 +206,7 @@ func (repo *ServiceRepo) setupServices() error {
 			case model.ServiceTypePgbouncer:
 				newService.ServiceID = "pgbouncer:" + strconv.Itoa(int(service.Port))
 			case model.ServiceTypeSystem:
-				// nothing to do
+				newService.ServiceID = "system"
 			}
 
 			// create exporter for the service
@@ -233,8 +230,8 @@ func (repo *ServiceRepo) setupServices() error {
 }
 
 // RemoveService removes service from the list (in case of its unavailability)
-func (repo *ServiceRepo) RemoveService(pid int32) {
-	//prometheus.Unregister(repo.Services[pid].Exporter)
+func (repo *ServiceRepo) removeService(pid int32) {
+	prometheus.Unregister(repo.Services[pid].Exporter)
 	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, process %d", repo.Services[pid].ServiceID, pid)
 	delete(repo.Services, pid)
 }
