@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -10,89 +9,15 @@ import (
 )
 
 func TestServiceRepo_startInitialDiscovery(t *testing.T) {
-	var c = &Config{
-		Logger:           zerolog.Logger{},
-		DiscoveryEnabled: true,
-		Credentials: Credentials{
-			PostgresUser:  "postgres",
-			PgbouncerUser: "pgbouncer",
-		},
-	}
-
+	var c = &Config{Logger: zerolog.Logger{}}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 
-	assert.NoError(t, repo.createServicesFromDiscovery())
+	assert.NoError(t, repo.discoverServicesOnce())
 	assert.Greater(t, len(repo.Services), 0)
 
 	for i := range repo.Services {
 		repo.removeService(repo.Services[i].Pid)
-	}
-}
-
-// Задача теста проверить что на каждый валидный URL создается сервис -- что там внутри сервиса в этом тесте НЕ важно
-func TestServiceRepo_configureServicesWithURL(t *testing.T) {
-	var c = &Config{
-		Logger:           zerolog.Logger{},
-		DiscoveryEnabled: true,
-		URLStrings:       nil,
-		Credentials: Credentials{
-			PostgresUser:  "postgres",
-			PgbouncerUser: "pgbouncer",
-		},
-	}
-	var testCases = []struct {
-		name       string
-		urlStrings []string
-		want       int
-	}{
-		{
-			name: "valid postgres urls",
-			urlStrings: []string{
-				"postgres://example.org",
-				"postgres://postgres@example.org:5433",
-				"postgres://postgres:password@example.org:5434",
-				"postgres://postgres:password@example.org:5435",
-				"postgres://postgres:password@example.org:5436/testdatabase",
-			},
-			want: 5,
-		},
-		{
-			name: "valid pgbouncer urls",
-			urlStrings: []string{
-				"pgbouncer://example.org",
-				"pgbouncer://postgres@example.org:6433",
-				"pgbouncer://postgres:password@example.org:6434",
-				"pgbouncer://postgres:password@example.org:6435",
-				"pgbouncer://postgres:password@example.org:6436/testdatabase",
-			},
-			want: 5,
-		},
-		{
-			name: "valid and invalid urls",
-			urlStrings: []string{
-				"pgbouncer://postgres:password@example.org:5432/testdatabase",
-				"invalid://postgres:password@example.org:5432/testdatabase",
-				"invalid",
-			},
-			want: 1,
-		},
-	}
-
-	for _, tc := range testCases {
-		fmt.Println(tc.name)
-		c.URLStrings = tc.urlStrings
-		repo := NewServiceRepo(c)
-		assert.NotNil(t, repo)
-
-		err := repo.createServicesFromURL()
-		assert.NoError(t, err)
-		assert.NotNil(t, repo.Services)
-		assert.Equal(t, len(repo.Services), tc.want)
-
-		for i := range repo.Services {
-			repo.removeService(repo.Services[i].Pid)
-		}
 	}
 }
 
@@ -102,10 +27,7 @@ func Test_lookupServices(t *testing.T) {
 		t.Skipf("root privileges required, skip")
 	}
 
-	var c = &Config{
-		Logger:           zerolog.Logger{},
-		DiscoveryEnabled: true,
-	}
+	var c = &Config{Logger: zerolog.Logger{}}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 
@@ -118,12 +40,7 @@ func Test_lookupServices(t *testing.T) {
 
 // Test_setupServices должен на вход принять пустой сервис и на выходе получить сервис с заполненым ServiceID и Exporter
 func Test_setupServices(t *testing.T) {
-	var c = &Config{
-		Logger:           zerolog.Logger{},
-		DiscoveryEnabled: true,
-		URLStrings:       nil,
-		Credentials:      Credentials{PostgresUser: "postgres", PgbouncerUser: "pgbouncer"},
-	}
+	var c = &Config{Logger: zerolog.Logger{}}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 

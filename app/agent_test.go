@@ -38,29 +38,22 @@ func Test_runPullMode(t *testing.T) {
 		t.Skipf("root privileges required, skip")
 	}
 
-	var c = &Config{
-		Logger:           zerolog.Logger{},
-		DiscoveryEnabled: true,
-		//URLStrings: []string{"postgres://postgres@127.0.0.1/postgres"},
-		Credentials: Credentials{
-			PostgresUser:  "weaponry_app",
-			PostgresPass:  "lessqqmorepewpew",
-			PgbouncerUser: "weaponry_app",
-			PgbouncerPass: "lessqqmorepewpew",
-		},
-	}
+	var c = &Config{Logger: zerolog.Logger{}, RuntimeMode: runtimeModePull}
 
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
-	assert.NoError(t, repo.Configure(c))
+	assert.NoError(t, repo.discoverServicesOnce())
 
+	// run test http-server
 	ts := httptest.NewServer(promhttp.Handler())
 	defer ts.Close()
 
+	// make a request to test http-server
 	res, err := http.Get(ts.URL)
 	assert.NoError(t, err)
 	assert.NotNil(t, res)
 
+	// parse response
 	content, err := ioutil.ReadAll(res.Body)
 	assert.NoError(t, err)
 	assert.NoError(t, res.Body.Close())

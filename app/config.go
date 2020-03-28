@@ -1,38 +1,52 @@
 package app
 
 import (
+	"fmt"
 	"github.com/rs/zerolog"
 	"net"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const (
+	runtimeModePull int = 1
+	runtimeModePush int = 2
+)
+
 // Config struct describes the application's configuration
 type Config struct {
 	Logger               zerolog.Logger
+	RuntimeMode          int
 	ProjectIDStr         string
 	ListenAddress        net.TCPAddr
-	MetricServiceBaseURL string
+	MetricServiceBaseURL url.URL
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
-	DiscoveryEnabled     bool
 	APIKey               string
 	BootstrapBinaryName  string
-	URLStrings           []string
-	Credentials          Credentials
+	DefaultCredentials
 }
 
-// Credentials struct describes default requisites defined by user and used for connecting to services
-type Credentials struct {
-	PostgresUser  string
-	PostgresPass  string
-	PgbouncerUser string
-	PgbouncerPass string
+type DefaultCredentials struct {
+	PostgresPassword  string
+	PgbouncerPassword string
 }
 
 func (c *Config) Validate() error {
+	if c.MetricServiceBaseURL.String() == "" {
+		c.RuntimeMode = runtimeModePull
+	} else {
+		c.RuntimeMode = runtimeModePush
+		c.ScheduleEnabled = true
+	}
+
+	if c.APIKey != "" && c.ProjectIDStr == "" {
+		return fmt.Errorf("project identifier is not specified")
+	}
+
 	return nil
 }
 

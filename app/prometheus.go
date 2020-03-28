@@ -201,7 +201,7 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 			} else {
 				e[descriptor.Name] = prometheus.NewDesc(descriptor.Name, globalHelpCatalog[descriptor.Name], descriptor.LabelNames, prometheus.Labels{"project_id": projectid, "sid": sid, "db_instance": hostname})
 			}
-			descriptor.Active = true
+			descriptor.Active = true // TODO: есть отдельный метод для активации, надо переделать на него
 			localCatalog = append(localCatalog, descriptor)
 		}
 	}
@@ -231,7 +231,7 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 			}
 
 			// check total number of failures, if too many errors then unregister exporter
-			if e.TotalFailed >= exporterFailureLimit && e.ServiceRepo.Config.DiscoveryEnabled {
+			if e.TotalFailed >= exporterFailureLimit {
 				//prometheus.Unregister(e)  // this done in removeService method
 				e.ServiceRepo.removeService(service.Pid)
 			}
@@ -341,7 +341,7 @@ func (e *prometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 				var desc = "node_netdev_" + v
 
 				if (desc == "node_netdev_speed" || desc == "node_netdev_duplex") && s.Speed > 0 {
-					ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.GaugeValue, s.SingleStat(v), s.Ifname)
+					ch <- prometheus.MustNewConstMetric(e.AllDesc[desc], prometheus.CounterValue, s.SingleStat(v), s.Ifname)
 					cnt++
 					continue
 				}

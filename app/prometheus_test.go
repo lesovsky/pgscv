@@ -23,7 +23,6 @@ func testPostgresService() model.Service {
 		Host:        "127.0.0.1",
 		Port:        5432,
 		User:        "weaponry_app",
-		Password:    "lessqqmorepewpew",
 		Dbname:      "postgres",
 	}
 }
@@ -35,7 +34,6 @@ func testPgbouncerService() model.Service {
 		Host:        "127.0.0.1",
 		Port:        6432,
 		User:        "weaponry_app",
-		Password:    "lessqqmorepewpew",
 		Dbname:      "pgbouncer",
 	}
 }
@@ -260,28 +258,6 @@ func Test_collectSystemUptime(t *testing.T) {
 	}
 }
 
-func Test_collectPgMetrics_pgbouncer(t *testing.T) {
-	var repo = &ServiceRepo{
-		Logger: zerolog.Logger{},
-	}
-	var service = testPgbouncerService()
-	var ch = make(chan prometheus.Metric)
-
-	e, err := newExporter(service, repo)
-	assert.NoError(t, err)
-	assert.NotNil(t, e)
-
-	go func() {
-		cnt := e.collectPgMetrics(ch, service)
-		close(ch)
-		assert.Greater(t, cnt, 0)
-	}()
-
-	for i := range ch {
-		assert.Contains(t, i.Desc().String(), "pgbouncer_")
-	}
-}
-
 func Test_collectPgMetrics_postgres(t *testing.T) {
 	var repo = &ServiceRepo{
 		Logger: zerolog.Logger{},
@@ -314,11 +290,31 @@ func Test_collectPgMetrics_postgres(t *testing.T) {
 		}
 		total++
 		if _, ok := m[k]; !ok {
-			//t.Logf("%s not found", k)
+			t.Logf("absent %s", k)
 			absent++
 		}
 	}
 	pct := 100 * absent / total
 	t.Logf("metrics: total %.0f, absent %.0f, absent %.2f%%\n", total, absent, pct)
 	assert.Less(t, pct, absentMetricsThreshold)
+}
+
+func Test_collectPgMetrics_pgbouncer(t *testing.T) {
+	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
+	var service = testPgbouncerService()
+	var ch = make(chan prometheus.Metric)
+
+	e, err := newExporter(service, repo)
+	assert.NoError(t, err)
+	assert.NotNil(t, e)
+
+	go func() {
+		cnt := e.collectPgMetrics(ch, service)
+		close(ch)
+		assert.Greater(t, cnt, 0)
+	}()
+
+	for i := range ch {
+		assert.Contains(t, i.Desc().String(), "pgbouncer_")
+	}
 }

@@ -1,7 +1,7 @@
 # __release_tag__ golang 1.13 was released 2019-09-03
 # __release_tag__ golangci-lint v1.23.8 was released 2020-03-04
 default:
-  image: golang:1.13
+  image: barcodepro/weaponry-pgscv-test-runner
   tags:
     - gitlab-org
 
@@ -29,11 +29,13 @@ lint_code:
 unit_tests:
   stage: test
   script:
+    - prepare-test-environment.sh
     - make test
 
 race_detector:
   stage: test
   script:
+    - prepare-test-environment.sh
     - make race
 
 #code_coverage:

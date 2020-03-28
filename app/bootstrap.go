@@ -13,9 +13,7 @@ import (
 const envFileTemplate = `API_KEY={{ .APIKey }}
 METRIC_SERVICE_BASE_URL={{ .MetricServiceBaseURL }}
 SEND_INTERVAL={{ .SendInterval }}
-PG_USERNAME={{ .Credentials.PostgresUser }}
 PG_PASSWORD={{ .Credentials.PostgresPass }}
-PGB_USERNAME={{ .Credentials.PgbouncerUser }}
 PGB_PASSWORD={{ .Credentials.PgbouncerPass }}
 `
 
@@ -58,16 +56,14 @@ type bootstrapConfig struct {
 	SendInterval         time.Duration `json:"send_interval"`
 	APIKey               string        `json:"api_key"`
 	AutoStart            bool          `json:"autostart"`
-	Credentials
 }
 
 func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
 	return &bootstrapConfig{
 		APIKey:               appconfig.APIKey,
 		AgentBinaryName:      appconfig.BootstrapBinaryName,
-		MetricServiceBaseURL: appconfig.MetricServiceBaseURL,
+		MetricServiceBaseURL: appconfig.MetricServiceBaseURL.String(),
 		SendInterval:         appconfig.MetricsSendInterval,
-		Credentials:          appconfig.Credentials,
 	}
 }
 

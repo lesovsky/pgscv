@@ -54,9 +54,9 @@ const (
 					pg_wal_lsn_diff(write_lsn, flush_lsn) AS flush_lag_bytes,
 					pg_wal_lsn_diff(flush_lsn, replay_lsn) AS replay_lag_bytes,
 					pg_wal_lsn_diff(pg_current_wal_lsn(), replay_lsn) AS total_lag_bytes,
-					extract(epoch from write_lag) as write_lag_sec,
-					extract(epoch from flush_lag) as flush_lag_sec,
-					extract(epoch from replay_lag) as replay_lag_sec
+					coalesce(extract(epoch from write_lag), 0) as write_lag_sec,
+					coalesce(extract(epoch from flush_lag), 0) as flush_lag_sec,
+					coalesce(extract(epoch from replay_lag), 0) as replay_lag_sec
 				FROM pg_stat_replication WHERE state != 'backup' AND application_name != 'pg_basebackup'`
 
 	pgReplicationSlotsQuery96 = `SELECT slot_name, active::int,pg_xlog_location_diff(pg_current_xlog_location(), restart_lsn) AS bytes FROM pg_replication_slots`

@@ -18,28 +18,31 @@ func Start(c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	logger.Debug().Msg("start application")
 
-	instanceRepo := NewServiceRepo(c)
+	serviceRepo := NewServiceRepo(c)
 
-	if err := instanceRepo.Configure(c); err != nil {
+	if err := serviceRepo.discoverServicesOnce(); err != nil {
 		return err
 	}
 
-	logger.Debug().Msg("selecting mode")
-	if c.MetricServiceBaseURL == "" {
-		if err := runPullMode(c); err != nil {
-			return err
-		}
-	}
+	go func() {
+		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
+		serviceRepo.startBackgroundDiscovery()
+	}()
 
-	if err := runPushMode(c, instanceRepo); err != nil {
-		return err
+	switch c.RuntimeMode {
+	case runtimeModePull:
+		return runPullMode(c)
+	case runtimeModePush:
+		return runPushMode(c, serviceRepo)
+	default:
+		logger.Error().Msgf("unknown mode selected: %d, quit", c.RuntimeMode)
+		return nil
 	}
-	return nil
 }
 
 // runPullMode runs application in PULL mode (accepts requests for metrics via HTTP)
 func runPullMode(config *Config) error {
-	config.Logger.Info().Msgf("use PULL model, accepting requests on http://%s/metrics", config.ListenAddress.String())
+	config.Logger.Info().Msgf("use PULL mode, accepting requests on http://%s/metrics", config.ListenAddress.String())
 
 	http.Handle("/metrics", promhttp.Handler())
 	return http.ListenAndServe(config.ListenAddress.String(), nil)
@@ -47,7 +50,7 @@ func runPullMode(config *Config) error {
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
 func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
-	config.Logger.Info().Msgf("use PUSH model, sending metrics to %s every %d seconds", config.MetricServiceBaseURL, config.MetricsSendInterval/time.Second)
+	config.Logger.Info().Msgf("use PUSH mode, sending metrics to %s every %d seconds", config.MetricServiceBaseURL.String(), config.MetricsSendInterval/time.Second)
 
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
@@ -64,7 +67,7 @@ func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
 		// metrics for every discovered service is wrapped into a separate push
 		for _, service := range instanceRepo.Services {
 			jobLabel := fmt.Sprintf("db_system_%s_%s", jobLabelBase, service.ServiceID)
-			var pusher = push.New(config.MetricServiceBaseURL, jobLabel)
+			var pusher = push.New(config.MetricServiceBaseURL.String(), jobLabel)
 
 			// if api-key specified use custom http-client and attach api-key to http requests
 			if config.APIKey != "" {
