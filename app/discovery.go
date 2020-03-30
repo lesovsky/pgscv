@@ -61,6 +61,11 @@ func (repo *ServiceRepo) startBackgroundDiscovery() {
 	// TODO: нет кейса для выхода
 	for {
 		<-time.After(60 * time.Second)
+		// remove services that become unavailable during last discovery interval
+		if removed := repo.removeStaleServices(); removed > 0 {
+			repo.Logger.Info().Msgf("auto-discovery: removed %d stale services", removed)
+		}
+
 		if err := repo.lookupServices(); err != nil {
 			repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
 			continue
@@ -70,6 +75,17 @@ func (repo *ServiceRepo) startBackgroundDiscovery() {
 			continue
 		}
 	}
+}
+
+// removeStaleServices checks services availability (is associated process live and it's the same) and remove unavailable
+func (repo *ServiceRepo) removeStaleServices() (removed int) {
+	for pid, service := range repo.Services {
+		if !service.IsAvailable() {
+			repo.removeService(pid)
+			removed++
+		}
+	}
+	return removed
 }
 
 // lookupServices scans PIDs and looking for required services
@@ -103,22 +119,36 @@ func (repo *ServiceRepo) lookupServices() error {
 		case "postgres":
 			ppid, _ := proc.Ppid() // error doesn't matter here, even if ppid will be 0 - we're interested in ppid == 1
 			if ppid == 1 {
+				ctime, err := proc.CreateTime()
+				if err != nil {
+					repo.Logger.Warn().Err(err).Msg("get process create time failed")
+					break
+				}
 				postgres, err := discoverPostgres(proc)
 				if err != nil {
 					repo.Logger.Warn().Err(err).Msg("postgresql service has been found, but skipped due to:")
 					break
 				}
 				postgres.Validate()
+				postgres.ProcessName = name
+				postgres.ProcessCreateTime = ctime
 				postgres.Password = repo.Config.DefaultCredentials.PostgresPassword
 				repo.Services[pid] = postgres // add postgresql service to the repo
 			}
 		case "pgbouncer":
+			ctime, err := proc.CreateTime()
+			if err != nil {
+				repo.Logger.Warn().Err(err).Msg("get process create time failed")
+				break
+			}
 			pgbouncer, err := discoverPgbouncer(proc)
 			if err != nil {
 				repo.Logger.Warn().Err(err).Msg("pgbouncer service has been found, but skipped due to:")
 				break
 			}
 			pgbouncer.Validate()
+			pgbouncer.ProcessName = name
+			pgbouncer.ProcessCreateTime = ctime
 			pgbouncer.Password = repo.Config.DefaultCredentials.PgbouncerPassword
 			repo.Services[pid] = pgbouncer // add pgbouncer service to the repo
 		default:
@@ -167,7 +197,7 @@ func (repo *ServiceRepo) setupServices() error {
 // RemoveService removes service from the list (in case of its unavailability)
 func (repo *ServiceRepo) removeService(pid int32) {
 	prometheus.Unregister(repo.Services[pid].Exporter)
-	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, process %d", repo.Services[pid].ServiceID, pid)
+	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, pid %d", repo.Services[pid].ServiceID, pid)
 	delete(repo.Services, pid)
 }
 

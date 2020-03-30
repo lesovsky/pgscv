@@ -221,6 +221,13 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 	var metricsCnt int
 
 	for _, service := range e.ServiceRepo.Services {
+		// before running collect, check the service is not stale
+		if !service.IsAvailable() {
+			e.Logger.Warn().Msg("service is not available, skip")
+			e.ServiceRepo.removeService(service.Pid)
+			continue
+		}
+
 		if e.ServiceID == service.ServiceID {
 			// в зависимости от типа экспортера делаем соотв.проверки
 			switch service.ServiceType {
