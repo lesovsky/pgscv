@@ -13,8 +13,8 @@ import (
 const envFileTemplate = `API_KEY={{ .APIKey }}
 METRIC_SERVICE_BASE_URL={{ .MetricServiceBaseURL }}
 SEND_INTERVAL={{ .SendInterval }}
-PG_PASSWORD={{ .Credentials.PostgresPass }}
-PGB_PASSWORD={{ .Credentials.PgbouncerPass }}
+PG_PASSWORD={{ .DefaultCredentials.PostgresPassword }}
+PGB_PASSWORD={{ .DefaultCredentials.PgbouncerPassword }}
 `
 
 const unitTemplate = `
@@ -32,7 +32,7 @@ EnvironmentFile=/etc/environment.d/weaponry-agent.conf
 WorkingDirectory=~
 
 # Start the agent process
-ExecStart=/usr/local/bin/{{ .AgentBinaryName }}
+ExecStart=/usr/bin/{{ .AgentBinaryName }}
 
 # Only kill the agent process
 KillMode=process
@@ -56,6 +56,7 @@ type bootstrapConfig struct {
 	SendInterval         time.Duration `json:"send_interval"`
 	APIKey               string        `json:"api_key"`
 	AutoStart            bool          `json:"autostart"`
+	DefaultCredentials
 }
 
 func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
@@ -64,6 +65,7 @@ func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
 		AgentBinaryName:      appconfig.BootstrapBinaryName,
 		MetricServiceBaseURL: appconfig.MetricServiceBaseURL.String(),
 		SendInterval:         appconfig.MetricsSendInterval,
+		DefaultCredentials:   appconfig.DefaultCredentials,
 	}
 }
 
@@ -129,7 +131,7 @@ func preCheck() error {
 func installBin(config *bootstrapConfig) error {
 	log.Info().Msg("Install agent")
 	fromFilename := fmt.Sprintf("./%s", config.AgentBinaryName)
-	toFilename := fmt.Sprintf("/usr/local/bin/%s", config.AgentBinaryName)
+	toFilename := fmt.Sprintf("/usr/bin/%s", config.AgentBinaryName)
 
 	from, err := os.Open(fromFilename)
 	if err != nil {
