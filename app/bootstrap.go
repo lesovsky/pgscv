@@ -62,7 +62,7 @@ type bootstrapConfig struct {
 func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
 	return &bootstrapConfig{
 		APIKey:               appconfig.APIKey,
-		AgentBinaryName:      appconfig.BootstrapBinaryName,
+		AgentBinaryName:      appconfig.BinaryName,
 		MetricServiceBaseURL: appconfig.MetricServiceBaseURL.String(),
 		SendInterval:         appconfig.MetricsSendInterval,
 		DefaultCredentials:   appconfig.DefaultCredentials,
@@ -113,7 +113,7 @@ func RunBootstrap(appconfig *Config) int {
 
 // run pre-bootstrap checks
 func preCheck() error {
-	log.Info().Msg("Run pre-bootstrap checks")
+	log.Info().Msg("Run pre-flight checks")
 
 	// check is system systemd-aware
 	if !isRunningSystemd() {

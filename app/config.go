@@ -26,7 +26,7 @@ type Config struct {
 	MetricsSendInterval  time.Duration
 	ScheduleEnabled      bool
 	APIKey               string
-	BootstrapBinaryName  string
+	BinaryName           string
 	DefaultCredentials
 }
 

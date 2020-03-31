@@ -26,6 +26,7 @@ func main() {
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").URL()
 		metricsSendInterval  = kingpin.Flag("send-interval", "Interval between pushes").Default("60s").Envar("SEND_INTERVAL").Duration()
 		doBootstrap          = kingpin.Flag("bootstrap", "Run bootstrap, requires root privileges").Default("false").Envar("BOOTSTRAP").Bool()
+		doUninstall          = kingpin.Flag("uninstall", "Run uninstall, requires root privileges").Default("false").Envar("UNINSTALL").Bool()
 		apiKey               = kingpin.Flag("api-key", "Use api key").Default("").Envar("API_KEY").String()
 		postgresPassword     = kingpin.Flag("pg-password", "Default password used for connecting to all discovered Postgres services").Default("").Envar("PG_PASSWORD").String()
 		pgbouncerPassword    = kingpin.Flag("pgb-password", "Default password used for connecting to all discovered Pgbouncer services").Default("").Envar("PGB_PASSWORD").String()
@@ -42,7 +43,7 @@ func main() {
 		ProjectIDStr:         app.DecodeProjectIDStr(*apiKey),
 		ScheduleEnabled:      false,
 		APIKey:               *apiKey,
-		BootstrapBinaryName:  binName,
+		BinaryName:           binName,
 		DefaultCredentials: app.DefaultCredentials{
 			PostgresPassword:  *postgresPassword,
 			PgbouncerPassword: *pgbouncerPassword,
@@ -65,6 +66,15 @@ func main() {
 	if *showver {
 		fmt.Printf("%s %s-%s\n", appName, gitCommit, gitBranch)
 		os.Exit(0)
+	}
+
+	if *doUninstall && *doBootstrap {
+		log.Logger.Error().Msg("flags --uninstall and --bootstrap can not be used together, quit")
+		os.Exit(1)
+	}
+
+	if *doUninstall {
+		os.Exit(app.RunUninstall(sc))
 	}
 
 	if *doBootstrap {
