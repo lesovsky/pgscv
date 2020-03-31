@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	binName, appName, gitCommit, gitBranch string
+	appName, gitCommit, gitBranch string
 )
 
 func main() {
@@ -43,7 +43,7 @@ func main() {
 		ProjectIDStr:         app.DecodeProjectIDStr(*apiKey),
 		ScheduleEnabled:      false,
 		APIKey:               *apiKey,
-		BinaryName:           binName,
+		BinaryName:           appName,
 		DefaultCredentials: app.DefaultCredentials{
 			PostgresPassword:  *postgresPassword,
 			PgbouncerPassword: *pgbouncerPassword,
