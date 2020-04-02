@@ -145,7 +145,7 @@ func getDistributionVersion(baseURL string) (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("get failed, %s", resp.StatusCode)
+		return "", fmt.Errorf("get failed, %d", resp.StatusCode)
 	}
 
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
@@ -161,17 +161,17 @@ func downloadNewVersion(baseURL string) error {
 	log.Debug().Msg("download an agent distribution")
 
 	var (
-		distUrl  = baseURL + "/" + fileDistribution
+		distURL  = baseURL + "/" + fileDistribution
 		distFile = tmpDir + "/" + fileDistribution
-		sumUrl   = baseURL + "/" + fileSha256Sum
+		sumURL   = baseURL + "/" + fileSha256Sum
 		sumFile  = tmpDir + "/" + fileSha256Sum
 	)
 
-	err := downloadFile(distUrl, distFile)
+	err := downloadFile(distURL, distFile)
 	if err != nil {
 		return err
 	}
-	err = downloadFile(sumUrl, sumFile)
+	err = downloadFile(sumURL, sumFile)
 	if err != nil {
 		return err
 	}
@@ -230,7 +230,7 @@ func extractDistribution() error {
 	}
 
 	tarReader := tar.NewReader(uncompressedStream)
-	for true {
+	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
 			break
@@ -255,7 +255,7 @@ func extractDistribution() error {
 			outFile.Close()
 
 		default:
-			return fmt.Errorf("uknown type: %s in %s", header.Typeflag, header.Name)
+			return fmt.Errorf("uknown type: %d in %s", header.Typeflag, header.Name)
 		}
 	}
 	log.Debug().Msg("extract finished")
@@ -339,7 +339,7 @@ func downloadFile(url, file string) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("get failed, %s", resp.StatusCode)
+		return fmt.Errorf("get failed, %d", resp.StatusCode)
 	}
 
 	out, err := os.Create(file)
