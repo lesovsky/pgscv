@@ -17,7 +17,7 @@ help: ## Display this help screen
 	@grep -h -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  * \033[36m%-15s\033[0m %s\n", $$1, $$2}'
 
 clean: ## Clean
-	rm -f ./bin/${APPNAME} ./bin/${APPNAME}.tar.gz
+	rm -f ./bin/${APPNAME} ./bin/${APPNAME}.tar.gz ./bin/${APPNAME}.version ./bin/${APPNAME}.sha256
 	rmdir ./bin
 
 dep: ## Get the dependencies
@@ -35,7 +35,10 @@ race: dep ## Run data race detector
 build: dep ## Build
 	mkdir -p ./bin
 	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${APPNAME} ./cmd/app
-	tar czf ./bin/${APPNAME}.tar.gz -C ./bin ${APPNAME}
+	cd bin; \
+		tar czf ${APPNAME}.tar.gz ${APPNAME} && \
+		sha256sum ${APPNAME}.tar.gz > ${APPNAME}.sha256 && \
+		echo ${COMMIT}-${BRANCH} > ${APPNAME}.version
 
 docker-build: ## Build docker image
 	mkdir -p ./bin

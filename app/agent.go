@@ -29,6 +29,11 @@ func Start(c *Config) error {
 		serviceRepo.startBackgroundDiscovery()
 	}()
 
+	go func() {
+		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
+		StartBackgroundAutoUpdate(c)
+	}()
+
 	switch c.RuntimeMode {
 	case runtimeModePull:
 		return runPullMode(c)

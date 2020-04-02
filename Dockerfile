@@ -14,6 +14,8 @@ COPY ./extras/nginx.conf /etc/nginx/nginx.conf
 COPY ./extras/agent.conf /etc/nginx/conf.d/agent.conf
 COPY ./bin/install.sh /var/www/html/install.sh
 COPY --from=build-stage /app/bin/weaponry-agent.tar.gz /var/www/html/weaponry-agent.tar.gz
+COPY --from=build-stage /app/bin/weaponry-agent.version /var/www/html/weaponry-agent.version
+COPY --from=build-stage /app/bin/weaponry-agent.sha256 /var/www/html/weaponry-agent.sha256
 EXPOSE 1080
 STOPSIGNAL SIGTERM
 CMD ["nginx", "-g", "daemon off;"]

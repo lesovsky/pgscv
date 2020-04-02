@@ -44,6 +44,7 @@ func main() {
 		ScheduleEnabled:      false,
 		APIKey:               *apiKey,
 		BinaryName:           appName,
+		BinaryVersion:        fmt.Sprintf("%s-%s", gitCommit, gitBranch),
 		DefaultCredentials: app.DefaultCredentials{
 			PostgresPassword:  *postgresPassword,
 			PgbouncerPassword: *pgbouncerPassword,
@@ -64,7 +65,7 @@ func main() {
 	}
 
 	if *showver {
-		fmt.Printf("%s %s-%s\n", appName, gitCommit, gitBranch)
+		fmt.Printf("%s %s\n", appName, sc.BinaryVersion)
 		os.Exit(0)
 	}
 

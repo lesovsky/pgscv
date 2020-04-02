@@ -27,6 +27,7 @@ type Config struct {
 	ScheduleEnabled      bool
 	APIKey               string
 	BinaryName           string
+	BinaryVersion        string
 	DefaultCredentials
 }
 
