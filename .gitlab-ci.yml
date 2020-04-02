@@ -63,6 +63,7 @@ build_staging:
   script:
     - apk add git make bash
     - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+    - git checkout -B "$CI_BUILD_REF_NAME" "$CI_BUILD_REF"
     - make docker-build -e ENV=staging
     - make docker-push -e ENV=staging
 
