@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"pgscv/app/packaging"
 	"strings"
 	"time"
 )
@@ -30,7 +31,11 @@ func Start(ctx context.Context, c *Config) error {
 	}()
 
 	go func() {
-		StartBackgroundAutoUpdate(ctx, c)
+		ac := &packaging.AutoupdateConfig{
+			Logger:        c.Logger,
+			BinaryVersion: c.BinaryVersion,
+		}
+		packaging.StartBackgroundAutoUpdate(ctx, ac)
 	}()
 
 	switch c.RuntimeMode {

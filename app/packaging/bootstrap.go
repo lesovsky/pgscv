@@ -1,4 +1,4 @@
-package app
+package packaging
 
 import (
 	"fmt"
@@ -13,8 +13,8 @@ import (
 const envFileTemplate = `API_KEY={{ .APIKey }}
 METRIC_SERVICE_BASE_URL={{ .MetricServiceBaseURL }}
 SEND_INTERVAL={{ .SendInterval }}
-PG_PASSWORD={{ .DefaultCredentials.PostgresPassword }}
-PGB_PASSWORD={{ .DefaultCredentials.PgbouncerPassword }}
+PG_PASSWORD={{ .DefaultPostgresPassword }}
+PGB_PASSWORD={{ .DefaultPgbouncerPassword }}
 `
 
 const unitTemplate = `
@@ -50,33 +50,22 @@ OOMScoreAdjust=1000
 WantedBy=multi-user.target
 `
 
-type bootstrapConfig struct {
-	AgentBinaryName      string
-	MetricServiceBaseURL string        `json:"metric_service_base_url"`
-	SendInterval         time.Duration `json:"send_interval"`
-	APIKey               string        `json:"api_key"`
-	AutoStart            bool          `json:"autostart"`
-	DefaultCredentials
-}
-
-func newBootstrapConfig(appconfig *Config) *bootstrapConfig {
-	return &bootstrapConfig{
-		APIKey:               appconfig.APIKey,
-		AgentBinaryName:      appconfig.BinaryName,
-		MetricServiceBaseURL: appconfig.MetricServiceBaseURL.String(),
-		SendInterval:         appconfig.MetricsSendInterval,
-		DefaultCredentials:   appconfig.DefaultCredentials,
-	}
+type BootstrapConfig struct {
+	AgentBinaryName          string
+	MetricServiceBaseURL     string
+	SendInterval             time.Duration
+	APIKey                   string
+	AutoStart                bool
+	DefaultPostgresPassword  string
+	DefaultPgbouncerPassword string
 }
 
 // RunBootstrap is the main bootstrap entry point
-func RunBootstrap(appconfig *Config) int {
+func RunBootstrap(config *BootstrapConfig) int {
 	log.Info().Msg("Running bootstrap")
 	if err := preCheck(); err != nil {
 		return bootstrapFailed(err)
 	}
-
-	config := newBootstrapConfig(appconfig)
 
 	if err := installBin(config); err != nil {
 		return bootstrapFailed(err)
@@ -128,7 +117,7 @@ func preCheck() error {
 }
 
 // installs agent binary
-func installBin(config *bootstrapConfig) error {
+func installBin(config *BootstrapConfig) error {
 	log.Info().Msg("Install agent")
 	fromFilename := fmt.Sprintf("./%s", config.AgentBinaryName)
 	toFilename := fmt.Sprintf("/usr/bin/%s", config.AgentBinaryName)
@@ -156,7 +145,7 @@ func installBin(config *bootstrapConfig) error {
 }
 
 // creates systemd unit in system path
-func createEnvironmentFile(config *bootstrapConfig) error {
+func createEnvironmentFile(config *BootstrapConfig) error {
 	var envdir = "/etc/environment.d"
 	log.Info().Msg("Create environment file")
 
@@ -196,7 +185,7 @@ func createEnvironmentFile(config *bootstrapConfig) error {
 }
 
 // creates systemd unit in system path
-func createSystemdUnit(config *bootstrapConfig) error {
+func createSystemdUnit(config *BootstrapConfig) error {
 	log.Info().Msg("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
@@ -238,7 +227,7 @@ func reloadSystemd() error {
 }
 
 // enables agent autostart
-func enableAutostart(config *bootstrapConfig) error {
+func enableAutostart(config *BootstrapConfig) error {
 	log.Info().Msg("Enable autostart")
 
 	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
@@ -257,7 +246,7 @@ func enableAutostart(config *bootstrapConfig) error {
 }
 
 // run agent systemd unit
-func runAgent(config *bootstrapConfig) error {
+func runAgent(config *BootstrapConfig) error {
 	log.Info().Msg("Run agent")
 
 	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
@@ -277,7 +266,7 @@ func runAgent(config *bootstrapConfig) error {
 }
 
 // delete self executable
-func deleteSelf(config *bootstrapConfig) error {
+func deleteSelf(config *BootstrapConfig) error {
 	log.Info().Msg("Cleanup")
 	filename := fmt.Sprintf("./%s", config.AgentBinaryName)
 	return os.Remove(filename)

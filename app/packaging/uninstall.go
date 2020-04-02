@@ -1,4 +1,4 @@
-package app
+package packaging
 
 import (
 	"fmt"
@@ -7,26 +7,30 @@ import (
 	"os/exec"
 )
 
+type UninstallConfig struct {
+	BinaryName string
+}
+
 // RunUninstall is the main uninstall entry point
-func RunUninstall(appconfig *Config) int {
+func RunUninstall(config *UninstallConfig) int {
 	log.Info().Msg("Run uninstall")
 	if err := preCheck(); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := stopAgent(appconfig); err != nil {
+	if err := stopAgent(config); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeServiceUnit(appconfig); err != nil {
+	if err := removeServiceUnit(config); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeEnvConfig(appconfig); err != nil {
+	if err := removeEnvConfig(config); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeBinary(appconfig); err != nil {
+	if err := removeBinary(config); err != nil {
 		return uninstallFailed(err)
 	}
 
@@ -34,7 +38,7 @@ func RunUninstall(appconfig *Config) int {
 }
 
 // stopAgent stops agent' systemd service
-func stopAgent(c *Config) error {
+func stopAgent(c *UninstallConfig) error {
 	log.Info().Msg("Stop agent")
 
 	servicename := fmt.Sprintf("%s.service", c.BinaryName)
@@ -54,21 +58,21 @@ func stopAgent(c *Config) error {
 }
 
 // removeServiceUnit removes systemd unit file
-func removeServiceUnit(c *Config) error {
+func removeServiceUnit(c *UninstallConfig) error {
 	log.Info().Msg("Remove systemd unit")
 	filename := fmt.Sprintf("/etc/systemd/system/%s.service", c.BinaryName)
 	return os.Remove(filename)
 }
 
 // removeEnvConfig removes environment configuration file
-func removeEnvConfig(c *Config) error {
+func removeEnvConfig(c *UninstallConfig) error {
 	log.Info().Msg("Remove environment file")
 	filename := fmt.Sprintf("/etc/environment.d/%s.conf", c.BinaryName)
 	return os.Remove(filename)
 }
 
 // removeBinary removes binary
-func removeBinary(c *Config) error {
+func removeBinary(c *UninstallConfig) error {
 	log.Info().Msg("Remove agent")
 	filename := fmt.Sprintf("/usr/bin/%s", c.BinaryName)
 	return os.Remove(filename)

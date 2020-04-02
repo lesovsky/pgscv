@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"pgscv/app"
+	"pgscv/app/packaging"
 	"syscall"
 	"time"
 )
@@ -76,11 +77,20 @@ func main() {
 	}
 
 	if *doUninstall {
-		os.Exit(app.RunUninstall(sc))
+		uc := &packaging.UninstallConfig{BinaryName: sc.BinaryName}
+		os.Exit(packaging.RunUninstall(uc))
 	}
 
 	if *doBootstrap {
-		os.Exit(app.RunBootstrap(sc))
+		bc := &packaging.BootstrapConfig{
+			AgentBinaryName:          sc.BinaryName,
+			MetricServiceBaseURL:     sc.MetricServiceBaseURL.String(),
+			SendInterval:             sc.MetricsSendInterval,
+			APIKey:                   sc.APIKey,
+			DefaultPostgresPassword:  sc.PostgresPassword,
+			DefaultPgbouncerPassword: sc.PgbouncerPassword,
+		}
+		os.Exit(packaging.RunBootstrap(bc))
 	}
 
 	if err := sc.Validate(); err != nil {

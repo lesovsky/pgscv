@@ -1,4 +1,4 @@
-package app
+package packaging
 
 import (
 	"archive/tar"
@@ -8,6 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,11 @@ import (
 	"strings"
 	"time"
 )
+
+type AutoupdateConfig struct {
+	Logger        zerolog.Logger
+	BinaryVersion string
+}
 
 const (
 	stableDistUpgradeBaseURL  = "https://dist.weaponry.io"
@@ -33,7 +39,7 @@ const (
 )
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
-func StartBackgroundAutoUpdate(ctx context.Context, c *Config) {
+func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 	c.Logger.Info().Msg("start background auto-update")
 	// inifinte loop
 	for {
@@ -51,7 +57,7 @@ func StartBackgroundAutoUpdate(ctx context.Context, c *Config) {
 }
 
 // RunUpdate is the main entry point for updating agent
-func RunUpdate(c *Config) error {
+func RunUpdate(c *AutoupdateConfig) error {
 	c.Logger.Debug().Msg("run update")
 
 	// get proper URL of agent distribution
