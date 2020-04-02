@@ -36,6 +36,8 @@ const (
 	fileDistribution = "weaponry-agent.tar.gz"
 
 	systemdServiceName = "weaponry-agent.service"
+
+	defaultAutoUpdateInterval = 5 * time.Minute
 )
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
@@ -49,7 +51,7 @@ func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 	// inifinte loop
 	for {
 		select {
-		case <-time.After(60 * time.Second):
+		case <-time.After(defaultAutoUpdateInterval):
 			err := RunUpdate(c)
 			if err != nil {
 				c.Logger.Error().Err(err).Msg("auto-update failed")
