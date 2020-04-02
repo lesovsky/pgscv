@@ -40,6 +40,11 @@ const (
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
 func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
+	if err := preCheck(); err != nil {
+		c.Logger.Warn().Err(err).Msg("auto-update disabled:")
+		return
+	}
+
 	c.Logger.Info().Msg("start background auto-update")
 	// inifinte loop
 	for {

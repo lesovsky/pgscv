@@ -32,7 +32,7 @@ func Start(ctx context.Context, c *Config) error {
 
 	go func() {
 		ac := &packaging.AutoupdateConfig{
-			Logger:        c.Logger,
+			Logger:        c.Logger.With().Str("module", "auto-update").Logger(),
 			BinaryVersion: c.BinaryVersion,
 		}
 		packaging.StartBackgroundAutoUpdate(ctx, ac)

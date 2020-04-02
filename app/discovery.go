@@ -27,7 +27,7 @@ type ServiceRepo struct {
 // NewServiceRepo creates new services repository
 func NewServiceRepo(config *Config) *ServiceRepo {
 	return &ServiceRepo{
-		Logger:   config.Logger.With().Str("service", "discovery").Logger(),
+		Logger:   config.Logger.With().Str("module", "auto-discovery").Logger(),
 		Services: make(map[int32]model.Service),
 		Config:   config,
 	}
