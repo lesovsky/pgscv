@@ -5,6 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/sha256"
 	"fmt"
 	"github.com/rs/zerolog/log"
@@ -32,14 +33,19 @@ const (
 )
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
-func StartBackgroundAutoUpdate(c *Config) {
-	c.Logger.Debug().Msg("start background auto-update")
+func StartBackgroundAutoUpdate(ctx context.Context, c *Config) {
+	c.Logger.Info().Msg("start background auto-update")
 	// inifinte loop
 	for {
-		<-time.After(60 * time.Second)
-		err := RunUpdate(c)
-		if err != nil {
-			c.Logger.Error().Err(err).Msg("autoupdate failed")
+		select {
+		case <-time.After(60 * time.Second):
+			err := RunUpdate(c)
+			if err != nil {
+				c.Logger.Error().Err(err).Msg("auto-update failed")
+			}
+		case <-ctx.Done():
+			c.Logger.Info().Msg("exit signaled, stop auto-update")
+			return
 		}
 	}
 }
@@ -314,7 +320,7 @@ func doCleanup() {
 // downloadFile downloads file and saves it locally
 func downloadFile(url, file string) error {
 	log.Debug().Msgf("download using %s to %s", url, file)
-	var client http.Client
+	var client = http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
 		return err

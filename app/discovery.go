@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
@@ -55,24 +56,28 @@ func (repo *ServiceRepo) discoverServicesOnce() error {
 }
 
 // startBackgroundDiscovery is periodically searches new services
-func (repo *ServiceRepo) startBackgroundDiscovery() {
-	repo.Logger.Debug().Msg("starting background discovery")
+func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context) {
+	repo.Logger.Debug().Msg("starting background auto-discovery")
 
-	// TODO: нет кейса для выхода
 	for {
-		<-time.After(60 * time.Second)
-		// remove services that become unavailable during last discovery interval
-		if removed := repo.removeStaleServices(); removed > 0 {
-			repo.Logger.Info().Msgf("auto-discovery: removed %d stale services", removed)
-		}
+		select {
+		case <-time.After(60 * time.Second):
+			// remove services that become unavailable during last discovery interval
+			if removed := repo.removeStaleServices(); removed > 0 {
+				repo.Logger.Info().Msgf("auto-discovery: removed %d stale services", removed)
+			}
 
-		if err := repo.lookupServices(); err != nil {
-			repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
-			continue
-		}
-		if err := repo.setupServices(); err != nil {
-			repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
-			continue
+			if err := repo.lookupServices(); err != nil {
+				repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
+				continue
+			}
+			if err := repo.setupServices(); err != nil {
+				repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
+				continue
+			}
+		case <-ctx.Done():
+			repo.Logger.Info().Msg("exit signaled, stop auto-discovery")
+			return
 		}
 	}
 }

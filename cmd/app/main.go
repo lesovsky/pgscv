@@ -2,6 +2,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -86,13 +87,17 @@ func main() {
 		log.Logger.Err(err).Msgf("failed to start")
 	}
 
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+
 	var doExit = make(chan error, 2)
 	go func() {
 		doExit <- listenSignals()
+		cancel()
 	}()
 
 	go func() {
-		doExit <- app.Start(sc)
+		doExit <- app.Start(ctx, sc)
 	}()
 
 	log.Info().Msgf("graceful shutdown: %s", <-doExit)
@@ -100,6 +105,6 @@ func main() {
 
 func listenSignals() error {
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGINT|syscall.SIGTERM)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	return fmt.Errorf("got %s", <-c)
 }

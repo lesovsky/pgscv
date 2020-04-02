@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"crypto/md5"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -14,7 +15,7 @@ import (
 )
 
 // Start is the application's main entry point
-func Start(c *Config) error {
+func Start(ctx context.Context, c *Config) error {
 	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
 	logger.Debug().Msg("start application")
 
@@ -25,13 +26,11 @@ func Start(c *Config) error {
 	}
 
 	go func() {
-		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-		serviceRepo.startBackgroundDiscovery()
+		serviceRepo.startBackgroundDiscovery(ctx)
 	}()
 
 	go func() {
-		// TODO: что если там произойдет ошибка? по идее нужно делать ретрай
-		StartBackgroundAutoUpdate(c)
+		StartBackgroundAutoUpdate(ctx, c)
 	}()
 
 	switch c.RuntimeMode {
