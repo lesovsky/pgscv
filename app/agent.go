@@ -40,7 +40,7 @@ func Start(ctx context.Context, c *Config) error {
 	case runtimeModePull:
 		return runPullMode(c)
 	case runtimeModePush:
-		return runPushMode(c, serviceRepo)
+		return runPushMode(ctx, c, serviceRepo)
 	default:
 		log.Errorf("unknown mode selected: %d, quit", c.RuntimeMode)
 		return nil
@@ -56,7 +56,7 @@ func runPullMode(config *Config) error {
 }
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
-func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
+func runPushMode(ctx context.Context, config *Config, instanceRepo *ServiceRepo) error {
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
 	// this label should be removed with 'metric_relabel_config' rule.
@@ -67,40 +67,55 @@ func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
 
 	log.Infof("use PUSH mode, sending metrics to %s every %d seconds", config.MetricServiceBaseURL.String(), config.MetricsSendInterval/time.Second)
 
-	// TODO: infinite loop, need case for exiting
+	ticker := time.NewTicker(config.MetricsSendInterval)
 	for {
-		log.Debugf("start job")
-		var start = time.Now()
+		// push metrics to the remote service
+		pushMetrics(jobLabelBase, config.MetricServiceBaseURL.String(), config.APIKey, instanceRepo)
 
-		// metrics for every discovered service is wrapped into a separate push
-		for _, service := range instanceRepo.Services {
-			jobLabel := fmt.Sprintf("db_system_%s_%s", jobLabelBase, service.ServiceID)
-			var pusher = push.New(config.MetricServiceBaseURL.String(), jobLabel)
+		// sleeping for next iteration
+		select {
+		case <-ticker.C:
+			continue
+		case <-ctx.Done():
+			log.Info("exit signaled, stop pushing metrics")
+			ticker.Stop()
+			return nil
+		}
+	}
+}
 
-			// if api-key specified use custom http-client and attach api-key to http requests
-			if config.APIKey != "" {
-				client := newHTTPClient(config.APIKey)
-				pusher.Client(client)
-			}
+// pushMetrics collects metrics for discovered services and pushes them to remote service
+func pushMetrics(labelBase string, url string, apiKey string, repo *ServiceRepo) {
+	log.Debug("job started")
 
-			// collect metrics for all discovered services
-			pusher.Collector(service.Exporter)
+	// metrics for every discovered service is wrapped into a separate push
+	for _, service := range repo.Services {
+		jobLabel := fmt.Sprintf("db_system_%s_%s", labelBase, service.ServiceID)
+		var pusher = push.New(url, jobLabel)
 
-			// push metrics
-			if err := pusher.Add(); err != nil {
-				// it is not critical error, just show it and continue
-				log.Warnln("could not push metrics: ", err)
-			}
+		// if api-key specified use custom http-client and attach api-key to http requests
+		if apiKey != "" {
+			client := newHTTPClient(apiKey)
+			pusher.Client(client)
 		}
 
-		// sleep now
-		log.Debug("all jobs are finished, going to sleep")
-		time.Sleep(time.Until(start.Add(config.MetricsSendInterval)))
+		// collect metrics for all discovered services
+		pusher.Collector(service.Exporter)
+
+		// push metrics
+		if err := pusher.Add(); err != nil {
+			// it is not critical error, just show it and continue
+			log.Warnln("could not push metrics: ", err)
+		}
 	}
+
+	log.Debug("job finished")
 }
 
 // getJobLabelBase returns a unique string for job label. The string is based on machine-id or hostname.
 func getJobLabelBase() (string, error) {
+	log.Debug("calculating job label for pushed metrics")
+
 	// try to use machine-id-based label
 	machineID, err := getLabelByMachineID()
 	if err == nil {

@@ -31,6 +31,7 @@ func main() {
 		logLevel             = kingpin.Flag("log-level", "set log level: debug, info, warn, error").Default("info").Envar("LOG_LEVEL").String()
 	)
 	kingpin.Parse()
+	log.SetLevel(*logLevel)
 
 	var sc = &app.Config{
 		ListenAddress:        **listenAddress,
@@ -46,8 +47,6 @@ func main() {
 			PgbouncerPassword: *pgbouncerPassword,
 		},
 	}
-
-	log.SetLevel(*logLevel)
 
 	if *showver {
 		fmt.Printf("%s %s\n", appName, sc.BinaryVersion)
@@ -92,9 +91,10 @@ func main() {
 
 	go func() {
 		doExit <- app.Start(ctx, sc)
+		cancel()
 	}()
 
-	log.Infof("graceful shutdown: %s", <-doExit)
+	log.Infof("going shutdown: %s", <-doExit)
 }
 
 func listenSignals() error {
