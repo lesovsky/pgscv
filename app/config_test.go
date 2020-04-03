@@ -38,6 +38,10 @@ func TestDecodeProjectIDStr(t *testing.T) {
 			key: "invalid",
 			id:  "",
 		},
+		{
+			key: "",
+			id:  "",
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.key, func(t *testing.T) {
