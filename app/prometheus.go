@@ -4,10 +4,9 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"os"
 	"path/filepath"
+	"pgscv/app/log"
 	"pgscv/app/model"
 	"pgscv/app/stat"
 	"regexp"
@@ -18,7 +17,6 @@ import (
 
 // prometheusExporter is the realization of prometheus.Collector
 type prometheusExporter struct {
-	Logger      zerolog.Logger              // logging
 	ServiceID   string                      // unique ID across all services
 	AllDesc     map[string]*prometheus.Desc // metrics assigned to this exporter
 	ServiceRepo ServiceRepo                 // service repository
@@ -181,7 +179,6 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 		itype     = service.ServiceType
 		projectid = service.ProjectID
 		sid       = service.ServiceID
-		logger    = repo.Logger.With().Str("service", "exporter").Logger()
 	)
 
 	var e = make(map[string]*prometheus.Desc)
@@ -206,7 +203,7 @@ func newExporter(service model.Service, repo *ServiceRepo) (*prometheusExporter,
 		}
 	}
 
-	return &prometheusExporter{Logger: logger, ServiceID: sid, AllDesc: e, ServiceRepo: *repo, statCatalog: localCatalog}, nil
+	return &prometheusExporter{ServiceID: sid, AllDesc: e, ServiceRepo: *repo, statCatalog: localCatalog}, nil
 }
 
 // Describe method describes all metrics specified in the exporter
@@ -223,7 +220,7 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 	for _, service := range e.ServiceRepo.Services {
 		// before running collect, check the service is not stale
 		if !service.IsAvailable() {
-			e.Logger.Warn().Msg("service is not available, skip")
+			log.Warn("service is not available, skip")
 			e.ServiceRepo.removeService(service.Pid)
 			continue
 		}
@@ -242,7 +239,7 @@ func (e *prometheusExporter) Collect(ch chan<- prometheus.Metric) {
 				//prometheus.Unregister(e)  // this done in removeService method
 				e.ServiceRepo.removeService(service.Pid)
 			}
-			e.Logger.Debug().Msgf("%s: %d metrics generated", service.ServiceID, metricsCnt)
+			log.Debugf("%s: %d metrics generated", service.ServiceID, metricsCnt)
 		}
 	}
 }
@@ -309,7 +306,7 @@ func (e *prometheusExporter) collectDiskstatsMetrics(ch chan<- prometheus.Metric
 		diskUtilStat = make(stat.Diskstats, bdevCnt)
 		err := diskUtilStat.ReadLocal()
 		if err != nil {
-			e.Logger.Error().Err(err).Msg("failed to collect diskstat metrics")
+			log.Errorln("failed to collect diskstats metrics: ", err)
 			return 0
 		}
 
@@ -335,7 +332,7 @@ func (e *prometheusExporter) collectNetdevMetrics(ch chan<- prometheus.Metric) (
 		netdevUtil = make(stat.Netdevs, ifsCnt)
 		err := netdevUtil.ReadLocal()
 		if err != nil {
-			e.Logger.Error().Err(err).Msg("failed to collect netdev metrics")
+			log.Errorln("failed to collect netdev metrics: ", err)
 			return 0
 		}
 
@@ -366,7 +363,7 @@ func (e *prometheusExporter) collectFsMetrics(ch chan<- prometheus.Metric) (cnt 
 	var fsStats = make(stat.FsStats, 0, 10)
 	err := fsStats.ReadLocal()
 	if err != nil {
-		e.Logger.Error().Err(err).Msg("failed to collect filesystem metrics")
+		log.Errorln("failed to collect filesystem metrics: ", err)
 		return 0
 	}
 
@@ -389,7 +386,7 @@ func (e *prometheusExporter) collectSysctlMetrics(ch chan<- prometheus.Metric) (
 	for _, sysctl := range sysctlList() {
 		value, err := stat.GetSysctl(sysctl)
 		if err != nil {
-			e.Logger.Error().Err(err).Msg("failed to obtain sysctl")
+			log.Errorln("failed to obtain sysctl: ", err)
 			continue
 		}
 		ch <- prometheus.MustNewConstMetric(e.AllDesc["node_settings_sysctl"], prometheus.CounterValue, float64(value), sysctl)
@@ -403,7 +400,7 @@ func (e *prometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (
 	// Collect total number of CPU cores
 	online, offline, err := stat.CountCPU()
 	if err != nil {
-		e.Logger.Error().Err(err).Msg("failed counting CPUs")
+		log.Errorln("failed counting CPUs: ", err)
 		return 0
 	}
 	total := online + offline
@@ -418,7 +415,7 @@ func (e *prometheusExporter) collectCPUCoresState(ch chan<- prometheus.Metric) (
 func (e *prometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Metric) (cnt int) {
 	sg, err := stat.CountScalingGovernors()
 	if err != nil {
-		e.Logger.Error().Err(err).Msg("failed counting scaling governors")
+		log.Errorln("failed counting scaling governors: ", err)
 		return 0
 	}
 	if len(sg) > 0 {
@@ -437,7 +434,7 @@ func (e *prometheusExporter) collectCPUScalingGovernors(ch chan<- prometheus.Met
 func (e *prometheusExporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt int) {
 	numa, err := stat.CountNumaNodes()
 	if err != nil {
-		e.Logger.Error().Err(err).Msg("failed counting NUMA nodes")
+		log.Errorln("failed counting NUMA nodes: ", err)
 		return 0
 	}
 	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_numa_nodes"], prometheus.CounterValue, float64(numa))
@@ -449,7 +446,7 @@ func (e *prometheusExporter) collectNumaNodes(ch chan<- prometheus.Metric) (cnt 
 func (e *prometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metric) (cnt int) {
 	dirs, err := filepath.Glob("/sys/block/*")
 	if err != nil {
-		fmt.Println(err)
+		log.Warnln("skip collecting io schedulers: ", err)
 		return 0
 	}
 
@@ -462,12 +459,12 @@ func (e *prometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metri
 			devname = strings.Replace(devpath, "/sys/block/", "/dev/", 1)
 			rotational, err = stat.IsDeviceRotational(devpath)
 			if err != nil {
-				e.Logger.Warn().Err(err)
+				log.Warnf("skip collecting io schedulers for %s: %s", devname, err)
 				continue
 			}
 			scheduler, err = stat.GetDeviceScheduler(devpath)
 			if err != nil {
-				e.Logger.Warn().Err(err)
+				log.Warnf("skip collecting io schedulers for %s: %s", devname, err)
 				continue
 			}
 			ch <- prometheus.MustNewConstMetric(e.AllDesc["node_hardware_storage_rotational"], prometheus.GaugeValue, rotational, devname, scheduler)
@@ -481,7 +478,7 @@ func (e *prometheusExporter) collectStorageSchedulers(ch chan<- prometheus.Metri
 func (e *prometheusExporter) collectSystemUptime(ch chan<- prometheus.Metric) (cnt int) {
 	uptime, err := stat.Uptime()
 	if err != nil {
-		fmt.Println(err)
+		log.Warnln("skip collecting system uptime: ", err)
 		return 0
 	}
 	ch <- prometheus.MustNewConstMetric(e.AllDesc["node_uptime_seconds"], prometheus.CounterValue, uptime)
@@ -506,29 +503,29 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		conn, err := CreateConn(&service)
 		if err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceID)
+			log.Warnf("collect failed: %d/%d, skip collecting stats for %s, failed to connect: %s", e.TotalFailed, exporterFailureLimit, service.ServiceID, err)
 			return 0
 		}
 		if err := PQstatus(conn, service.ServiceType); err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for %s, failed to check status", e.TotalFailed, exporterFailureLimit, service.ServiceID)
+			log.Warnf("collect failed: %d/%d, skip collecting stats for %s, failed to check status: %s", e.TotalFailed, exporterFailureLimit, service.ServiceID, err)
 			return 0
 		}
 		// адаптируем запросы под конкретную версию
 		if err := conn.QueryRow(pgVersionNumQuery).Scan(&version); err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting stats for %s, failed to obtain postgresql version", service.ServiceID)
+			log.Warnf("skip collecting stats for %s, failed to obtain postgresql version: %s", service.ServiceID, err)
 			return 0
 		}
 		adjustQueries(e.statCatalog, version)
 
 		dblist, err = getDBList(conn)
 		if err != nil {
-			e.Logger.Warn().Err(err).Msgf("failed to get list of databases, use default database name: %s", service.Dbname)
+			log.Warnf("use default database name %s, failed to get list of databases: %s", service.Dbname, err)
 			dblist = []string{service.Dbname}
 		}
 
 		if err := conn.Close(); err != nil {
-			e.Logger.Warn().Err(err).Msgf("failed to close the connection %s@%s:%d/%s, ignore", service.User, service.Host, service.Port, service.Dbname)
+			log.Warnf("failed to close the connection %s@%s:%d/%s, ignore; %s", service.User, service.Host, service.Port, service.Dbname, err)
 		}
 	} else {
 		dblist = []string{"pgbouncer"}
@@ -554,7 +551,7 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		conn, err := CreateConn(&service) // открываем коннект к базе
 		if err != nil {
 			e.TotalFailed++
-			e.Logger.Warn().Err(err).Msgf("collect failed: %d/%d, skip collecting stats for database %s/%s, failed to connect", e.TotalFailed, exporterFailureLimit, service.ServiceID, dbname)
+			log.Warnf("collect failed [%d/%d], skip collecting stats for database %s/%s, failed to connect: %s", e.TotalFailed, exporterFailureLimit, service.ServiceID, dbname, err)
 			continue
 		}
 
@@ -562,7 +559,7 @@ func (e *prometheusExporter) collectPgMetrics(ch chan<- prometheus.Metric, servi
 		n := e.getDBStat(conn, ch, service.ServiceType, version)
 		cnt += n
 		if err := conn.Close(); err != nil {
-			e.Logger.Warn().Err(err).Msgf("failed to close the connection %s@%s:%d/%s", service.User, service.Host, service.Port, service.Dbname)
+			log.Warnf("failed to close the connection %s@%s:%d/%s: %s", service.User, service.Host, service.Port, service.Dbname, err)
 		}
 	}
 	// After collecting, update time of last executed.
@@ -597,12 +594,12 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			continue
 		}
 
-		e.Logger.Debug().Msgf("start collecting %s", desc.Name)
+		log.Debugf("start collecting %s", desc.Name)
 
 		// обрабатываем статки с пустым запросом
 		if desc.QueryText == "" {
 			if n, err := getPostgresDirInfo(e, conn, ch, desc.Name, version); err != nil {
-				e.Logger.Warn().Err(err).Msgf("skip collecting %s", desc.Name)
+				log.Warnf("skip collecting %s: %s", desc.Name, err)
 			} else {
 				cnt += n
 				e.statCatalog[i].collectDone = true
@@ -612,13 +609,13 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 
 		// check pg_stat_statements availability in this database
 		if desc.Name == "pg_stat_statements" && !IsPGSSAvailable(conn) {
-			e.Logger.Debug().Msg("skip collecting pg_stat_statements in this database")
+			log.Debug("skip collecting pg_stat_statements in this database")
 			continue
 		}
 
 		rows, err := conn.Query(desc.QueryText)
 		if err != nil {
-			e.Logger.Warn().Err(err).Msgf("skip collecting %s, failed to execute query", desc.Name)
+			log.Warnf("skip collecting %s, failed to execute query: %s", desc.Name, err)
 			continue
 		}
 
@@ -640,7 +637,7 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 
 			err := rows.Scan(pointers...)
 			if err != nil {
-				e.Logger.Warn().Err(err).Msgf("skip collecting %s, failed to scan query result", desc.Name)
+				log.Warnf("skip collecting %s, failed to scan query result: %s", desc.Name, err)
 				continue // если произошла ошибка, то пропускаем эту строку и переходим к следующей
 			}
 
@@ -663,14 +660,14 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 
 					// игнорируем пустые строки, это NULL - нас они не интересуют
 					if container[c].String == "" {
-						e.Logger.Debug().Msgf("skip collecting %s_%s metric: got empty value", desc.Name, colname)
+						log.Debugf("skip collecting %s_%s metric: got empty value", desc.Name, colname)
 						continue
 					}
 
 					// получаем значение метрики (string) и конвертим его в подходящий для прометеуса float64
 					v, err := strconv.ParseFloat(container[c].String, 64)
 					if err != nil {
-						e.Logger.Warn().Err(err).Msgf("skip collecting %s_%s metric", desc.Name, colname)
+						log.Warnf("skip collecting %s_%s metric: %s", desc.Name, colname, err)
 						continue
 					}
 
@@ -686,10 +683,10 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 			}
 		}
 		if err := rows.Close(); err != nil {
-			e.Logger.Debug().Err(err).Msg("failed to close rows, ignore")
+			log.Debugln("failed to close rows, ignore: ", err)
 		}
 		if noRows {
-			e.Logger.Debug().Msgf("no rows returned for %s", desc.Name)
+			log.Debugf("no rows returned for %s", desc.Name)
 			continue
 		}
 		e.statCatalog[i].collectDone = true
@@ -700,29 +697,29 @@ func (e *prometheusExporter) getDBStat(conn *sql.DB, ch chan<- prometheus.Metric
 		}
 
 		e.TotalFailed = 0
-		e.Logger.Debug().Msgf("%s collected", desc.Name)
+		log.Debugf("%s collected", desc.Name)
 	}
 	return cnt
 }
 
 // IsPGSSAvailable returns true if pg_stat_statements exists and available
 func IsPGSSAvailable(conn *sql.DB) bool {
-	log.Debug().Msg("check pg_stat_statements availability")
+	log.Debug("check pg_stat_statements availability")
 	/* check pg_stat_statements */
 	var pgCheckPGSSExists = `SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = 'pg_stat_statements')`
 	var pgCheckPGSSCount = `SELECT 1 FROM pg_stat_statements LIMIT 1`
 	var vExists bool
 	var vCount int
 	if err := conn.QueryRow(pgCheckPGSSExists).Scan(&vExists); err != nil {
-		log.Debug().Msg("failed to check pg_stat_statements view in information_schema")
+		log.Debug("failed to check pg_stat_statements view in information_schema")
 		return false // failed to query information_schema
 	}
 	if !vExists {
-		log.Debug().Msg("pg_stat_statements is not available in this database")
+		log.Debug("pg_stat_statements is not available in this database")
 		return false // pg_stat_statements is not available
 	}
 	if err := conn.QueryRow(pgCheckPGSSCount).Scan(&vCount); err != nil {
-		log.Debug().Msg("pg_stat_statements exists but not queryable")
+		log.Debug("pg_stat_statements exists but not queryable")
 		return false // view exists, but unavailable for queries - empty shared_preload_libraries ?
 	}
 	return true

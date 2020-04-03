@@ -2,13 +2,13 @@ package packaging
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"os"
+	"pgscv/app/log"
 )
 
 // run pre-bootstrap checks
 func preCheck() error {
-	log.Info().Msg("run pre-flight checks")
+	log.Info("run pre-flight checks")
 
 	// check is system systemd-aware
 	if !isRunningSystemd() {

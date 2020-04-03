@@ -8,19 +8,17 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
+	"pgscv/app/log"
 	"strings"
 	"time"
 )
 
 type AutoupdateConfig struct {
-	Logger        zerolog.Logger
 	BinaryVersion string
 }
 
@@ -43,21 +41,21 @@ const (
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
 func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 	if err := preCheck(); err != nil {
-		c.Logger.Warn().Err(err).Msg("auto-update disabled:")
+		log.Warnln("auto-update disabled: ", err)
 		return
 	}
 
-	c.Logger.Info().Msg("start background auto-update")
+	log.Info("start background auto-update")
 	// inifinte loop
 	for {
 		select {
 		case <-time.After(defaultAutoUpdateInterval):
 			err := RunUpdate(c)
 			if err != nil {
-				c.Logger.Error().Err(err).Msg("auto-update failed")
+				log.Errorln("auto-update failed: ", err)
 			}
 		case <-ctx.Done():
-			c.Logger.Info().Msg("exit signaled, stop auto-update")
+			log.Info("exit signaled, stop auto-update")
 			return
 		}
 	}
@@ -65,7 +63,7 @@ func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 
 // RunUpdate is the main entry point for updating agent
 func RunUpdate(c *AutoupdateConfig) error {
-	c.Logger.Debug().Msg("run update")
+	log.Debug("run update")
 
 	// get proper URL of agent distribution
 	baseURL, err := getUpdateBaseURL(c.BinaryVersion)
@@ -81,7 +79,7 @@ func RunUpdate(c *AutoupdateConfig) error {
 
 	// skip update procedure if the version is the same as the version of running agent
 	if distVersion == c.BinaryVersion {
-		log.Debug().Msg("same version, update is not required, exit")
+		log.Debug("same version, update is not required, exit")
 		return nil
 	}
 
@@ -111,13 +109,13 @@ func RunUpdate(c *AutoupdateConfig) error {
 	// remove dist files
 	doCleanup()
 
-	c.Logger.Info().Msg("agent update successful")
+	log.Info("agent update successful")
 	return nil
 }
 
 // getUpdateBaseURL returns URL used for getting new agent version
 func getUpdateBaseURL(appVersion string) (string, error) {
-	log.Debug().Msg("getting an agent distribution URL")
+	log.Debug("getting an agent distribution URL")
 
 	fields := strings.Split(appVersion, "-")
 	if len(fields) != 2 {
@@ -135,7 +133,7 @@ func getUpdateBaseURL(appVersion string) (string, error) {
 
 // getDistributionVersion returns version of remote distribution
 func getDistributionVersion(baseURL string) (string, error) {
-	log.Debug().Msg("getting a distribution version")
+	log.Debug("getting a distribution version")
 
 	var client = http.Client{Timeout: 10 * time.Second}
 	var url = baseURL + "/" + fileVersion
@@ -160,7 +158,7 @@ func getDistributionVersion(baseURL string) (string, error) {
 
 // downloadNewVersion downloads agent distribution and saves to tmpdir
 func downloadNewVersion(baseURL string) error {
-	log.Debug().Msg("download an agent distribution")
+	log.Debug("download an agent distribution")
 
 	var (
 		distURL  = baseURL + "/" + fileDistribution
@@ -183,7 +181,7 @@ func downloadNewVersion(baseURL string) error {
 // checkDistributionChecksum calculates checksum of the downloaded agent distribution and checks with pre-calculated
 // checksum from distribution.
 func checkDistributionChecksum() error {
-	log.Debug().Msg("check agent distribution checksum")
+	log.Debug("check agent distribution checksum")
 
 	var distFilename = tmpDir + "/" + fileDistribution
 	var distSumFilename = tmpDir + "/" + fileSha256Sum
@@ -212,13 +210,13 @@ func checkDistributionChecksum() error {
 	if got != want {
 		return fmt.Errorf("checksums differs, want: %s, got %s", want, got)
 	}
-	log.Debug().Msg("checksums ok")
+	log.Debug("checksums ok")
 	return nil
 }
 
 // extractDistribution reads distribuiton and extract agent's binary
 func extractDistribution() error {
-	log.Debug().Msg("extracting agent distribution")
+	log.Debug("extracting agent distribution")
 
 	var distFile = tmpDir + "/" + fileDistribution
 	r, err := os.Open(distFile)
@@ -260,13 +258,13 @@ func extractDistribution() error {
 			return fmt.Errorf("uknown type: %d in %s", header.Typeflag, header.Name)
 		}
 	}
-	log.Debug().Msg("extract finished")
+	log.Debug("extract finished")
 	return nil
 }
 
 // updateBinary replaces existing agent executable with new version
 func updateBinary() error {
-	log.Debug().Msg("start agent binary update")
+	log.Debug("start agent binary update")
 
 	var fromFilename = tmpDir + "/" + fileBinary
 	var toFilename = "/usr/bin/" + fileBinary
@@ -291,14 +289,14 @@ func updateBinary() error {
 		return fmt.Errorf("copy file failed: %s", err)
 	}
 	if err = from.Close(); err != nil {
-		log.Warn().Err(err).Msg("close source file failed, ignore it")
+		log.Warnln("close source file failed, ignore it; ", err)
 	}
 	if err = to.Close(); err != nil {
-		log.Warn().Err(err).Msg("close destination file failed, ignore it")
+		log.Warnln("close destination file failed, ignore it; ", err)
 	}
 
 	// run service restart
-	log.Debug().Msg("restarting the service")
+	log.Debug("restarting the service")
 	cmd := exec.Command("systemctl", "restart", systemdServiceName)
 	// after cmd.Start execution of this code could be interrupted, end even err might not be handled.
 	err = cmd.Start()
@@ -316,7 +314,7 @@ func updateBinary() error {
 
 // doCleanup removes agent distribution files from tmp directory
 func doCleanup() {
-	log.Debug().Msg("cleanup agent distribution files")
+	log.Debug("cleanup agent distribution files")
 	var (
 		distFile = tmpDir + "/" + fileDistribution
 		sumFile  = tmpDir + "/" + fileSha256Sum
@@ -325,14 +323,14 @@ func doCleanup() {
 
 	for _, file := range []string{distFile, sumFile, binFile} {
 		if err := os.Remove(file); err != nil {
-			log.Warn().Err(err).Msg("failed remove file, ignore it;")
+			log.Warnln("failed remove file, ignore it; ", err)
 		}
 	}
 }
 
 // downloadFile downloads file and saves it locally
 func downloadFile(url, file string) error {
-	log.Debug().Msgf("download using %s to %s", url, file)
+	log.Debugf("download using %s to %s", url, file)
 	var client = http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Get(url)
 	if err != nil {
@@ -359,7 +357,7 @@ func downloadFile(url, file string) error {
 
 // hashSha256 calculates sha256 for specified file
 func hashSha256(filename string) (string, error) {
-	log.Debug().Msgf("calculating sha256 checksum for %s", filename)
+	log.Debugf("calculating sha256 checksum for %s", filename)
 	f, err := os.Open(filename)
 	if err != nil {
 		return "", err

@@ -6,11 +6,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/process"
 	"io"
 	"io/ioutil"
+	"pgscv/app/log"
 	"pgscv/app/model"
 	"strconv"
 	"strings"
@@ -19,7 +18,6 @@ import (
 
 // ServiceRepo is the store of discovered services
 type ServiceRepo struct {
-	Logger   zerolog.Logger
 	Services map[int32]model.Service
 	Config   *Config
 }
@@ -27,7 +25,6 @@ type ServiceRepo struct {
 // NewServiceRepo creates new services repository
 func NewServiceRepo(config *Config) *ServiceRepo {
 	return &ServiceRepo{
-		Logger:   config.Logger.With().Str("module", "auto-discovery").Logger(),
 		Services: make(map[int32]model.Service),
 		Config:   config,
 	}
@@ -35,10 +32,10 @@ func NewServiceRepo(config *Config) *ServiceRepo {
 
 // discoverServiceOnce performs initial service discovery required at application startup
 func (repo *ServiceRepo) discoverServicesOnce() error {
-	repo.Logger.Debug().Msg("starting initial discovery")
+	log.Debug("starting initial discovery")
 
 	// add pseudo-service for system metrics
-	repo.Logger.Debug().Msg("adding system service")
+	log.Debug("adding system service")
 	repo.Services[0] = model.Service{ServiceType: model.ServiceTypeSystem}
 
 	// search services and add them to the repo
@@ -51,32 +48,32 @@ func (repo *ServiceRepo) discoverServicesOnce() error {
 		return err
 	}
 
-	repo.Logger.Debug().Msgf("finish initial discovery: found %d services", len(repo.Services))
+	log.Debugf("finish initial discovery: found %d services", len(repo.Services))
 	return nil
 }
 
 // startBackgroundDiscovery is periodically searches new services
 func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context) {
-	repo.Logger.Debug().Msg("starting background auto-discovery")
+	log.Debug("starting background auto-discovery")
 
 	for {
 		select {
 		case <-time.After(60 * time.Second):
 			// remove services that become unavailable during last discovery interval
 			if removed := repo.removeStaleServices(); removed > 0 {
-				repo.Logger.Info().Msgf("auto-discovery: removed %d stale services", removed)
+				log.Infof("auto-discovery: removed %d stale services", removed)
 			}
 
 			if err := repo.lookupServices(); err != nil {
-				repo.Logger.Warn().Err(err).Msg("auto-discovery: lookup failed, skip")
+				log.Warnln("auto-discovery: lookup failed, skip; ", err)
 				continue
 			}
 			if err := repo.setupServices(); err != nil {
-				repo.Logger.Warn().Err(err).Msg("auto-discovery: create exporter failed, skip")
+				log.Warnln("auto-discovery: create exporter failed, skip; ", err)
 				continue
 			}
 		case <-ctx.Done():
-			repo.Logger.Info().Msg("exit signaled, stop auto-discovery")
+			log.Info("exit signaled, stop auto-discovery")
 			return
 		}
 	}
@@ -104,19 +101,19 @@ func (repo *ServiceRepo) lookupServices() error {
 	// проходимся по всем пидам и смотрим что у них за имена, и далее отталкиваеимся от имен и cmdline
 	for _, pid := range pids {
 		if _, ok := repo.Services[pid]; ok {
-			repo.Logger.Debug().Msgf("auto-discovery: service with pid %d already in the repository, skip", pid)
+			log.Debugf("auto-discovery: service with pid %d already in the repository, skip", pid)
 			continue // skip processes when services with such pids already in the service repo
 		}
 
 		proc, err := process.NewProcess(pid)
 		if err != nil {
-			repo.Logger.Debug().Err(err).Msgf("auto-discovery: failed to create process struct for pid %d, skip", pid)
+			log.Debugf("auto-discovery: failed to create process struct for pid %d, skip; %s", pid, err)
 			continue
 		}
 
 		name, err := proc.Name()
 		if err != nil {
-			repo.Logger.Warn().Err(err).Msgf("auto-discovery: no process name for pid %d, skip", pid)
+			log.Warnf("auto-discovery: no process name for pid %d, skip; %s", pid, err)
 			continue // skip processes with no names
 		}
 
@@ -126,12 +123,12 @@ func (repo *ServiceRepo) lookupServices() error {
 			if ppid == 1 {
 				ctime, err := proc.CreateTime()
 				if err != nil {
-					repo.Logger.Warn().Err(err).Msg("get process create time failed")
+					log.Warnln("get process create time failed: ", err)
 					break
 				}
 				postgres, err := discoverPostgres(proc)
 				if err != nil {
-					repo.Logger.Warn().Err(err).Msg("postgresql service has been found, but skipped due to:")
+					log.Warnln("postgresql service has been found, but skipped due to: ", err)
 					break
 				}
 				postgres.Validate()
@@ -143,12 +140,12 @@ func (repo *ServiceRepo) lookupServices() error {
 		case "pgbouncer":
 			ctime, err := proc.CreateTime()
 			if err != nil {
-				repo.Logger.Warn().Err(err).Msg("get process create time failed")
+				log.Warnln("get process create time failed: ", err)
 				break
 			}
 			pgbouncer, err := discoverPgbouncer(proc)
 			if err != nil {
-				repo.Logger.Warn().Err(err).Msg("pgbouncer service has been found, but skipped due to:")
+				log.Warnln("pgbouncer service has been found, but skipped due to: ", err)
 				break
 			}
 			pgbouncer.Validate()
@@ -189,7 +186,7 @@ func (repo *ServiceRepo) setupServices() error {
 			// для PULL режима надо зарегать новоявленного экспортера, для PUSH это сделается в процессе самого пуша
 			if repo.Config.RuntimeMode == runtimeModePull {
 				prometheus.MustRegister(newService.Exporter)
-				repo.Logger.Info().Msgf("auto-discovery: exporter registered for %s with pid %d", newService.ServiceID, newService.Pid)
+				log.Infof("auto-discovery: exporter registered for %s with pid %d", newService.ServiceID, newService.Pid)
 			}
 
 			// put updated service copy into repo
@@ -202,13 +199,13 @@ func (repo *ServiceRepo) setupServices() error {
 // RemoveService removes service from the list (in case of its unavailability)
 func (repo *ServiceRepo) removeService(pid int32) {
 	prometheus.Unregister(repo.Services[pid].Exporter)
-	repo.Logger.Info().Msgf("auto-discovery: collector unregistered for %s, pid %d", repo.Services[pid].ServiceID, pid)
+	log.Infof("auto-discovery: collector unregistered for %s, pid %d", repo.Services[pid].ServiceID, pid)
 	delete(repo.Services, pid)
 }
 
 // discoverPgbouncer
 func discoverPgbouncer(proc *process.Process) (model.Service, error) {
-	log.Debug().Msg("looking for pgbouncer services")
+	log.Debug("looking for pgbouncer services")
 
 	// пока тупо возвращаем значение без всякого дискавери
 	// надо взять конфиг из cmdline прочитать его и найти параметры порта и адреса
@@ -230,7 +227,7 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 	var sdir, laddr string
 	var lport int
 
-	log.Debug().Msgf("auto-discovery: start reading %s", conffile)
+	log.Debugf("auto-discovery: start reading %s", conffile)
 	for {
 		line, _, err := reader.ReadLine()
 		if err == io.EOF {
@@ -269,7 +266,7 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 
 	// TODO: laddr не используется, то есть мы его типа ищем, но в конечном счете он не используется дальше (для коннекта используется unix_socket_dir
 
-	log.Info().Msgf("auto-discovery: pgbouncer service has been found, pid %d, available through %s, port %d", proc.Pid, sdir, 6432)
+	log.Infof("auto-discovery: pgbouncer service has been found, pid %d, available through %s, port %d", proc.Pid, sdir, 6432)
 	return model.Service{ServiceType: model.ServiceTypePgbouncer, Pid: proc.Pid, Host: sdir, Port: uint16(lport)}, nil
 }
 
@@ -277,7 +274,7 @@ func discoverPgbouncer(proc *process.Process) (model.Service, error) {
 // Postgres discovering works through looking for Postgres's UNIX socket. Potentially Postgres might be configured
 // without listening on UNIX socket, thus agent should foresee additional methods for such case.
 func discoverPostgres(proc *process.Process) (model.Service, error) {
-	log.Debug().Msg("looking for postgresql services")
+	log.Debug("looking for postgresql services")
 	// надо найти сокет для коннекта
 	cmdline, err := proc.CmdlineSlice()
 	if err != nil {
@@ -320,6 +317,6 @@ func discoverPostgres(proc *process.Process) (model.Service, error) {
 		}
 	}
 
-	log.Info().Msgf("auto-discovery: postgresql service has been found, pid %d, available through %s, port %d", proc.Pid, unixsocketdir, port)
+	log.Infof("auto-discovery: postgresql service has been found, pid %d, available through %s, port %d", proc.Pid, unixsocketdir, port)
 	return model.Service{ServiceType: model.ServiceTypePostgresql, Pid: proc.Pid, Host: unixsocketdir, Port: uint16(port)}, nil
 }

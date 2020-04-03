@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"pgscv/app/model"
 	"strings"
@@ -39,11 +38,10 @@ func testPgbouncerService() model.Service {
 }
 
 func Test_collectCPUMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -59,11 +57,10 @@ func Test_collectCPUMetrics(t *testing.T) {
 }
 
 func Test_collectMemMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -79,11 +76,10 @@ func Test_collectMemMetrics(t *testing.T) {
 }
 
 func Test_collectDiskstatsMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -99,11 +95,10 @@ func Test_collectDiskstatsMetrics(t *testing.T) {
 }
 
 func Test_collectNetdevMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -119,11 +114,10 @@ func Test_collectNetdevMetrics(t *testing.T) {
 }
 
 func Test_collectFsMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -139,11 +133,10 @@ func Test_collectFsMetrics(t *testing.T) {
 }
 
 func Test_collectSysctlMetrics(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -159,11 +152,10 @@ func Test_collectSysctlMetrics(t *testing.T) {
 }
 
 func Test_collectCPUCoresState(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -179,11 +171,10 @@ func Test_collectCPUCoresState(t *testing.T) {
 }
 
 func Test_collectCPUScalingGovernors(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -199,11 +190,10 @@ func Test_collectCPUScalingGovernors(t *testing.T) {
 }
 
 func Test_collectNumaNodes(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -219,11 +209,10 @@ func Test_collectNumaNodes(t *testing.T) {
 }
 
 func Test_collectStorageSchedulers(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = model.Service{ServiceType: model.ServiceTypeSystem, ServiceID: "system"}
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -239,11 +228,10 @@ func Test_collectStorageSchedulers(t *testing.T) {
 }
 
 func Test_collectSystemUptime(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = testSystemService()
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -259,13 +247,10 @@ func Test_collectSystemUptime(t *testing.T) {
 }
 
 func Test_collectPgMetrics_postgres(t *testing.T) {
-	var repo = &ServiceRepo{
-		Logger: zerolog.Logger{},
-	}
 	var service = testPostgresService()
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 
@@ -300,11 +285,10 @@ func Test_collectPgMetrics_postgres(t *testing.T) {
 }
 
 func Test_collectPgMetrics_pgbouncer(t *testing.T) {
-	var repo = &ServiceRepo{Logger: zerolog.Logger{}}
 	var service = testPgbouncerService()
 	var ch = make(chan prometheus.Metric)
 
-	e, err := newExporter(service, repo)
+	e, err := newExporter(service, &ServiceRepo{})
 	assert.NoError(t, err)
 	assert.NotNil(t, e)
 

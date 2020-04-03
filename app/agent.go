@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
-	"github.com/rs/zerolog"
 	"io/ioutil"
 	"net/http"
 	"os"
+	"pgscv/app/log"
 	"pgscv/app/packaging"
 	"strings"
 	"time"
@@ -17,8 +17,7 @@ import (
 
 // Start is the application's main entry point
 func Start(ctx context.Context, c *Config) error {
-	logger := c.Logger.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	logger.Debug().Msg("start application")
+	log.Debug("start application")
 
 	serviceRepo := NewServiceRepo(c)
 
@@ -32,7 +31,6 @@ func Start(ctx context.Context, c *Config) error {
 
 	go func() {
 		ac := &packaging.AutoupdateConfig{
-			Logger:        c.Logger.With().Str("module", "auto-update").Logger(),
 			BinaryVersion: c.BinaryVersion,
 		}
 		packaging.StartBackgroundAutoUpdate(ctx, ac)
@@ -44,14 +42,14 @@ func Start(ctx context.Context, c *Config) error {
 	case runtimeModePush:
 		return runPushMode(c, serviceRepo)
 	default:
-		logger.Error().Msgf("unknown mode selected: %d, quit", c.RuntimeMode)
+		log.Errorf("unknown mode selected: %d, quit", c.RuntimeMode)
 		return nil
 	}
 }
 
 // runPullMode runs application in PULL mode (accepts requests for metrics via HTTP)
 func runPullMode(config *Config) error {
-	config.Logger.Info().Msgf("use PULL mode, accepting requests on http://%s/metrics", config.ListenAddress.String())
+	log.Infof("use PULL mode, accepting requests on http://%s/metrics", config.ListenAddress.String())
 
 	http.Handle("/metrics", promhttp.Handler())
 	return http.ListenAndServe(config.ListenAddress.String(), nil)
@@ -59,18 +57,19 @@ func runPullMode(config *Config) error {
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
 func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
-	config.Logger.Info().Msgf("use PUSH mode, sending metrics to %s every %d seconds", config.MetricServiceBaseURL.String(), config.MetricsSendInterval/time.Second)
-
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
 	// this label should be removed with 'metric_relabel_config' rule.
-	jobLabelBase, err := getJobLabelBase(config.Logger)
+	jobLabelBase, err := getJobLabelBase()
 	if err != nil {
 		return err
 	}
 
+	log.Infof("use PUSH mode, sending metrics to %s every %d seconds", config.MetricServiceBaseURL.String(), config.MetricsSendInterval/time.Second)
+
+	// TODO: infinite loop, need case for exiting
 	for {
-		config.Logger.Debug().Msgf("start job")
+		log.Debugf("start job")
 		var start = time.Now()
 
 		// metrics for every discovered service is wrapped into a separate push
@@ -90,18 +89,18 @@ func runPushMode(config *Config, instanceRepo *ServiceRepo) error {
 			// push metrics
 			if err := pusher.Add(); err != nil {
 				// it is not critical error, just show it and continue
-				config.Logger.Warn().Err(err).Msg("could not push metrics")
+				log.Warnln("could not push metrics: ", err)
 			}
 		}
 
 		// sleep now
-		config.Logger.Debug().Msg("all jobs are finished, going to sleep")
+		log.Debug("all jobs are finished, going to sleep")
 		time.Sleep(time.Until(start.Add(config.MetricsSendInterval)))
 	}
 }
 
 // getJobLabelBase returns a unique string for job label. The string is based on machine-id or hostname.
-func getJobLabelBase(logger zerolog.Logger) (string, error) {
+func getJobLabelBase() (string, error) {
 	// try to use machine-id-based label
 	machineID, err := getLabelByMachineID()
 	if err == nil {
@@ -109,10 +108,10 @@ func getJobLabelBase(logger zerolog.Logger) (string, error) {
 	}
 
 	// if getting machine-id failed, try to use hostname-based label
-	logger.Warn().Err(err).Msgf("read machine-id failed, fallback to use hostname")
+	log.Warnln("read machine-id failed, fallback to use hostname: ", err)
 	machineID, err = getLabelByHostname()
 	if err != nil {
-		logger.Warn().Err(err).Msgf("get hostname failed, can't create job label")
+		log.Warnln("get hostname failed, can't create job label: ", err)
 		return "", err
 	}
 	return machineID, nil

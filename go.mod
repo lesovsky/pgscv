@@ -13,6 +13,7 @@ require (
 	github.com/shirou/gopsutil v2.19.12+incompatible
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/sys v0.0.0-20200113162924-86b910548bc1 // indirect
+	golang.org/x/tools v0.0.0-20190828213141-aed303cbaa74
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 	gopkg.in/check.v1 v1.0.0-20190902080502-41f04d3bba15 // indirect
 )

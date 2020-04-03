@@ -3,7 +3,6 @@ package app
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
@@ -38,7 +37,7 @@ func Test_runPullMode(t *testing.T) {
 		t.Skipf("root privileges required, skip")
 	}
 
-	var c = &Config{Logger: zerolog.Logger{}, RuntimeMode: runtimeModePull}
+	var c = &Config{RuntimeMode: runtimeModePull}
 
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)

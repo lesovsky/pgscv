@@ -2,10 +2,10 @@ package packaging
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"io"
 	"os"
 	"os/exec"
+	"pgscv/app/log"
 	"text/template"
 	"time"
 )
@@ -62,7 +62,7 @@ type BootstrapConfig struct {
 
 // RunBootstrap is the main bootstrap entry point
 func RunBootstrap(config *BootstrapConfig) int {
-	log.Info().Msg("Running bootstrap")
+	log.Info("Running bootstrap")
 	if err := preCheck(); err != nil {
 		return bootstrapFailed(err)
 	}
@@ -102,7 +102,7 @@ func RunBootstrap(config *BootstrapConfig) int {
 
 // installs agent binary
 func installBin(config *BootstrapConfig) error {
-	log.Info().Msg("Install agent")
+	log.Info("Install agent")
 	fromFilename := fmt.Sprintf("./%s", config.AgentBinaryName)
 	toFilename := fmt.Sprintf("/usr/bin/%s", config.AgentBinaryName)
 
@@ -120,10 +120,10 @@ func installBin(config *BootstrapConfig) error {
 		return fmt.Errorf("copy file failed: %s", err)
 	}
 	if err = from.Close(); err != nil {
-		log.Warn().Err(err).Msg("close source file failed, ignore it")
+		log.Warnln("close source file failed, ignore it; ", err)
 	}
 	if err = to.Close(); err != nil {
-		log.Warn().Err(err).Msg("close destination file failed, ignore it")
+		log.Warnln("close destination file failed, ignore it; ", err)
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func installBin(config *BootstrapConfig) error {
 // creates systemd unit in system path
 func createEnvironmentFile(config *BootstrapConfig) error {
 	var envdir = "/etc/environment.d"
-	log.Info().Msg("Create environment file")
+	log.Info("Create environment file")
 
 	// check directory exists and create if not exists
 	if _, err := os.Stat(envdir); os.IsNotExist(err) {
@@ -148,7 +148,7 @@ func createEnvironmentFile(config *BootstrapConfig) error {
 		return fmt.Errorf("create environment file failed: %s ", err)
 	}
 	if err = f.Chmod(0600); err != nil {
-		log.Warn().Err(err).Msg("change file permissions failed, leave defaults")
+		log.Warnln("change file permissions failed, leave defaults; ", err)
 	}
 
 	// write content using template
@@ -162,7 +162,7 @@ func createEnvironmentFile(config *BootstrapConfig) error {
 	}
 
 	if err = f.Close(); err != nil {
-		log.Warn().Err(err).Msg("close file failed, ignore it")
+		log.Warnln("close file failed, ignore it; ", err)
 	}
 
 	return nil
@@ -170,7 +170,7 @@ func createEnvironmentFile(config *BootstrapConfig) error {
 
 // creates systemd unit in system path
 func createSystemdUnit(config *BootstrapConfig) error {
-	log.Info().Msg("Create systemd unit")
+	log.Info("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
 		return fmt.Errorf("parse template failed: %s", err)
@@ -188,21 +188,21 @@ func createSystemdUnit(config *BootstrapConfig) error {
 	}
 
 	if err = f.Close(); err != nil {
-		log.Warn().Err(err).Msg("close file failed, ignore it")
+		log.Warnln("close file failed, ignore it; ", err)
 	}
 	return nil
 }
 
 // reloads systemd
 func reloadSystemd() error {
-	log.Info().Msg("Reload systemd")
+	log.Info("Reload systemd")
 	cmd := exec.Command("systemctl", "daemon-reload")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("systemd reload failed: %s ", err)
 	}
 
-	log.Info().Msg("bootstrap: waiting until systemd daemon-reload to finish...")
+	log.Info("bootstrap: waiting until systemd daemon-reload to finish...")
 	err = cmd.Wait()
 	if err != nil {
 		return fmt.Errorf("systemd reload failed: %s ", err)
@@ -212,7 +212,7 @@ func reloadSystemd() error {
 
 // enables agent autostart
 func enableAutostart(config *BootstrapConfig) error {
-	log.Info().Msg("Enable autostart")
+	log.Info("Enable autostart")
 
 	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
 	cmd := exec.Command("systemctl", "enable", servicename)
@@ -220,7 +220,7 @@ func enableAutostart(config *BootstrapConfig) error {
 	if err != nil {
 		return fmt.Errorf("enable agent service failed: %s ", err)
 	}
-	log.Info().Msg("bootstrap: waiting until systemd enables agent service...")
+	log.Info("bootstrap: waiting until systemd enables agent service...")
 
 	err = cmd.Wait()
 	if err != nil {
@@ -231,7 +231,7 @@ func enableAutostart(config *BootstrapConfig) error {
 
 // run agent systemd unit
 func runAgent(config *BootstrapConfig) error {
-	log.Info().Msg("Run agent")
+	log.Info("Run agent")
 
 	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
 	cmd := exec.Command("systemctl", "start", servicename)
@@ -240,7 +240,7 @@ func runAgent(config *BootstrapConfig) error {
 		return fmt.Errorf("start agent service failed: %s ", err)
 
 	}
-	log.Info().Msg("bootstrap: waiting until systemd starts agent service...")
+	log.Info("bootstrap: waiting until systemd starts agent service...")
 
 	err = cmd.Wait()
 	if err != nil {
@@ -251,19 +251,19 @@ func runAgent(config *BootstrapConfig) error {
 
 // delete self executable
 func deleteSelf(config *BootstrapConfig) error {
-	log.Info().Msg("Cleanup")
+	log.Info("Cleanup")
 	filename := fmt.Sprintf("./%s", config.AgentBinaryName)
 	return os.Remove(filename)
 }
 
 // bootstrapFailed signales bootstrap failed with error
 func bootstrapFailed(e error) int {
-	log.Error().Err(e).Msg("Stop bootstrap: %s")
+	log.Errorln("Stop bootstrap: ", e)
 	return 1
 }
 
 // bootstrapSuccessful signales bootstrap finished successfully
 func bootstrapSuccessful() int {
-	log.Info().Msg("Bootstrap successful")
+	log.Info("Bootstrap successful")
 	return 0
 }

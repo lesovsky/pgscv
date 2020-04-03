@@ -2,9 +2,9 @@ package app
 
 import (
 	"fmt"
-	"github.com/rs/zerolog"
 	"net"
 	"net/url"
+	"pgscv/app/log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,7 +18,6 @@ const (
 
 // Config struct describes the application's configuration
 type Config struct {
-	Logger               zerolog.Logger
 	RuntimeMode          int
 	ProjectIDStr         string
 	ListenAddress        net.TCPAddr
@@ -53,22 +52,25 @@ func (c *Config) Validate() error {
 
 // DecodeProjectIDStr ...
 func DecodeProjectIDStr(s string) string {
-	reAlpha, err := regexp.Compile("[A-Z]+")
+	re, err := regexp.Compile("[A-Z]+")
 	if err != nil {
+		log.Errorln("regexp compile failed: ", err)
 		return ""
 	}
 	// split api key
 	parts := strings.Split(s, "-")
 	if len(parts) != 4 {
+		log.Error("bad API key format")
 		return ""
 	}
 
 	// extract project_id from last part
-	id := reAlpha.ReplaceAllString(parts[3], "")
+	id := re.ReplaceAllString(parts[3], "")
 
 	// check extracted value is convertable to int64
 	_, err = strconv.ParseInt(id, 10, 64)
 	if err != nil {
+		log.Errorln("parse int failed: ", err)
 		return ""
 	}
 	return id

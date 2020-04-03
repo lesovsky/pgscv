@@ -2,9 +2,9 @@ package packaging
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"os"
 	"os/exec"
+	"pgscv/app/log"
 )
 
 type UninstallConfig struct {
@@ -13,7 +13,7 @@ type UninstallConfig struct {
 
 // RunUninstall is the main uninstall entry point
 func RunUninstall(config *UninstallConfig) int {
-	log.Info().Msg("Run uninstall")
+	log.Info("Run uninstall")
 	if err := preCheck(); err != nil {
 		return uninstallFailed(err)
 	}
@@ -39,7 +39,7 @@ func RunUninstall(config *UninstallConfig) int {
 
 // stopAgent stops agent' systemd service
 func stopAgent(c *UninstallConfig) error {
-	log.Info().Msg("Stop agent")
+	log.Info("Stop agent")
 
 	servicename := fmt.Sprintf("%s.service", c.BinaryName)
 	cmd := exec.Command("systemctl", "stop", servicename)
@@ -48,7 +48,7 @@ func stopAgent(c *UninstallConfig) error {
 		return fmt.Errorf("stop agent service failed: %s ", err)
 
 	}
-	log.Info().Msg("uninstall: waiting until systemd stops agent service...")
+	log.Info("uninstall: waiting until systemd stops agent service...")
 
 	err = cmd.Wait()
 	if err != nil {
@@ -59,33 +59,33 @@ func stopAgent(c *UninstallConfig) error {
 
 // removeServiceUnit removes systemd unit file
 func removeServiceUnit(c *UninstallConfig) error {
-	log.Info().Msg("Remove systemd unit")
+	log.Info("Remove systemd unit")
 	filename := fmt.Sprintf("/etc/systemd/system/%s.service", c.BinaryName)
 	return os.Remove(filename)
 }
 
 // removeEnvConfig removes environment configuration file
 func removeEnvConfig(c *UninstallConfig) error {
-	log.Info().Msg("Remove environment file")
+	log.Info("Remove environment file")
 	filename := fmt.Sprintf("/etc/environment.d/%s.conf", c.BinaryName)
 	return os.Remove(filename)
 }
 
 // removeBinary removes binary
 func removeBinary(c *UninstallConfig) error {
-	log.Info().Msg("Remove agent")
+	log.Info("Remove agent")
 	filename := fmt.Sprintf("/usr/bin/%s", c.BinaryName)
 	return os.Remove(filename)
 }
 
 // uninstallFailed signales uninstall failed with error
 func uninstallFailed(e error) int {
-	log.Error().Err(e).Msg("Uninstall failed: %s")
+	log.Errorln("Uninstall failed: ", e)
 	return 1
 }
 
 // uninstallSuccessful signales bootstrap finished successfully
 func uninstallSuccessful() int {
-	log.Info().Msg("Uninstall successful")
+	log.Info("Uninstall successful")
 	return 0
 }

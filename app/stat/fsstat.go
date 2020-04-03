@@ -6,10 +6,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"io"
 	"io/ioutil"
 	"os"
+	"pgscv/app/log"
 	"strings"
 	"syscall"
 )
@@ -152,7 +152,7 @@ func ReadMounts() map[string]string {
 func resolveDeviceMapperName(device string) string {
 	device, err := os.Readlink(device)
 	if err != nil {
-		log.Warn().Err(err).Msgf("failed to resolve symlink '%s' to origin", device)
+		log.Warnf("failed to resolve symlink '%s' to origin: %s", device, err)
 		return ""
 	}
 	return strings.Replace(device, "..", "/dev", 1)

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"pgscv/app/model"
@@ -9,7 +8,7 @@ import (
 )
 
 func TestServiceRepo_startInitialDiscovery(t *testing.T) {
-	var c = &Config{Logger: zerolog.Logger{}}
+	var c = &Config{}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 
@@ -27,7 +26,7 @@ func Test_lookupServices(t *testing.T) {
 		t.Skipf("root privileges required, skip")
 	}
 
-	var c = &Config{Logger: zerolog.Logger{}}
+	var c = &Config{}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 
@@ -40,7 +39,7 @@ func Test_lookupServices(t *testing.T) {
 
 // Test_setupServices должен на вход принять пустой сервис и на выходе получить сервис с заполненым ServiceID и Exporter
 func Test_setupServices(t *testing.T) {
-	var c = &Config{Logger: zerolog.Logger{}}
+	var c = &Config{}
 	repo := NewServiceRepo(c)
 	assert.NotNil(t, repo)
 

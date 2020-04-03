@@ -1,7 +1,7 @@
 package app
 
 import (
-	"github.com/rs/zerolog/log"
+	"pgscv/app/log"
 	"time"
 )
 
@@ -42,7 +42,7 @@ func (s *statDescriptor) IsScheduleExpired() bool {
 	if elapsed < s.Interval {
 		return false
 	}
-	log.Debug().Msgf("time for %s, elapsed: %v > %v", s.Name, elapsed, s.Interval)
+	log.Debugf("time for %s, elapsed: %v > %v", s.Name, elapsed, s.Interval)
 	return true
 }
 

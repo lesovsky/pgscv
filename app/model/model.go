@@ -2,8 +2,8 @@ package model
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/rs/zerolog/log"
 	"github.com/shirou/gopsutil/process"
+	"pgscv/app/log"
 )
 
 const (
@@ -79,6 +79,8 @@ func (s *Service) Validate() {
 }
 
 // IsAvailable checks the process associated with the service is still exists in processes list and has the same name and created time
+// TODO: содержимое модели не должно зависеть от сторонних модулей; по идее тут можно вместо bool возвращать ошибку, и во
+//   внешних функциях воспрнимать ее как "false"
 func (s *Service) IsAvailable() bool {
 	// system service always available, skip it
 	if s.ServiceType == ServiceTypeSystem {
@@ -88,30 +90,30 @@ func (s *Service) IsAvailable() bool {
 	// check process with such pid still exists, NewProcess internally checks process existence
 	proc, err := process.NewProcess(s.Pid)
 	if err != nil {
-		log.Warn().Err(err).Msg("service disappeared")
+		log.Warnln("service disappeared: ", err)
 		return false
 	}
 
 	// check process's name
 	name, err := proc.Name()
 	if err != nil {
-		log.Warn().Err(err).Msg("failed get process name")
+		log.Warnln("failed get process name: ", err)
 		return false
 	}
 	if s.ProcessName != name {
-		log.Warn().Msgf("process exists, but has different name (%s)", name)
+		log.Warnf("process exists, but has different name (%s)", name)
 		return false
 	}
 
 	// check process's create time
 	ctime, err := proc.CreateTime()
 	if err != nil {
-		log.Warn().Err(err).Msg("get process create time failed")
+		log.Warnln("get process create time failed: ", err)
 		return false // mark the service as unavailable even if getting the create time is failed
 	}
 
 	if s.ProcessCreateTime != ctime {
-		log.Warn().Msgf("process exists, but has different create time")
+		log.Warnf("process exists, but has different create time")
 		return false
 	}
 

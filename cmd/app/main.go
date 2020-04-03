@@ -4,15 +4,13 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"os/signal"
 	"pgscv/app"
+	"pgscv/app/log"
 	"pgscv/app/packaging"
 	"syscall"
-	"time"
 )
 
 var (
@@ -20,9 +18,6 @@ var (
 )
 
 func main() {
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-	//log.Logger = log.With().Caller().Logger().Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339})
-
 	var (
 		listenAddress        = kingpin.Flag("listen-address", "Address to listen on for metrics").Default("127.0.0.1:10090").Envar("LISTEN_ADDRESS").TCP()
 		metricServiceBaseURL = kingpin.Flag("metric-service-url", "Metric service URL push to").Default("").Envar("METRIC_SERVICE_BASE_URL").URL()
@@ -38,7 +33,6 @@ func main() {
 	kingpin.Parse()
 
 	var sc = &app.Config{
-		Logger:               log.Logger,
 		ListenAddress:        **listenAddress,
 		MetricServiceBaseURL: **metricServiceBaseURL,
 		MetricsSendInterval:  *metricsSendInterval,
@@ -53,18 +47,7 @@ func main() {
 		},
 	}
 
-	switch *logLevel {
-	case "debug":
-		zerolog.SetGlobalLevel(zerolog.DebugLevel)
-	case "info":
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	case "warn":
-		zerolog.SetGlobalLevel(zerolog.WarnLevel)
-	case "error":
-		zerolog.SetGlobalLevel(zerolog.ErrorLevel)
-	default:
-		zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	}
+	log.SetLevel(*logLevel)
 
 	if *showver {
 		fmt.Printf("%s %s\n", appName, sc.BinaryVersion)
@@ -72,7 +55,7 @@ func main() {
 	}
 
 	if *doUninstall && *doBootstrap {
-		log.Logger.Error().Msg("flags --uninstall and --bootstrap can not be used together, quit")
+		log.Error("flags --uninstall and --bootstrap can not be used together, quit")
 		os.Exit(1)
 	}
 
@@ -94,7 +77,8 @@ func main() {
 	}
 
 	if err := sc.Validate(); err != nil {
-		log.Logger.Err(err).Msgf("failed to start")
+		log.Errorf("failed to start: %s", err)
+		os.Exit(1)
 	}
 
 	ctx := context.Background()
@@ -110,7 +94,7 @@ func main() {
 		doExit <- app.Start(ctx, sc)
 	}()
 
-	log.Info().Msgf("graceful shutdown: %s", <-doExit)
+	log.Infof("graceful shutdown: %s", <-doExit)
 }
 
 func listenSignals() error {
