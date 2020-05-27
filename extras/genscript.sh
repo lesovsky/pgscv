@@ -32,7 +32,7 @@ PGSCV_METRICS_SERVICE_BASE_URL="https://push.${BASE_DOMAIN}" \
 PGSCV_API_KEY=\$1
 
 # download and extract agent
-curl -s https://dist.${BASE_DOMAIN}/pgscv-agent.tar.gz -o - | tar xzf -
+curl -s https://dist.${BASE_DOMAIN}/pgscv.tar.gz -o - | tar xzf -
 
 # run agent bootstrap using passed key
 ./pgscv --bootstrap
