@@ -1,7 +1,7 @@
-# __release_tag__ golang 1.13 was released 2019-09-03
 # __release_tag__ golangci-lint v1.23.8 was released 2020-03-04
+# __release_tag__ docker 19.03.1 was released 2019-07-25
 default:
-  image: barcodepro/weaponry-pgscv-test-runner
+  image: barcodepro/weaponry-pgscv-test-runner:v0.0.1
   tags:
     - gitlab-org
 

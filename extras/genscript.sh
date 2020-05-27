@@ -27,11 +27,13 @@ cat <<EOF
 # sanity checks
 if [ \$# -eq 0 ]; then { echo "API key is not specified, exit"; exit 1; }; fi
 
-API_KEY=\$1
+export PGSCV_RUN_AS_USER=postgres \
+PGSCV_METRICS_SERVICE_BASE_URL="https://push.${BASE_DOMAIN}" \
+PGSCV_API_KEY=\$1
 
 # download and extract agent
-curl -s https://dist.${BASE_DOMAIN}/weaponry-agent.tar.gz -o - | tar xzf -
+curl -s https://dist.${BASE_DOMAIN}/pgscv-agent.tar.gz -o - | tar xzf -
 
 # run agent bootstrap using passed key
-./weaponry-agent --bootstrap --api-key=\${API_KEY} --metric-service-url=https://push.${BASE_DOMAIN}
+./pgscv --bootstrap
 EOF
