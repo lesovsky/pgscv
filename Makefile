@@ -64,4 +64,9 @@ deploy: ## Deploy
 docker-build-test-runner: ## Build environmental docker image for CI tests
 	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
 	cd ./deployment/docker-test-runner; \
-		docker build -t barcodepro/weaponry-pgscv-test-runner:${VERSION} .
+		docker build -t ${DOCKER_ACCOUNT}/weaponry-pgscv-test-runner:${VERSION} .
+
+docker-push-test-runner: ## Build environmental docker image for CI tests
+	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
+	cd ./deployment/docker-test-runner; \
+		docker push ${DOCKER_ACCOUNT}/weaponry-pgscv-test-runner:${VERSION}
