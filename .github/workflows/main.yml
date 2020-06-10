@@ -46,7 +46,7 @@ jobs:
   deploy_staging:
     runs-on: [self-hosted, staging]
     container: barcodepro/ansible:2.9.5-alpine
-    needs: [ test, build ]
+    needs: [ test, build_staging ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
