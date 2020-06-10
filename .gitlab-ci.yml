@@ -1,83 +1,83 @@
-# __release_tag__ golangci-lint v1.23.8 was released 2020-03-04
-# __release_tag__ docker 19.03.1 was released 2019-07-25
-default:
-  image: barcodepro/weaponry-pgscv-test-runner:v0.0.1
-  tags:
-    - gitlab-org
-
-cache:
-  paths:
-    - /apt-cache
-    - /go/src/github.com
-    - /go/src/golang.org
-    - /go/src/google.golang.org
-    - /go/src/k8s.io
-
-stages:
-  - test
-  - build
-  - deploy
-
-lint_code:
-  stage: test
-  script:
-    - curl -s -L https://github.com/golangci/golangci-lint/releases/download/v1.23.8/golangci-lint-1.23.8-linux-amd64.tar.gz -o golangci-lint-1.23.8-linux-amd64.tar.gz
-    - tar xvzf golangci-lint-1.23.8-linux-amd64.tar.gz
-    - mv golangci-lint-1.23.8-linux-amd64/golangci-lint /usr/local/bin
-    - make lint
-
-unit_tests:
-  stage: test
-  script:
-    - prepare-test-environment.sh
-    - make test
-
-race_detector:
-  stage: test
-  script:
-    - prepare-test-environment.sh
-    - make race
-
-#code_coverage:
-#  stage: test
-#  script:
-#    - make coverage
+## __release_tag__ golangci-lint v1.23.8 was released 2020-03-04
+## __release_tag__ docker 19.03.1 was released 2019-07-25
+#default:
+#  image: barcodepro/weaponry-pgscv-test-runner:v0.0.1
+#  tags:
+#    - gitlab-org
 #
-#code_coverage_report:
+#cache:
+#  paths:
+#    - /apt-cache
+#    - /go/src/github.com
+#    - /go/src/golang.org
+#    - /go/src/google.golang.org
+#    - /go/src/k8s.io
+#
+#stages:
+#  - test
+#  - build
+#  - deploy
+#
+#lint_code:
 #  stage: test
 #  script:
-#    - make coverhtml
+#    - curl -s -L https://github.com/golangci/golangci-lint/releases/download/v1.23.8/golangci-lint-1.23.8-linux-amd64.tar.gz -o golangci-lint-1.23.8-linux-amd64.tar.gz
+#    - tar xvzf golangci-lint-1.23.8-linux-amd64.tar.gz
+#    - mv golangci-lint-1.23.8-linux-amd64/golangci-lint /usr/local/bin
+#    - make lint
+#
+#unit_tests:
+#  stage: test
+#  script:
+#    - prepare-test-environment.sh
+#    - make test
+#
+#race_detector:
+#  stage: test
+#  script:
+#    - prepare-test-environment.sh
+#    - make race
+#
+##code_coverage:
+##  stage: test
+##  script:
+##    - make coverage
+##
+##code_coverage_report:
+##  stage: test
+##  script:
+##    - make coverhtml
+##  only:
+##    - master
+#
+#build_staging:
+#  image: docker:19.03.1
+#  stage: build
+#  tags:
+#    - docker
+#  services:
+#    - docker:19.03.1-dind
+#  variables:
+#    DOCKER_HOST: tcp://docker:2376
+#    DOCKER_TLS_CERTDIR: "/certs"
+#  script:
+#    - apk add git make bash
+#    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+#    - git checkout -B "$CI_BUILD_REF_NAME" "$CI_BUILD_REF"
+#    - make docker-build -e ENV=staging
+#    - make docker-push -e ENV=staging
+#
+#deploy_staging:
+#  image: barcodepro/ansible:2.9.5-alpine
+#  stage: deploy
+#  tags:
+#    - weaponry-staging
+#  environment:
+#    name: staging
 #  only:
 #    - master
-
-build_staging:
-  image: docker:19.03.1
-  stage: build
-  tags:
-    - docker
-  services:
-    - docker:19.03.1-dind
-  variables:
-    DOCKER_HOST: tcp://docker:2376
-    DOCKER_TLS_CERTDIR: "/certs"
-  script:
-    - apk add git make bash
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - git checkout -B "$CI_BUILD_REF_NAME" "$CI_BUILD_REF"
-    - make docker-build -e ENV=staging
-    - make docker-push -e ENV=staging
-
-deploy_staging:
-  image: barcodepro/ansible:2.9.5-alpine
-  stage: deploy
-  tags:
-    - weaponry-staging
-  environment:
-    name: staging
-  only:
-    - master
-  script:
-    - mkdir /root/.kube
-    - echo $KUBECONFIG > /root/.kube/config
-    - chmod 600 /root/.kube/config
-    - make deploy -e ENV=staging
+#  script:
+#    - mkdir /root/.kube
+#    - echo $KUBECONFIG > /root/.kube/config
+#    - chmod 600 /root/.kube/config
+#    - make deploy -e ENV=staging

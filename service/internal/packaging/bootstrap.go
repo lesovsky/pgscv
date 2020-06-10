@@ -12,8 +12,7 @@ import (
 	"time"
 )
 
-const confFileTemplate = `
-{
+const confFileTemplate = `{
   "api_key": "{{ .APIKey }}",
   "metrics_service_url": "{{ .MetricServiceBaseURL }}",
   "defaults": {
