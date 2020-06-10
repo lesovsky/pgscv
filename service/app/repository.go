@@ -394,6 +394,10 @@ func discoverPgbouncer(proc *process.Process, appConfig *Config) (model.Service,
 		return model.Service{}, err
 	}
 
+	if len(cmdline) == 0 {
+		return model.Service{}, fmt.Errorf("empty cmdline")
+	}
+
 	// inifile is always the last argument in cmdline string, take it
 	var iniFilePath = cmdline[len(cmdline)-1]
 
