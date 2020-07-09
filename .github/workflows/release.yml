@@ -1,12 +1,12 @@
 # __release_tag__ golangci-lint v1.27.0 was released 2020-05-13
 ---
-name: Main
+name: Release
 
 on:
   push:
-    branches: [ master ]
+    branches: [ release ]
   pull_request:
-    branches: [ master ]
+    branches: [ release ]
 
 jobs:
   test:
@@ -30,31 +30,31 @@ jobs:
       - name: Race detector
         run: make race
 
-  build_staging:
+  build_production:
     runs-on: ubuntu-latest
     needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Build image
-        run: make docker-build -e ENV=staging
+        run: make docker-build -e ENV=production
       - name: Log in to Docker Hub
         run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
       - name: Push image to Docker Hub
-        run: make docker-push -e ENV=staging
+        run: make docker-push -e ENV=production
 
-  deploy_staging:
-    runs-on: [self-hosted, staging]
+  deploy_production:
+    runs-on: [self-hosted, production]
     container: barcodepro/ansible:2.9.5-alpine
-    needs: [ test, build_staging ]
+    needs: [ test, build_production ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Deploy on staging
         env:
           KUBECONFIG: /root/.kubeconfig
-          KUBECONFIG_DATA: ${{ secrets.STAGING_KUBECONFIG_DATA }}
+          KUBECONFIG_DATA: ${{ secrets.PRODUCTION_KUBECONFIG_DATA }}
         run: |
           echo "$KUBECONFIG_DATA" > /root/.kubeconfig
           chmod 600 /root/.kubeconfig
-          make deploy -e ENV=staging
+          make deploy -e ENV=production
