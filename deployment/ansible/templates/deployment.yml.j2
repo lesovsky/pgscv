@@ -20,6 +20,7 @@ spec:
       containers:
         - name: {{ appname }}
           image: barcodepro/weaponry-{{ appname }}:{{ app_version }}-{{ env }}
+{% if env == "production" %}
           resources:
             requests:
               cpu: "0.2"
@@ -27,6 +28,7 @@ spec:
             limits:
               cpu: "0.4"
               memory: "200Mi"
+{% endif %}
           ports:
             - containerPort: 1080
           readinessProbe:
