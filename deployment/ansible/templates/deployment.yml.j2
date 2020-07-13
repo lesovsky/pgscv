@@ -20,6 +20,13 @@ spec:
       containers:
         - name: {{ appname }}
           image: barcodepro/weaponry-{{ appname }}:{{ app_version }}-{{ env }}
+          resources:
+            requests:
+              cpu: "0.2"
+              memory: "100Mi"
+            limits:
+              cpu: "0.4"
+              memory: "200Mi"
           ports:
             - containerPort: 1080
           readinessProbe:
