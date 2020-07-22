@@ -68,78 +68,19 @@ func runPullMode(config *Config) error {
 	//http.Handle("/metrics", newHandler())
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`<html>
+		_, err := w.Write([]byte(`<html>
 			<head><title>pgSCV / Weaponry metric collector</title></head>
 			<body>
 			<h1>pgSCV / Weaponry metric collector, for more info visit https://weaponry.io</h1>
 			<p><a href="/metrics">Metrics</a></p>
 			</body>
 			</html>`))
+		if err != nil {
+			log.Warnln("response write failed: ", err)
+		}
 	})
 	return http.ListenAndServe(config.ListenAddress, nil)
 }
-
-//type handler struct {
-//	httpHandler             http.Handler
-//	exporterMetricsRegistry *prometheus.Registry
-//}
-//
-//func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-//	h.httpHandler.ServeHTTP(w, r)
-//}
-//
-//func newHandler() *handler {
-//	h := &handler{
-//	  httpHandler: promhttp.Handler(),
-//		exporterMetricsRegistry: prometheus.NewRegistry(),
-//	}
-//
-//	h.exporterMetricsRegistry.MustRegister(
-//		prometheus.NewProcessCollector(prometheus.ProcessCollectorOpts{}),
-//		prometheus.NewGoCollector(),
-//	)
-//
-//	if innerHandler, err := h.innerHandler(); err != nil {
-//		panic(fmt.Sprintf("Couldn't create metrics handler: %s", err))
-//	} else {
-//		h.httpHandler = innerHandler
-//	}
-//	return h
-//}
-//
-//func (h *handler) innerHandler() (http.Handler, error) {
-//  sysFactories := collector.Factories{}
-//  collector.RegisterSystemCollectors(sysFactories)
-//
-//  mc, err := collector.NewPgscvCollector("101", "pgscv:self", sysFactories)
-//  if err != nil {
-//    return nil, fmt.Errorf("couldn't create collector: %s", err)
-//  }
-//
-//  log.Infoln("Enabled collectors")
-//  collectors := []string{}
-//  for n := range mc.Collectors {
-//    collectors = append(collectors, n)
-//  }
-//  sort.Strings(collectors)
-//  for _, c := range collectors {
-//    log.Infoln("collector ", c)
-//  }
-//
-//  r := prometheus.NewRegistry()
-//  r.MustRegister(version.NewCollector("pgscv"))
-//  if err := r.Register(mc); err != nil {
-//    return nil, fmt.Errorf("couldn't register pgscv collector: %s", err)
-//  }
-//  handler := promhttp.HandlerFor(
-//    prometheus.Gatherers{h.exporterMetricsRegistry, r},
-//    promhttp.HandlerOpts{
-//      ErrorHandling: promhttp.ContinueOnError,
-//      Registry:      h.exporterMetricsRegistry,
-//    },
-//  )
-//  return handler, nil
-//}
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
 func runPushMode(ctx context.Context, config *Config, instanceRepo *service.ServiceRepo) error {
@@ -215,19 +156,19 @@ func pushMetrics(labelBase string, url string, apiKey string, repo *service.Serv
 	log.Debug("job finished")
 }
 
-// кастомная реализация http клиента, с помощью которой мы будем добавлять допольнительные заголовки к запросам
+// httpClient is the custom realization of HTTP client which wrap API key processing.
 type httpClient struct {
 	client http.Client
 	apiKey string
 }
 
-// newHTTPClient ...
+// newHTTPClient create new httpClient instance.
 func newHTTPClient(key string) *httpClient {
 	c := http.Client{}
 	return &httpClient{client: c, apiKey: key}
 }
 
-// Do is the customizable way for sending HTTP requests
+// Do sends HTTP requests with API key attached as a header.
 func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 	req.Header.Add("X-Weaponry-Api-Key", c.apiKey)
 	return c.client.Do(req)

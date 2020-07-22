@@ -18,7 +18,7 @@ func TestServiceRepo_addService(t *testing.T) {
 	r.addService(s1.ServiceID, s1)
 	r.addService(s2.ServiceID, s2)
 	r.addService(s3.ServiceID, s3)
-	assert.Equal(t, 3, r.TotalServices())
+	assert.Equal(t, 3, r.totalServices())
 }
 
 func TestServiceRepo_getService(t *testing.T) {
@@ -26,7 +26,7 @@ func TestServiceRepo_getService(t *testing.T) {
 	s := TestSystemService()
 	r.addService(s.ServiceID, s)
 
-	got := r.GetService(s.ServiceID)
+	got := r.getService(s.ServiceID)
 	assert.Equal(t, s.ServiceID, got.ServiceID)
 	assert.Equal(t, s.ProjectID, got.ProjectID)
 	assert.Equal(t, s.ConnSettings, got.ConnSettings)
@@ -36,9 +36,9 @@ func TestServiceRepo_removeServiceByServiceID(t *testing.T) {
 	r := NewServiceRepo()
 	s := TestSystemService()
 	r.addService(s.ServiceID, s)
-	assert.Equal(t, 1, r.TotalServices())
+	assert.Equal(t, 1, r.totalServices())
 	r.removeServiceByServiceID(s.ServiceID)
-	assert.Equal(t, 0, r.TotalServices())
+	assert.Equal(t, 0, r.totalServices())
 }
 
 func TestServiceRepo_getServiceIDs(t *testing.T) {
@@ -50,7 +50,7 @@ func TestServiceRepo_getServiceIDs(t *testing.T) {
 	r.addService(s2.ServiceID, s2)
 	r.addService(s3.ServiceID, s3)
 
-	ids := r.GetServiceIDs()
+	ids := r.getServiceIDs()
 	assert.Equal(t, 3, len(ids))
 
 	for _, v := range []string{s1.ServiceID, s2.ServiceID, s3.ServiceID} {
@@ -90,8 +90,8 @@ func TestServiceRepo_addServicesFromConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		r := NewServiceRepo()
-		r.AddServicesFromConfig(tc.config)
-		assert.Equal(t, tc.expected, r.TotalServices())
+		r.addServicesFromConfig(tc.config)
+		assert.Equal(t, tc.expected, r.totalServices())
 	}
 }
 
@@ -124,10 +124,10 @@ func TestServiceRepo_setupServices(t *testing.T) {
 
 	for _, tc := range testCases {
 		r := NewServiceRepo()
-		r.AddServicesFromConfig(tc.config)
-		assert.Equal(t, tc.expected, r.TotalServices())
+		r.addServicesFromConfig(tc.config)
+		assert.Equal(t, tc.expected, r.totalServices())
 
-		assert.NoError(t, r.SetupServices(tc.config))
+		assert.NoError(t, r.setupServices(tc.config))
 		// TODO: should be enabled after implementing postgres/pgbouncer services
 		//s := r.GetService("postgres:127.0.0.1:5432")
 		//assert.NotNil(t, s.Collector)
@@ -138,8 +138,8 @@ func TestServiceRepo_startBackgroundDiscovery(t *testing.T) {
 	r := NewServiceRepo()
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	r.StartBackgroundDiscovery(ctx, Config{})
-	assert.NotEqual(t, 0, r.TotalServices())
+	r.startBackgroundDiscovery(ctx, Config{})
+	assert.NotEqual(t, 0, r.totalServices())
 }
 
 func TestServiceRepo_lookupServices(t *testing.T) {
@@ -149,7 +149,7 @@ func TestServiceRepo_lookupServices(t *testing.T) {
 
 	r := NewServiceRepo()
 	assert.NoError(t, r.lookupServices(Config{}))
-	assert.NotEqual(t, 0, r.TotalServices())
+	assert.NotEqual(t, 0, r.totalServices())
 }
 
 func Test_parsePostgresProcessCmdline(t *testing.T) {

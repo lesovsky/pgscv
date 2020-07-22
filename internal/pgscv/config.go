@@ -26,6 +26,7 @@ const (
 	defaultMetricsSendInterval = 60 * time.Second
 )
 
+// Config defines application's configuration.
 type Config struct {
 	BinaryVersion        string                       // version of the program, required for auto-update procedure
 	RuntimeMode          int                          // application runtime mode
@@ -39,6 +40,7 @@ type Config struct {
 	Defaults             map[string]string            `json:"defaults"` // Defaults
 }
 
+// NewConfig creates new config based on config file.
 func NewConfig(configFilePath string) (*Config, error) {
 	content, err := ioutil.ReadFile(configFilePath)
 	if err != nil {

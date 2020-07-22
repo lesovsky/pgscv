@@ -51,8 +51,17 @@ type Service struct {
 	ProjectID string
 	// Connection settings required for connecting to the service.
 	ConnSettings ServiceConnSetting
-	// Prometheus-based metrics exporter associated with the service.
+	// Prometheus-based metrics collector associated with the service. Each 'service' has its own dedicated collector instance
+	// which implements a service-specific set of metric collectors.
 	Collector Collector
+}
+
+// Config defines service's configuration.
+type Config struct {
+	RuntimeMode  int
+	ProjectID    string
+	ConnDefaults map[string]string `json:"defaults"` // Defaults
+	ConnSettings []ServiceConnSetting
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -61,18 +70,13 @@ type Collector interface {
 	Collect(chan<- prometheus.Metric)
 }
 
-type Config struct {
-	RuntimeMode  int
-	ProjectID    string
-	ConnDefaults map[string]string `json:"defaults"` // Defaults
-	ConnSettings []ServiceConnSetting
-}
-
 // ServiceConnSetting describes connection settings required for connecting to particular service. This struct primarily
 // is used for representing services defined by user in the config file.
 type ServiceConnSetting struct {
+	// ServiceType defines type of service for which these connection settings are used.
 	ServiceType string `json:"service_type"`
-	Conninfo    string `json:"conninfo"`
+	// Conninfo is the connection string in service-specific format.
+	Conninfo string `json:"conninfo"`
 }
 
 // connectionParams is the set of parameters that may be required when constructing connection string.
@@ -100,6 +104,40 @@ func NewServiceRepo() *ServiceRepo {
 	}
 }
 
+/* Public wrapper-methods of ServiceRepo */
+
+//
+func (repo *ServiceRepo) GetService(id string) Service {
+	return repo.getService(id)
+}
+
+//
+func (repo *ServiceRepo) TotalServices() int {
+	return repo.totalServices()
+}
+
+//
+func (repo *ServiceRepo) GetServiceIDs() []string {
+	return repo.getServiceIDs()
+}
+
+//
+func (repo *ServiceRepo) AddServicesFromConfig(config Config) {
+	repo.addServicesFromConfig(config)
+}
+
+//
+func (repo *ServiceRepo) SetupServices(config Config) error {
+	return repo.setupServices(config)
+}
+
+//
+func (repo *ServiceRepo) StartBackgroundDiscovery(ctx context.Context, config Config) {
+	repo.startBackgroundDiscovery(ctx, config)
+}
+
+/* Private methods of ServiceRepo */
+
 // addService adds service to the repo.
 func (repo *ServiceRepo) addService(id string, s Service) {
 	repo.Lock()
@@ -108,7 +146,7 @@ func (repo *ServiceRepo) addService(id string, s Service) {
 }
 
 // getService returns the service from repo with specified ID.
-func (repo *ServiceRepo) GetService(id string) Service {
+func (repo *ServiceRepo) getService(id string) Service {
 	repo.RLock()
 	s := repo.Services[id]
 	repo.RUnlock()
@@ -127,7 +165,7 @@ func (repo *ServiceRepo) removeServiceByServiceID(id string) {
 }
 
 // totalServices returns the number of services registered in the repo.
-func (repo *ServiceRepo) TotalServices() int {
+func (repo *ServiceRepo) totalServices() int {
 	repo.RLock()
 	var size = len(repo.Services)
 	repo.RUnlock()
@@ -135,8 +173,8 @@ func (repo *ServiceRepo) TotalServices() int {
 }
 
 // getServiceIDs returns slice of services' IDs in the repo.
-func (repo *ServiceRepo) GetServiceIDs() []string {
-	var serviceIDs = make([]string, 0, repo.TotalServices())
+func (repo *ServiceRepo) getServiceIDs() []string {
+	var serviceIDs = make([]string, 0, repo.totalServices())
 	repo.RLock()
 	for i := range repo.Services {
 		serviceIDs = append(serviceIDs, i)
@@ -146,7 +184,7 @@ func (repo *ServiceRepo) GetServiceIDs() []string {
 }
 
 // addServicesFromConfig reads info about services from the config file and fulfill the repo.
-func (repo *ServiceRepo) AddServicesFromConfig(config Config) {
+func (repo *ServiceRepo) addServicesFromConfig(config Config) {
 	// sanity check, but basically should be always passed
 	if config.ConnSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
@@ -184,18 +222,18 @@ func (repo *ServiceRepo) AddServicesFromConfig(config Config) {
 }
 
 // setupServices attaches metrics exporters to the services in the repo.
-func (repo *ServiceRepo) SetupServices(config Config) error {
-	var servicesIDs = repo.GetServiceIDs()
+func (repo *ServiceRepo) setupServices(config Config) error {
+	var servicesIDs = repo.getServiceIDs()
 
 	for _, id := range servicesIDs {
-		var service = repo.GetService(id)
+		var service = repo.getService(id)
 		if service.Collector == nil {
 			service.ProjectID = config.ProjectID
 
 			switch service.ConnSettings.ServiceType {
 			case ServiceTypeSystem:
 				sysFactories := collector.Factories{}
-				collector.RegisterSystemCollectors(sysFactories)
+				sysFactories.RegisterSystemCollectors()
 
 				mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, sysFactories)
 				if err != nil {
@@ -206,7 +244,7 @@ func (repo *ServiceRepo) SetupServices(config Config) error {
 				// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
 				if config.RuntimeMode == runtime.PullMode {
 					prometheus.MustRegister(service.Collector)
-					log.Infof("exporter registered for %s", service.ServiceID)
+					log.Infof("collector registered for %s", service.ServiceID)
 				}
 			}
 
@@ -227,7 +265,7 @@ func (repo *ServiceRepo) SetupServices(config Config) error {
 }
 
 // startBackgroundDiscovery looking for services and add them to the repo.
-func (repo *ServiceRepo) StartBackgroundDiscovery(ctx context.Context, config Config) {
+func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context, config Config) {
 	log.Debug("starting background auto-discovery")
 
 	// add pseudo-service for system metrics
@@ -239,7 +277,7 @@ func (repo *ServiceRepo) StartBackgroundDiscovery(ctx context.Context, config Co
 			log.Warnln("auto-discovery: lookup failed, skip; ", err)
 			continue
 		}
-		if err := repo.SetupServices(config); err != nil {
+		if err := repo.setupServices(config); err != nil {
 			log.Warnln("auto-discovery: create exporter failed, skip; ", err)
 			continue
 		}
@@ -287,7 +325,7 @@ func (repo *ServiceRepo) lookupServices(config Config) error {
 				}
 
 				// check service in the repo
-				if s := repo.GetService(postgres.ServiceID); s.ServiceID == postgres.ServiceID {
+				if s := repo.getService(postgres.ServiceID); s.ServiceID == postgres.ServiceID {
 					log.Debugf("auto-discovery: postgres service [%s] already in the repository, skip", s.ServiceID)
 					break
 				}
@@ -303,7 +341,7 @@ func (repo *ServiceRepo) lookupServices(config Config) error {
 			}
 
 			// check service in the repo
-			if s := repo.GetService(pgbouncer.ServiceID); s.ServiceID == pgbouncer.ServiceID {
+			if s := repo.getService(pgbouncer.ServiceID); s.ServiceID == pgbouncer.ServiceID {
 				log.Debugf("auto-discovery: pgbouncer service [%s] already in the repository, skip", s.ServiceID)
 				break
 			}
@@ -600,7 +638,7 @@ func attemptConnect(connString string) error {
 	return nil
 }
 
-// stringsFind returns true if array of strings contains specific string
+// stringsContains returns true if array of strings contains specific string
 func stringsContains(ss []string, s string) bool {
 	for _, val := range ss {
 		if val == s {

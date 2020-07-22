@@ -8,10 +8,6 @@ import (
 )
 
 var (
-//factories = make(map[string]func(prometheus.Labels) (Collector, error))
-)
-
-var (
 	scrapeDurationDesc = prometheus.NewDesc(
 		prometheus.BuildFQName("pgscv", "scrape", "collector_duration_seconds"),
 		"pgscv_collector: Duration of a collector scrape.",
@@ -26,7 +22,18 @@ var (
 	)
 )
 
+// Factories defines collector functions which used for collecting metrics.
 type Factories map[string]func(prometheus.Labels) (Collector, error)
+
+// RegisterSystemCollectors joins all system-related collectors and registers them in single place.
+func (f Factories) RegisterSystemCollectors() {
+	f.register("cpu", NewCPUCollector)
+}
+
+// register is the generic routine which register any kind of collectors.
+func (f Factories) register(collector string, factory func(prometheus.Labels) (Collector, error)) {
+	f[collector] = factory
+}
 
 // Collector is the interface a collector has to implement.
 type Collector interface {
@@ -39,6 +46,7 @@ type PgscvCollector struct {
 	Collectors map[string]Collector
 }
 
+// NewPgscvCollector accepts Factories and creates per-service instance of Collector.
 func NewPgscvCollector(projectID string, serviceID string, factories Factories) (*PgscvCollector, error) {
 	collectors := make(map[string]Collector)
 
@@ -51,14 +59,6 @@ func NewPgscvCollector(projectID string, serviceID string, factories Factories) 
 	}
 
 	return &PgscvCollector{Collectors: collectors}, nil
-}
-
-func registerCollector(factories Factories, collector string, factory func(prometheus.Labels) (Collector, error)) {
-	factories[collector] = factory
-}
-
-func RegisterSystemCollectors(factories Factories) {
-	registerCollector(factories, "cpu", NewCPUCollector)
 }
 
 // Describe implements the prometheus.Collector interface.
@@ -80,6 +80,7 @@ func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
 	wg.Wait()
 }
 
+// execute acts like a middleware - it runs metric collection function and wraps it into instrumenting logic.
 func execute(name string, c Collector, ch chan<- prometheus.Metric) {
 	begin := time.Now()
 	err := c.Update(ch)
