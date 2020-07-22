@@ -40,163 +40,129 @@ type diskstatsCollector struct {
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt
 func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
-	var (
-		diskLabelNames = []string{"device"}
-
-		readsCompletedDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "reads_completed_total"),
-			"The total number of reads completed successfully.",
-			diskLabelNames, labels,
-		)
-
-		readBytesDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "read_bytes_total"),
-			"The total number of bytes read successfully.",
-			diskLabelNames, labels,
-		)
-
-		writesCompletedDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "writes_completed_total"),
-			"The total number of writes completed successfully.",
-			diskLabelNames, labels,
-		)
-
-		writtenBytesDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "written_bytes_total"),
-			"The total number of bytes written successfully.",
-			diskLabelNames, labels,
-		)
-
-		ioTimeSecondsDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "io_time_seconds_total"),
-			"Total seconds spent doing I/Os.",
-			diskLabelNames, labels,
-		)
-
-		readTimeSecondsDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "read_time_seconds_total"),
-			"The total number of seconds spent by all reads.",
-			diskLabelNames, labels,
-		)
-
-		writeTimeSecondsDesc = prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "disk", "write_time_seconds_total"),
-			"This is the total number of seconds spent by all writes.",
-			diskLabelNames, labels,
-		)
-	)
+	var diskLabelNames = []string{"device"}
 
 	return &diskstatsCollector{
 		ignoredDevicesPattern: regexp.MustCompile(ignoredDevicesPattern),
 		descs: []typedFactorDesc{
 			{
-				desc: readsCompletedDesc, valueType: prometheus.CounterValue,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "reads_completed_total"),
+					"The total number of reads completed successfully.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "reads_merged_total"),
 					"The total number of reads merged.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
-				desc: readBytesDesc, valueType: prometheus.CounterValue,
-				factor: diskSectorSize,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "read_bytes_total"),
+					"The total number of bytes read successfully.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: diskSectorSize,
 			},
 			{
-				desc: readTimeSecondsDesc, valueType: prometheus.CounterValue,
-				factor: .001,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "read_time_seconds_total"),
+					"The total number of seconds spent by all reads.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			{
-				desc: writesCompletedDesc, valueType: prometheus.CounterValue,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "writes_completed_total"),
+					"The total number of writes completed successfully.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "writes_merged_total"),
 					"The number of writes merged.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
-				desc: writtenBytesDesc, valueType: prometheus.CounterValue,
-				factor: diskSectorSize,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "written_bytes_total"),
+					"The total number of bytes written successfully.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: diskSectorSize,
 			},
 			{
-				desc: writeTimeSecondsDesc, valueType: prometheus.CounterValue,
-				factor: .001,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "write_time_seconds_total"),
+					"This is the total number of seconds spent by all writes.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "io_now"),
 					"The number of I/Os currently in progress.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.GaugeValue,
 			},
 			{
-				desc: ioTimeSecondsDesc, valueType: prometheus.CounterValue,
-				factor: .001,
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "disk", "io_time_seconds_total"),
+					"Total seconds spent doing I/Os.",
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "io_time_weighted_seconds_total"),
 					"The weighted # of seconds spent doing I/Os.",
-					diskLabelNames,
-					nil,
-				), valueType: prometheus.CounterValue,
-				factor: .001,
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "discards_completed_total"),
 					"The total number of discards completed successfully.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "discards_merged_total"),
 					"The total number of discards merged.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "discarded_sectors_total"),
 					"The total number of sectors discarded successfully.",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "discard_time_seconds_total"),
 					"This is the total number of seconds spent by all discards.",
-					diskLabelNames,
-					nil,
-				), valueType: prometheus.CounterValue,
-				factor: .001,
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "flush_requests_total"),
 					"The total number of flush requests completed successfully",
-					diskLabelNames,
-					nil,
+					diskLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "flush_requests_time_seconds_total"),
 					"This is the total number of seconds spent by all flush requests.",
-					diskLabelNames,
-					nil,
-				), valueType: prometheus.CounterValue,
-				factor: .001,
+					diskLabelNames, labels,
+				), valueType: prometheus.CounterValue, factor: .001,
 			},
 		},
 	}, nil
