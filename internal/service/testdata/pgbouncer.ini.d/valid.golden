@@ -1,0 +1,7 @@
+; comment
+
+listen_addr = 1.2.3.4
+listen_port = 16432
+unix_socket_dir = /testdir
+
+; comment
