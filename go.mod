@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/StackExchange/wmi v0.0.0-20190523213315-cbe66965904d // indirect
 	github.com/go-ole/go-ole v1.2.4 // indirect
+	github.com/jackc/pgproto3/v2 v2.0.2
 	github.com/jackc/pgx/v4 v4.7.2
 	github.com/prometheus/client_golang v1.7.1
 	github.com/prometheus/common v0.10.0
