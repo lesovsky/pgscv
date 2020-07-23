@@ -8,18 +8,18 @@ import (
 )
 
 var (
-	scrapeDurationDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("pgscv", "scrape", "collector_duration_seconds"),
-		"pgscv_collector: Duration of a collector scrape.",
-		[]string{"collector"},
-		nil,
-	)
-	scrapeSuccessDesc = prometheus.NewDesc(
-		prometheus.BuildFQName("pgscv", "scrape", "collector_success"),
-		"node_collector: Whether a collector succeeded.",
-		[]string{"collector"},
-		nil,
-	)
+//scrapeDurationDesc = prometheus.NewDesc(
+//	prometheus.BuildFQName("pgscv", "scrape", "collector_duration_seconds"),
+//	"pgscv_collector: Duration of a collector scrape.",
+//	[]string{"collector"},
+//	nil,
+//)
+//scrapeSuccessDesc = prometheus.NewDesc(
+//	prometheus.BuildFQName("pgscv", "scrape", "collector_success"),
+//	"node_collector: Whether a collector succeeded.",
+//	[]string{"collector"},
+//	nil,
+//)
 )
 
 // Factories defines collector functions which used for collecting metrics.
@@ -29,6 +29,10 @@ type Factories map[string]func(prometheus.Labels) (Collector, error)
 func (f Factories) RegisterSystemCollectors() {
 	f.register("cpu", NewCPUCollector)
 	f.register("disk", NewDiskstatsCollector)
+}
+
+func (f Factories) RegisterPostgresCollector() {
+	f.register("database", NewPostgresDatabaseCollector)
 }
 
 // register is the generic routine which register any kind of collectors.
@@ -64,8 +68,8 @@ func NewPgscvCollector(projectID string, serviceID string, factories Factories) 
 
 // Describe implements the prometheus.Collector interface.
 func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
-	ch <- scrapeDurationDesc
-	ch <- scrapeSuccessDesc
+	//ch <- scrapeDurationDesc
+	//ch <- scrapeSuccessDesc
 }
 
 // Collect implements the prometheus.Collector interface.
@@ -86,14 +90,14 @@ func execute(name string, c Collector, ch chan<- prometheus.Metric) {
 	begin := time.Now()
 	err := c.Update(ch)
 	duration := time.Since(begin)
-	var success float64
+	//var success float64
 
 	if err != nil {
 		log.Errorf("%s collector failed; duration_seconds %f; err: %s", name, duration.Seconds(), err)
-		success = 0
+		//success = 0
 	} else {
-		success = 1
+		//success = 1
 	}
-	ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)
-	ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, success, name)
+	//ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)
+	//ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, success, name)
 }
