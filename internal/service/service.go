@@ -230,31 +230,27 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 		if service.Collector == nil {
 			service.ProjectID = config.ProjectID
 
+			factories := collector.Factories{}
 			switch service.ConnSettings.ServiceType {
 			case ServiceTypeSystem:
-				sysFactories := collector.Factories{}
-				sysFactories.RegisterSystemCollectors()
-
-				mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, sysFactories)
-				if err != nil {
-					return err
-				}
-				service.Collector = mc
-
-				// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
-				if config.RuntimeMode == runtime.PullMode {
-					prometheus.MustRegister(service.Collector)
-					log.Infof("collector registered for %s", service.ServiceID)
-				}
+				factories.RegisterSystemCollectors()
+			case ServiceTypePostgresql:
+				factories.RegisterPostgresCollector()
+			default:
+				continue
 			}
 
 			// create exporter for the service
-			//exporter, err := newExporter(service, repo)
-			//mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID)
-			//if err != nil {
-			//	return err
-			//}
-			//service.Collector = mc
+			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories)
+			if err != nil {
+				return err
+			}
+			service.Collector = mc
+
+			// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
+			if config.RuntimeMode == runtime.PullMode {
+				prometheus.MustRegister(service.Collector)
+			}
 
 			// put updated service copy into repo
 			repo.addService(id, service)
