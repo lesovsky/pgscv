@@ -40,7 +40,7 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 }
 
 // Update implements Collector and exposes cpu related metrics from /proc/stat and /sys/.../cpu/.
-func (c *cpuCollector) Update(ch chan<- prometheus.Metric) error {
+func (c *cpuCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	if err := c.updateStat(ch); err != nil {
 		return err
 	}

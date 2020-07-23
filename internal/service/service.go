@@ -241,7 +241,8 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 			}
 
 			// create exporter for the service
-			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories)
+			collectorConfig := collector.Config{ServiceType: service.ConnSettings.ServiceType, ConnString: service.ConnSettings.Conninfo}
+			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories, collectorConfig)
 			if err != nil {
 				return err
 			}

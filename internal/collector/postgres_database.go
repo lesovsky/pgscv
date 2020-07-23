@@ -10,6 +10,8 @@ import (
 	"strconv"
 )
 
+const databaseQuery = "SELECT COALESCE(datname, '__shared__') AS datname, xact_commit, xact_rollback FROM pg_stat_database"
+
 type typedDesc struct {
 	colname   string
 	desc      *prometheus.Desc
@@ -35,14 +37,20 @@ func NewPostgresDatabaseCollector(labels prometheus.Labels) (Collector, error) {
 					databaseLabelNames, labels,
 				), valueType: prometheus.CounterValue,
 			},
+			{
+				colname: "xact_rollback",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "xact_rollback_total"),
+					"The total number of transactions rolled back.",
+					databaseLabelNames, labels,
+				), valueType: prometheus.CounterValue,
+			},
 		},
 	}, nil
 }
 
-const databaseQuery = "SELECT COALESCE(datname, '__shared__') AS datname, xact_commit FROM pg_stat_database"
-
-func (c *postgresDatabaseCollector) Update(ch chan<- prometheus.Metric) error {
-	db, err := store.NewDB("postgres://postgres@127.0.0.1/postgres")
+func (c *postgresDatabaseCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+	db, err := store.NewDB(config.ConnString)
 	if err != nil {
 		return err
 	}
@@ -104,7 +112,7 @@ func (c *postgresDatabaseCollector) Update(ch chan<- prometheus.Metric) error {
 
 				idx, err := lookupDesc(c.descs, string(colname.Name))
 				if err != nil {
-					log.Warnln("skip collecting %s metric: %s", c.descs[i].desc.String(), err)
+					log.Warnf("skip collecting metric: %s", err)
 					continue
 				}
 
@@ -121,7 +129,6 @@ func (c *postgresDatabaseCollector) Update(ch chan<- prometheus.Metric) error {
 
 func lookupDesc(descs []typedDesc, pattern string) (int, error) {
 	for i, desc := range descs {
-		log.Infoln("lessqq: ", desc.colname)
 		if desc.colname == pattern {
 			return i, nil
 		}

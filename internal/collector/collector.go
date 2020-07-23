@@ -25,12 +25,13 @@ var (
 // Factories defines collector functions which used for collecting metrics.
 type Factories map[string]func(prometheus.Labels) (Collector, error)
 
-// RegisterSystemCollectors joins all system-related collectors and registers them in single place.
+// RegisterSystemCollectors unions all system-related collectors and registers them in single place.
 func (f Factories) RegisterSystemCollectors() {
 	f.register("cpu", NewCPUCollector)
 	f.register("disk", NewDiskstatsCollector)
 }
 
+// RegisterPostgresCollector unions all postgres-related collectors and registers them in single place.
 func (f Factories) RegisterPostgresCollector() {
 	f.register("database", NewPostgresDatabaseCollector)
 }
@@ -43,16 +44,23 @@ func (f Factories) register(collector string, factory func(prometheus.Labels) (C
 // Collector is the interface a collector has to implement.
 type Collector interface {
 	// Get new metrics and expose them via prometheus registry.
-	Update(ch chan<- prometheus.Metric) error
+	Update(config Config, ch chan<- prometheus.Metric) error
+}
+
+// Config defines collector configuration settings
+type Config struct {
+	ServiceType string
+	ConnString  string
 }
 
 // Collector implements the prometheus.Collector interface.
 type PgscvCollector struct {
+	Config     Config
 	Collectors map[string]Collector
 }
 
 // NewPgscvCollector accepts Factories and creates per-service instance of Collector.
-func NewPgscvCollector(projectID string, serviceID string, factories Factories) (*PgscvCollector, error) {
+func NewPgscvCollector(projectID string, serviceID string, factories Factories, config Config) (*PgscvCollector, error) {
 	collectors := make(map[string]Collector)
 
 	for key := range factories {
@@ -63,11 +71,11 @@ func NewPgscvCollector(projectID string, serviceID string, factories Factories) 
 		collectors[key] = collector
 	}
 
-	return &PgscvCollector{Collectors: collectors}, nil
+	return &PgscvCollector{Config: config, Collectors: collectors}, nil
 }
 
 // Describe implements the prometheus.Collector interface.
-func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
+func (n PgscvCollector) Describe(_ chan<- *prometheus.Desc) {
 	//ch <- scrapeDurationDesc
 	//ch <- scrapeSuccessDesc
 }
@@ -78,7 +86,7 @@ func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
 	wg.Add(len(n.Collectors))
 	for name, c := range n.Collectors {
 		go func(name string, c Collector) {
-			execute(name, c, ch)
+			execute(name, n.Config, c, ch)
 			wg.Done()
 		}(name, c)
 	}
@@ -86,9 +94,9 @@ func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
 }
 
 // execute acts like a middleware - it runs metric collection function and wraps it into instrumenting logic.
-func execute(name string, c Collector, ch chan<- prometheus.Metric) {
+func execute(name string, config Config, c Collector, ch chan<- prometheus.Metric) {
 	begin := time.Now()
-	err := c.Update(ch)
+	err := c.Update(config, ch)
 	duration := time.Since(begin)
 	//var success float64
 

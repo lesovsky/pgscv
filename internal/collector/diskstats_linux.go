@@ -168,7 +168,7 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 	}, nil
 }
 
-func (c *diskstatsCollector) Update(ch chan<- prometheus.Metric) error {
+func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	diskStats, err := getDiskStats()
 	if err != nil {
 		return fmt.Errorf("couldn't get diskstats: %w", err)
