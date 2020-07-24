@@ -51,7 +51,7 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 
 				// Empty (NULL) values are converted to zeros.
 				if row[i].String == "" {
-					log.Debugf("got empty value, convert it to zero")
+					log.Debug("got empty value, convert it to zero")
 					row[i] = sql.NullString{String: "0", Valid: true}
 				}
 
