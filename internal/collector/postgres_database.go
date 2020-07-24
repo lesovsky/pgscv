@@ -5,7 +5,16 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 )
 
-const databaseQuery = "SELECT COALESCE(datname, '__shared__') AS datname, xact_commit, xact_rollback FROM pg_stat_database"
+const databaseQuery = `SELECT
+  COALESCE(datname, '__shared__') AS datname,
+  xact_commit, xact_rollback,
+  blks_read, blks_hit,
+  tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted,
+  conflicts, temp_files, temp_bytes, deadlocks,
+  blk_read_time, blk_write_time,
+  pg_database_size(datname) as size_bytes,
+  coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds
+FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)`
 
 type postgresDatabasesCollector struct {
 	descs      []typedDesc
@@ -33,6 +42,126 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "database", "xact_rollback_total"),
 					"The total number of transactions rolled back.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "blks_read",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "blks_read_total"),
+					"Total number of disk blocks read in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "blks_hit",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "blks_hit_total"),
+					"Total number of times disk blocks were found already in the buffer cache, so that a read was not necessary.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "tup_returned",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "tup_returned_total"),
+					"Total number of rows returned by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "tup_fetched",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "tup_fetched_total"),
+					"Total number of rows fetched by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "tup_inserted",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "tup_inserted_total"),
+					"Total number of rows inserted by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "tup_updated",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "tup_updated_total"),
+					"Total number of rows updated by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "tup_deleted",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "tup_deleted_total"),
+					"Total number of rows deleted by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "conflicts",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "conflicts_total"),
+					"Number of queries canceled due to conflicts with recovery in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "temp_files",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "temp_files_total"),
+					"Number of temporary files created by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "temp_bytes",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "temp_bytes_total"),
+					"Total amount of data written to temporary files by queries in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "deadlocks",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "deadlocks_total"),
+					"Number of deadlocks detected in this database.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "blk_read_time",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "blk_read_time_seconds"),
+					"Time spent reading data file blocks by backends in this database, in seconds.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue, factor: .001,
+			},
+			{
+				colname: "blk_write_time",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "blk_write_time_seconds"),
+					"Time spent writing data file blocks by backends in this database, in seconds.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue, factor: .001,
+			},
+			{
+				colname: "size_bytes",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "size_bytes_total"),
+					"Total size of the database, in bytes.",
+					databaseLabelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			{
+				colname: "stats_age_seconds",
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("pgscv", "database", "stats_age_seconds"),
+					"The age of the activity statistics, in seconds.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
