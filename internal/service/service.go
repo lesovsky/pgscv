@@ -238,6 +238,8 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 				factories.RegisterSystemCollectors()
 			case model.ServiceTypePostgresql:
 				factories.RegisterPostgresCollectors()
+			case model.ServiceTypePgbouncer:
+				factories.RegisterPgbouncerCollectors()
 			default:
 				continue
 			}

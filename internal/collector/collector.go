@@ -37,6 +37,11 @@ func (f Factories) RegisterPostgresCollectors() {
 	f.register("table", NewPostgresTablesCollector)
 }
 
+// RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
+func (f Factories) RegisterPgbouncerCollectors() {
+	f.register("pool", NewPgbouncerPoolsCollector)
+}
+
 // register is the generic routine which register any kind of collectors.
 func (f Factories) register(collector string, factory func(prometheus.Labels) (Collector, error)) {
 	f[collector] = factory
