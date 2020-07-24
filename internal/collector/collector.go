@@ -40,6 +40,7 @@ func (f Factories) RegisterPostgresCollectors() {
 // RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
 func (f Factories) RegisterPgbouncerCollectors() {
 	f.register("pool", NewPgbouncerPoolsCollector)
+	f.register("pool", NewPgbouncerStatsCollector)
 }
 
 // register is the generic routine which register any kind of collectors.

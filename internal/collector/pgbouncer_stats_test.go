@@ -8,17 +8,23 @@ import (
 	"testing"
 )
 
-func TestPgbouncerPoolsCollector_Update(t *testing.T) {
+// Important: this test might produce some warns because collector doesn't collect averages stored in stats.
+func TestPgbouncerStatsCollector_Update(t *testing.T) {
 	var requiredMetricNames = []string{
-		"pgscv_pgbouncer_pool_conn_total",
-		"pgscv_pgbouncer_pool_max_wait_seconds",
+		"pgscv_pgbouncer_xact_total",
+		"pgscv_pgbouncer_query_total",
+		"pgscv_pgbouncer_received_bytes_total",
+		"pgscv_pgbouncer_sent_bytes_total",
+		"pgscv_pgbouncer_xact_time_seconds_total",
+		"pgscv_pgbouncer_query_time_seconds_total",
+		"pgscv_pgbouncer_wait_time_seconds_total",
 	}
 
-	collector, err := NewPgbouncerPoolsCollector(prometheus.Labels{"example_label": "example_value"})
+	collector, err := NewPgbouncerStatsCollector(prometheus.Labels{"example_label": "example_value"})
 	assert.NoError(t, err)
 	ch := make(chan prometheus.Metric)
 
-	config := Config{ServiceType: model.ServiceTypePgbouncer, ConnString: "postgres://pgbouncer@127.0.0.1:6432/pgbouncer"}
+	config := Config{ServiceType: model.ServiceTypePgbouncer, ConnString: "postgres://postgres@127.0.0.1:6432/pgbouncer"}
 
 	go func() {
 		err := collector.Update(config, ch)
