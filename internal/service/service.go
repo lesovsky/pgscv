@@ -22,7 +22,6 @@ import (
 )
 
 const (
-	ServiceTypeDisabled   = "disabled"
 	ServiceTypeSystem     = "system"
 	ServiceTypePostgresql = "postgres"
 	ServiceTypePgbouncer  = "pgbouncer"
@@ -185,7 +184,7 @@ func (repo *ServiceRepo) getServiceIDs() []string {
 
 // addServicesFromConfig reads info about services from the config file and fulfill the repo.
 func (repo *ServiceRepo) addServicesFromConfig(config Config) {
-	// sanity check, but basically should be always passed
+	// Sanity check, but basically should be always passed.
 	if config.ConnSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
 		return
@@ -194,28 +193,35 @@ func (repo *ServiceRepo) addServicesFromConfig(config Config) {
 	log.Debug("adding system service")
 	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: ServiceTypeSystem}})
 
+	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
+	// in the repo.
 	for _, cs := range config.ConnSettings {
-		config, err := pgx.ParseConfig(cs.Conninfo)
+		// *ConnConfig struct will be used for
+		//   1) doing connection;
+		//   2) getting connection properties to define service-specific parameters.
+		pgconfig, err := pgx.ParseConfig(cs.Conninfo)
 		if err != nil {
 			log.Warnf("%s: %s, skip", cs.Conninfo, err)
 			continue
 		}
-		// check connection using passed Conninfo, if successful add it to Service Repo
-		db, err := store.NewDBConfig(config)
-		if err != nil {
-			log.Warnf("%s: %s, skip", cs.Conninfo, err)
-			continue
-		}
-		db.Close() // close connection explicitly to avoid "Connection reset by peer" messages
 
+		// Check connection using created *ConnConfig, go next if connection failed.
+		db, err := store.NewDBConfig(pgconfig)
+		if err != nil {
+			log.Warnf("%s: %s, skip", cs.Conninfo, err)
+			continue
+		}
+		db.Close()
+
+		// Connection was successful, create 'Service' struct with service-related properties and add it to service repo.
 		s := Service{
-			ServiceID:    cs.ServiceType + ":" + strconv.Itoa(int(config.Port)),
+			ServiceID:    cs.ServiceType + ":" + strconv.Itoa(int(pgconfig.Port)),
 			ConnSettings: cs,
 			Collector:    nil,
 		}
 
-		// Adding "host" into key because user might specify services with the same port (but the are running on different hosts)
-		var key = strings.Join([]string{cs.ServiceType, config.Host, strconv.Itoa(int(config.Port))}, ":")
+		// Add "host", because user might manually specify services with the same port (but the are running on different hosts).
+		var key = strings.Join([]string{cs.ServiceType, pgconfig.Host, strconv.Itoa(int(pgconfig.Port))}, ":")
 		repo.addService(key, s)
 		log.Infof("service [%s] registered successfully", s.ServiceID)
 	}

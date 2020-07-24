@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"fmt"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 )
@@ -39,25 +38,18 @@ func NewPostgresDatabaseCollector(labels prometheus.Labels) (Collector, error) {
 	}, nil
 }
 
+// Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresDatabaseCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	db, err := store.NewDB(config.ConnString)
+	conn, err := store.NewDB(config.ConnString)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	res, err := conn.GetStats(databaseQuery)
 	if err != nil {
 		return err
 	}
 
-	qq, err := getStats(db, databaseQuery)
-	if err != nil {
-		return err
-	}
-
-	return parseStats(qq, ch, c.descs, c.labelNames)
-}
-
-func lookupDesc(descs []typedDesc, pattern string) (int, error) {
-	for i, desc := range descs {
-		if desc.colname == pattern {
-			return i, nil
-		}
-	}
-	return -1, fmt.Errorf("pattern not found")
+	return parseStats(res, ch, c.descs, c.labelNames)
 }

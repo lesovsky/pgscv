@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"database/sql"
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v4"
 )
 
@@ -95,4 +97,60 @@ func (db *DB) Close() {
 	if err != nil {
 		log.Warnf("failed to close database connection: %s; ignore", err)
 	}
+}
+
+// QueryResult is the iterable store that contains result of query - data (values) and metadata (number of rows, columns and names).
+type QueryResult struct {
+	Nrows    int
+	Ncols    int
+	Colnames []pgproto3.FieldDescription
+	Rows     [][]sql.NullString
+}
+
+// GetStats executed query and wraps result into QueryResult struct
+func (db *DB) GetStats(query string) (*QueryResult, error) {
+	rows, err := db.Conn.Query(context.Background(), query)
+	if err != nil {
+		return nil, err
+	}
+
+	// Generic variables describe properties of query result.
+	var (
+		colnames = rows.FieldDescriptions()
+		ncols    = len(colnames)
+		nrows    int
+	)
+
+	// Storage used for data extracted from rows.
+	// Scan operation supports only slice of interfaces, 'pointers' slice is the intermediate store where all values written.
+	// Next values from 'pointers' associated with type-strict slice - 'values'. When Scan is writing to the 'pointers' it
+	// also writing to the 'values' under the hood. When all pointers/values have been scanned, put them into 'rowsStore'.
+	// Finally we get queryResult iterable store with data and information about stored rows, columns and columns names.
+	var rowsStore = make([][]sql.NullString, 0, 10)
+
+	for rows.Next() {
+		pointers := make([]interface{}, ncols)
+		values := make([]sql.NullString, ncols)
+
+		for i := range pointers {
+			pointers[i] = &values[i]
+		}
+
+		err = rows.Scan(pointers...)
+		if err != nil {
+			log.Warnf("skip collecting database stats: %s", err)
+			continue
+		}
+		rowsStore = append(rowsStore, values)
+		nrows++
+	}
+
+	rows.Close()
+
+	return &QueryResult{
+		Nrows:    nrows,
+		Ncols:    ncols,
+		Colnames: colnames,
+		Rows:     rowsStore,
+	}, nil
 }
