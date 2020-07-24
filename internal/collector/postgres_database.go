@@ -155,7 +155,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 					prometheus.BuildFQName("pgscv", "database", "size_bytes_total"),
 					"Total size of the database, in bytes.",
 					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
+				), valueType: prometheus.GaugeValue,
 			},
 			{
 				colname: "stats_age_seconds",

@@ -31,7 +31,7 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 			"pgscv_database_stats_age_seconds",
 		}
 
-		// requiredMetricNamesCounter is the counter of how many times metric have been collected
+		// requiredMetricNamesCounter is the counter of how many times metrics have been collected
 		requiredMetricNamesCounter = map[string]int{}
 	)
 
