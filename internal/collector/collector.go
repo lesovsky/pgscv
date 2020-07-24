@@ -31,9 +31,9 @@ func (f Factories) RegisterSystemCollectors() {
 	f.register("disk", NewDiskstatsCollector)
 }
 
-// RegisterPostgresCollector unions all postgres-related collectors and registers them in single place.
-func (f Factories) RegisterPostgresCollector() {
-	f.register("database", NewPostgresDatabaseCollector)
+// RegisterPostgresCollectors unions all postgres-related collectors and registers them in single place.
+func (f Factories) RegisterPostgresCollectors() {
+	f.register("database", NewPostgresDatabasesCollector)
 	f.register("table", NewPostgresTablesCollector)
 }
 

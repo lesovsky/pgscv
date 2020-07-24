@@ -241,7 +241,7 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 			case ServiceTypeSystem:
 				factories.RegisterSystemCollectors()
 			case ServiceTypePostgresql:
-				factories.RegisterPostgresCollector()
+				factories.RegisterPostgresCollectors()
 			default:
 				continue
 			}
