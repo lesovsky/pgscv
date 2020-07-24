@@ -34,6 +34,7 @@ func (f Factories) RegisterSystemCollectors() {
 // RegisterPostgresCollector unions all postgres-related collectors and registers them in single place.
 func (f Factories) RegisterPostgresCollector() {
 	f.register("database", NewPostgresDatabaseCollector)
+	f.register("table", NewPostgresTablesCollector)
 }
 
 // register is the generic routine which register any kind of collectors.
