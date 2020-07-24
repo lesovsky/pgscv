@@ -19,22 +19,9 @@ const (
 	ignoredDevicesPattern = "^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\\d+n\\d+p)\\d+$"
 )
 
-type typedFactorDesc struct {
-	desc      *prometheus.Desc
-	valueType prometheus.ValueType
-	factor    float64
-}
-
-func (d *typedFactorDesc) mustNewConstMetric(value float64, labels ...string) prometheus.Metric {
-	if d.factor != 0 {
-		value *= d.factor
-	}
-	return prometheus.MustNewConstMetric(d.desc, d.valueType, value, labels...)
-}
-
 type diskstatsCollector struct {
 	ignoredDevicesPattern *regexp.Regexp
-	descs                 []typedFactorDesc
+	descs                 []typedDesc
 }
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
@@ -44,7 +31,7 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 
 	return &diskstatsCollector{
 		ignoredDevicesPattern: regexp.MustCompile(ignoredDevicesPattern),
-		descs: []typedFactorDesc{
+		descs: []typedDesc{
 			{
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("pgscv", "disk", "reads_completed_total"),
@@ -168,7 +155,7 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 	}, nil
 }
 
-func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	diskStats, err := getDiskStats()
 	if err != nil {
 		return fmt.Errorf("couldn't get diskstats: %w", err)

@@ -2,31 +2,11 @@ package collector
 
 import (
 	"database/sql"
-	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 )
-
-type typedDesc struct {
-	// name is the name of column in a query output used for getting value for metric.
-	colname string
-	// desc is the descriptor used by every Prometheus Metric.
-	desc *prometheus.Desc
-	// valueType is an enumeration of metric types that represent a simple value.
-	valueType prometheus.ValueType
-}
-
-// lookupDesc returns index of the descriptor with colname specified in pattern
-func lookupByColname(descs []typedDesc, pattern string) (int, error) {
-	for i, desc := range descs {
-		if desc.colname == pattern {
-			return i, nil
-		}
-	}
-	return -1, fmt.Errorf("pattern not found")
-}
 
 // parseStats extracts values from query result, generates metrics using extracted values and passed
 // labels and send them to Prometheus.
@@ -71,7 +51,8 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 				}
 
 				// Generate metric and throw it to Prometheus.
-				ch <- prometheus.MustNewConstMetric(descs[idx].desc, descs[idx].valueType, v, labelValues...)
+				ch <- descs[idx].mustNewConstMetric(v, labelValues...)
+				//ch <- prometheus.MustNewConstMetric(descs[idx].desc, descs[idx].valueType, v, labelValues...)
 			}
 		}
 	}
