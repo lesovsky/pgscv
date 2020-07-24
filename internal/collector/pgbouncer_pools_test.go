@@ -11,8 +11,8 @@ import (
 
 func TestPgbouncerPoolsCollector_Update(t *testing.T) {
 	var requiredMetricNames = []string{
-		"pgscv_pgbouncer_pool_cl_active_total",
-		"pgscv_pgbouncer_pool_cl_waiting_total",
+		"pgscv_pgbouncer_pool_conn_total",
+		"pgscv_pgbouncer_pool_conn_total",
 	}
 
 	collector, err := NewPgbouncerPoolsCollector(prometheus.Labels{"example_label": "example_value"})
