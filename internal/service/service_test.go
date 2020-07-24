@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/runtime"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -67,7 +67,7 @@ func TestServiceRepo_addServicesFromConfig(t *testing.T) {
 		{
 			name: "valid",
 			config: Config{ConnSettings: []ServiceConnSetting{
-				{ServiceType: "postgres", Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 			}},
 			expected: 2,
 		},
@@ -78,12 +78,12 @@ func TestServiceRepo_addServicesFromConfig(t *testing.T) {
 		},
 		{
 			name:     "invalid service",
-			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: "postgres", Conninfo: "invalid conninfo"}}},
+			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid conninfo"}}},
 			expected: 1,
 		},
 		{
 			name:     "unavailable service",
-			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: "postgres", Conninfo: "port=15432"}}},
+			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=15432"}}},
 			expected: 1,
 		},
 	}
@@ -105,7 +105,7 @@ func TestServiceRepo_setupServices(t *testing.T) {
 			name: "valid",
 			config: Config{
 				ConnSettings: []ServiceConnSetting{
-					{ServiceType: "postgres", Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 				},
 			},
 			expected: 2,
@@ -113,9 +113,9 @@ func TestServiceRepo_setupServices(t *testing.T) {
 		{
 			name: "valid with pull mode",
 			config: Config{
-				RuntimeMode: runtime.PullMode,
+				RuntimeMode: model.RuntimePullMode,
 				ConnSettings: []ServiceConnSetting{
-					{ServiceType: "postgres", Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 				},
 			},
 			expected: 2,

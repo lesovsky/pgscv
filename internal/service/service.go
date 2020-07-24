@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/collector"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/runtime"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -22,10 +22,6 @@ import (
 )
 
 const (
-	ServiceTypeSystem     = "system"
-	ServiceTypePostgresql = "postgres"
-	ServiceTypePgbouncer  = "pgbouncer"
-
 	defaultHost              = "127.0.0.1"
 	defaultPgbouncerPort     = 6432
 	defaultPostgresUsername  = "pgscv"
@@ -191,7 +187,7 @@ func (repo *ServiceRepo) addServicesFromConfig(config Config) {
 	}
 
 	log.Debug("adding system service")
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: ServiceTypeSystem}})
+	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypeSystem}})
 
 	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
 	// in the repo.
@@ -238,9 +234,9 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 
 			factories := collector.Factories{}
 			switch service.ConnSettings.ServiceType {
-			case ServiceTypeSystem:
+			case model.ServiceTypeSystem:
 				factories.RegisterSystemCollectors()
-			case ServiceTypePostgresql:
+			case model.ServiceTypePostgresql:
 				factories.RegisterPostgresCollectors()
 			default:
 				continue
@@ -255,7 +251,7 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 			service.Collector = mc
 
 			// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
-			if config.RuntimeMode == runtime.PullMode {
+			if config.RuntimeMode == model.RuntimePullMode {
 				prometheus.MustRegister(service.Collector)
 			}
 
@@ -273,7 +269,7 @@ func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context, config Co
 
 	// add pseudo-service for system metrics
 	log.Debug("adding system service")
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: ServiceTypeSystem}})
+	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypeSystem}})
 
 	for {
 		if err := repo.lookupServices(config); err != nil {
@@ -388,9 +384,9 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 	}
 
 	s := Service{
-		ServiceID:    ServiceTypePostgresql + ":" + strconv.Itoa(connParams.listenPort),
+		ServiceID:    model.ServiceTypePostgresql + ":" + strconv.Itoa(connParams.listenPort),
 		ProjectID:    config.ProjectID,
-		ConnSettings: ServiceConnSetting{ServiceType: ServiceTypePostgresql, Conninfo: connString},
+		ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypePostgresql, Conninfo: connString},
 		Collector:    nil,
 	}
 
@@ -523,9 +519,9 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 	}
 
 	s := Service{
-		ServiceID:    ServiceTypePgbouncer + ":" + strconv.Itoa(connParams.listenPort),
+		ServiceID:    model.ServiceTypePgbouncer + ":" + strconv.Itoa(connParams.listenPort),
 		ProjectID:    config.ProjectID,
-		ConnSettings: ServiceConnSetting{ServiceType: ServiceTypePgbouncer, Conninfo: connString},
+		ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypePgbouncer, Conninfo: connString},
 		Collector:    nil,
 	}
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/runtime"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
 	"io/ioutil"
@@ -67,9 +67,9 @@ func (c *Config) Validate() error {
 	}
 
 	if c.MetricsServiceURL == "" {
-		c.RuntimeMode = runtime.PullMode
+		c.RuntimeMode = model.RuntimePullMode
 	} else {
-		c.RuntimeMode = runtime.PushMode
+		c.RuntimeMode = model.RuntimePushMode
 		c.MetricsSendInterval = defaultMetricsSendInterval
 		c.ScheduleEnabled = true
 	}

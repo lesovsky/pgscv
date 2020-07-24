@@ -5,7 +5,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/runtime"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -52,9 +52,9 @@ func Start(ctx context.Context, config *Config) error {
 	//}()
 
 	switch config.RuntimeMode {
-	case runtime.PullMode:
+	case model.RuntimePullMode:
 		return runPullMode(config)
-	case runtime.PushMode:
+	case model.RuntimePushMode:
 		return runPushMode(ctx, config, serviceRepo)
 	default:
 		log.Errorf("unknown mode selected: %d, quit", config.RuntimeMode)
