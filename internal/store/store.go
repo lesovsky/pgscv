@@ -138,7 +138,7 @@ func (db *DB) GetStats(query string) (*QueryResult, error) {
 
 		err = rows.Scan(pointers...)
 		if err != nil {
-			log.Warnf("skip collecting database stats: %s", err)
+			log.Warnf("skip collecting stats: %s", err)
 			continue
 		}
 		rowsStore = append(rowsStore, values)

@@ -38,7 +38,7 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 				// Get data value and convert it to float64 used by Prometheus.
 				v, err := strconv.ParseFloat(row[i].String, 64)
 				if err != nil {
-					log.Warnf("skip collecting metric: %s", err)
+					log.Errorf("skip collecting metric: %s", err)
 					continue
 				}
 
@@ -46,7 +46,7 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 				// to tie up extracted data values with suitable metric descriptor - column's name here is the key.
 				idx, err := lookupByColname(descs, string(colname.Name))
 				if err != nil {
-					log.Warnf("skip collecting metric: %s", err)
+					log.Debugf("skip collecting metric: %s", err)
 					continue
 				}
 

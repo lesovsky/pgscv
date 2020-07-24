@@ -46,6 +46,8 @@ type connStat struct {
 	maxWait   float64
 }
 
+// NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
+// For details see https://www.pgbouncer.org/usage.html#show-pools.
 func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error) {
 	var poolsLabelNames = []string{cnameDatabase, cnameUser, cnamePoolMode, "state"}
 
@@ -99,15 +101,15 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 }
 
 func parsePgbouncerPoolsStats(r *store.QueryResult, labelNames []string) map[string]connStat {
-	var stats = map[string]connStat{}
-	var poolname string
-
 	// ad-hoc struct used to group pool properties (database, user and mode) in one place.
 	type poolProperties struct {
 		database string
 		user     string
 		mode     string
 	}
+
+	var stats = map[string]connStat{}
+	var poolname string
 
 	for _, row := range r.Rows {
 		props := poolProperties{}
@@ -139,7 +141,7 @@ func parsePgbouncerPoolsStats(r *store.QueryResult, labelNames []string) map[str
 				// Get data value and convert it to float64 used by Prometheus.
 				v, err := strconv.ParseFloat(row[i].String, 64)
 				if err != nil {
-					log.Warnf("skip collecting metric: %s", err)
+					log.Errorf("skip collecting metric: %s", err)
 					continue
 				}
 

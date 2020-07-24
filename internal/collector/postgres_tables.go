@@ -14,6 +14,8 @@ type postgresTablesCollector struct {
 	labelNames []string
 }
 
+// NewPostgresTablesCollector returns a new Collector exposing postgres tables stats.
+// For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-TABLES-VIEW
 func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error) {
 	var tablesLabelNames = []string{"datname", "schemaname", "relname"}
 
