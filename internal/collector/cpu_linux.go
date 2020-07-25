@@ -10,8 +10,8 @@ import (
 
 type cpuCollector struct {
 	fs            procfs.FS
-	cpu           *prometheus.Desc
-	cpuGuest      *prometheus.Desc
+	cpu           typedDesc
+	cpuGuest      typedDesc
 	cpuStats      []procfs.CPUStat // per-CPU stats
 	cpuStatsSum   procfs.CPUStat   // summary stats across all CPUs
 	cpuStatsMutex sync.Mutex
@@ -25,16 +25,22 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 	}
 	c := &cpuCollector{
 		fs: fs,
-		cpu: prometheus.NewDesc(
-			prometheus.BuildFQName("node", "cpu", "seconds_total"),
-			"Seconds the cpus spent in each mode.",
-			[]string{"mode"}, labels,
-		),
-		cpuGuest: prometheus.NewDesc(
-			prometheus.BuildFQName("node", "cpu", "guest_seconds_total"),
-			"Seconds the cpus spent in guests (VMs) for each mode.",
-			[]string{"mode"}, labels,
-		),
+		cpu: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "cpu", "seconds_total"),
+				"Seconds the cpus spent in each mode.",
+				[]string{"mode"}, labels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		cpuGuest: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "cpu", "guest_seconds_total"),
+				"Seconds the cpus spent in guests (VMs) for each mode.",
+				[]string{"mode"}, labels,
+			),
+			valueType: prometheus.CounterValue,
+		},
 	}
 	return c, nil
 }
@@ -59,18 +65,18 @@ func (c *cpuCollector) updateStat(ch chan<- prometheus.Metric) error {
 	c.cpuStatsMutex.Lock()
 	defer c.cpuStatsMutex.Unlock()
 
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.User, "user")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.Nice, "nice")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.System, "system")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.Idle, "idle")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.Iowait, "iowait")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.IRQ, "irq")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.SoftIRQ, "softirq")
-	ch <- prometheus.MustNewConstMetric(c.cpu, prometheus.CounterValue, c.cpuStatsSum.Steal, "steal")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.User, "user")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Nice, "nice")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.System, "system")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Idle, "idle")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Iowait, "iowait")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.IRQ, "irq")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.SoftIRQ, "softirq")
+	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Steal, "steal")
 
 	// Guest CPU is also accounted for in cpuStat.User and cpuStat.Nice, expose these as separate metrics.
-	ch <- prometheus.MustNewConstMetric(c.cpuGuest, prometheus.CounterValue, c.cpuStatsSum.Guest, "user")
-	ch <- prometheus.MustNewConstMetric(c.cpuGuest, prometheus.CounterValue, c.cpuStatsSum.GuestNice, "nice")
+	ch <- c.cpuGuest.mustNewConstMetric(c.cpuStatsSum.Guest, "user")
+	ch <- c.cpuGuest.mustNewConstMetric(c.cpuStatsSum.GuestNice, "nice")
 
 	return nil
 }

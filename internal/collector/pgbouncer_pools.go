@@ -27,13 +27,12 @@ const (
 )
 
 type pgbouncerPoolsCollector struct {
-	descs      []typedDesc
 	labelNames []string
-	connStats  map[string]connStat
-	conns      *prometheus.Desc
-	maxwait    *prometheus.Desc
+	conns      typedDesc
+	maxwait    typedDesc
 }
 
+// connStat is a per-pool store for connections metrics.
 type connStat struct {
 	clActive  float64
 	clWaiting float64
@@ -51,16 +50,22 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 	var poolsLabelNames = []string{cnameDatabase, cnameUser, cnamePoolMode, "state"}
 
 	return &pgbouncerPoolsCollector{
-		conns: prometheus.NewDesc(
-			prometheus.BuildFQName("pgbouncer", "pool", "conn_total"),
-			"The total number of connections established.",
-			poolsLabelNames, constLabels,
-		),
-		maxwait: prometheus.NewDesc(
-			prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
-			"Total time the first (oldest) client in the queue has waited, in seconds.",
-			[]string{cnameDatabase, cnameUser, cnamePoolMode}, constLabels,
-		),
+		conns: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("pgbouncer", "pool", "conn_total"),
+				"The total number of connections established.",
+				poolsLabelNames, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
+		maxwait: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
+				"Total time the first (oldest) client in the queue has waited, in seconds.",
+				[]string{cnameDatabase, cnameUser, cnamePoolMode}, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
 		labelNames: poolsLabelNames,
 	}, nil
 }
@@ -86,14 +91,14 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 			log.Warnf("incomplete pool name: %s; skip", poolname)
 			continue
 		}
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.clActive, props[0], props[1], props[2], cnameClActive)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.clWaiting, props[0], props[1], props[2], cnameClWaiting)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.svActive, props[0], props[1], props[2], cnameSvActive)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.svIdle, props[0], props[1], props[2], cnameSvIdle)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.svUsed, props[0], props[1], props[2], cnameSvUsed)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.svTested, props[0], props[1], props[2], cnameSvTested)
-		ch <- prometheus.MustNewConstMetric(c.conns, prometheus.GaugeValue, poolstat.svLogin, props[0], props[1], props[2], cnameSvLogin)
-		ch <- prometheus.MustNewConstMetric(c.maxwait, prometheus.GaugeValue, poolstat.maxWait, props[0], props[1], props[2])
+		ch <- c.conns.mustNewConstMetric(poolstat.clActive, props[0], props[1], props[2], cnameClActive)
+		ch <- c.conns.mustNewConstMetric(poolstat.clWaiting, props[0], props[1], props[2], cnameClWaiting)
+		ch <- c.conns.mustNewConstMetric(poolstat.svActive, props[0], props[1], props[2], cnameSvActive)
+		ch <- c.conns.mustNewConstMetric(poolstat.svIdle, props[0], props[1], props[2], cnameSvIdle)
+		ch <- c.conns.mustNewConstMetric(poolstat.svUsed, props[0], props[1], props[2], cnameSvUsed)
+		ch <- c.conns.mustNewConstMetric(poolstat.svTested, props[0], props[1], props[2], cnameSvTested)
+		ch <- c.conns.mustNewConstMetric(poolstat.svLogin, props[0], props[1], props[2], cnameSvLogin)
+		ch <- c.maxwait.mustNewConstMetric(poolstat.maxWait, props[0], props[1], props[2])
 	}
 
 	return nil

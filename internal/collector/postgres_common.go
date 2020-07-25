@@ -51,7 +51,6 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 
 				// Generate metric and throw it to Prometheus.
 				ch <- descs[idx].mustNewConstMetric(v, labelValues...)
-				//ch <- prometheus.MustNewConstMetric(descs[idx].desc, descs[idx].valueType, v, labelValues...)
 			}
 		}
 	}
