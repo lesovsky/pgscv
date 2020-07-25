@@ -2,30 +2,30 @@ package collector
 
 import (
 	"database/sql"
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"regexp"
 	"testing"
 )
 
 func Test_parseStats(t *testing.T) {
 	var testDescs = []typedDesc{
 		{
-			colname: "xact_commit",
+			colname: "test_alfa",
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgscv", "database", "xact_commit_total"),
-				"The total number of transactions committed.",
-				[]string{"datname"}, prometheus.Labels{"example_label": "example_value"},
+				prometheus.BuildFQName("test", "example", "alfa_total"),
+				"Test example alfa.",
+				[]string{"testname"}, prometheus.Labels{"example_label": "example_value"},
 			), valueType: prometheus.CounterValue,
 		},
 		{
-			colname: "xact_rollback",
+			colname: "test_beta",
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgscv", "database", "xact_rollback_total"),
-				"The total number of transactions rolled back.",
-				[]string{"datname"}, prometheus.Labels{"example_label": "example_value"},
+				prometheus.BuildFQName("test", "example", "beta_total"),
+				"Test example beta.",
+				[]string{"testname"}, prometheus.Labels{"example_label": "example_value"},
 			), valueType: prometheus.CounterValue,
 		},
 	}
@@ -34,6 +34,7 @@ func Test_parseStats(t *testing.T) {
 		name         string
 		metricsTotal int
 		res          *store.QueryResult
+		required     []string
 	}{
 		{
 			name:         "1 valid query result",
@@ -41,12 +42,13 @@ func Test_parseStats(t *testing.T) {
 			res: &store.QueryResult{
 				Nrows:    2,
 				Ncols:    3,
-				Colnames: []pgproto3.FieldDescription{{Name: []byte("datname")}, {Name: []byte("xact_commit")}, {Name: []byte("xact_rollback")}},
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("testname")}, {Name: []byte("test_alfa")}, {Name: []byte("test_beta")}},
 				Rows: [][]sql.NullString{
-					{{String: "example1", Valid: true}, {String: "100", Valid: true}, {String: "1000", Valid: true}},
-					{{String: "example2", Valid: true}, {String: "200", Valid: true}, {String: "2000", Valid: true}},
+					{{String: "random1", Valid: true}, {String: "100", Valid: true}, {String: "1000", Valid: true}},
+					{{String: "random2", Valid: true}, {String: "200", Valid: true}, {String: "2000", Valid: true}},
 				},
 			},
+			required: []string{"test_example_alfa_total", "test_example_beta_total"},
 		},
 		{
 			name:         "2 valid query result, with empty (NULL) value",
@@ -54,11 +56,12 @@ func Test_parseStats(t *testing.T) {
 			res: &store.QueryResult{
 				Nrows:    1,
 				Ncols:    3,
-				Colnames: []pgproto3.FieldDescription{{Name: []byte("datname")}, {Name: []byte("xact_commit")}, {Name: []byte("xact_rollback")}},
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("testname")}, {Name: []byte("test_alfa")}, {Name: []byte("test_beta")}},
 				Rows: [][]sql.NullString{
-					{{String: "example3", Valid: true}, {String: "200", Valid: true}, {String: "", Valid: false}},
+					{{String: "random3", Valid: true}, {String: "200", Valid: true}, {String: "", Valid: false}},
 				},
 			},
+			required: []string{"test_example_alfa_total"},
 		},
 		{
 			name:         "3 invalid (text) value",
@@ -66,11 +69,12 @@ func Test_parseStats(t *testing.T) {
 			res: &store.QueryResult{
 				Nrows:    1,
 				Ncols:    3,
-				Colnames: []pgproto3.FieldDescription{{Name: []byte("datname")}, {Name: []byte("xact_commit")}, {Name: []byte("xact_rollback")}},
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("testname")}, {Name: []byte("test_alfa")}, {Name: []byte("test_beta")}},
 				Rows: [][]sql.NullString{
-					{{String: "example3", Valid: true}, {String: "200", Valid: true}, {String: "invalid", Valid: false}},
+					{{String: "random4", Valid: true}, {String: "200", Valid: true}, {String: "invalid", Valid: false}},
 				},
 			},
+			required: []string{"test_example_alfa_total"},
 		},
 		{
 			name:         "4 unknown column in result set",
@@ -78,36 +82,39 @@ func Test_parseStats(t *testing.T) {
 			res: &store.QueryResult{
 				Nrows:    1,
 				Ncols:    3,
-				Colnames: []pgproto3.FieldDescription{{Name: []byte("datname")}, {Name: []byte("xact_commit")}, {Name: []byte("unknown")}},
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("testname")}, {Name: []byte("test_alfa")}, {Name: []byte("unknown")}},
 				Rows: [][]sql.NullString{
-					{{String: "example3", Valid: true}, {String: "200", Valid: true}, {String: "300", Valid: true}},
+					{{String: "random5", Valid: true}, {String: "200", Valid: true}, {String: "300", Valid: true}},
 				},
 			},
+			required: []string{"test_example_alfa_total"},
 		},
 	}
 
-	for i, tc := range testCases {
+	for _, tc := range testCases {
 		var ch = make(chan prometheus.Metric)
 		tcCopy := tc
 		go func() {
-			assert.NoError(t, parseStats(tcCopy.res, ch, testDescs, []string{"datname"}))
+			assert.NoError(t, parseStats(tcCopy.res, ch, testDescs, []string{"testname"}))
 			close(ch)
 		}()
 
+		metricNamesCounter := map[string]int{}
+		// test all required metrics are generated
 		for metric := range ch {
-			switch i {
-			case 1:
-				assert.Regexp(t, "pgscv_database_xact_commit_total|pgscv_database_xact_rollback_total", metric.Desc().String())
-			case 2:
-				assert.Regexp(t, "pgscv_database_xact_commit_total|pgscv_database_xact_rollback_total", metric.Desc().String())
-			case 3:
-				assert.Regexp(t, "pgscv_database_xact_commit_total", metric.Desc().String())
-				assert.NotRegexp(t, "pgscv_database_xact_rollback_total", metric.Desc().String())
-			case 4:
-				assert.Regexp(t, "pgscv_database_xact_commit_total", metric.Desc().String())
-				assert.NotRegexp(t, "pgscv_database_xact_rollback_total", metric.Desc().String())
+			re := regexp.MustCompile(`fqName: "([a-z_]+)"`)
+			match := re.FindStringSubmatch(metric.Desc().String())[1]
+			assert.Contains(t, tc.required, match)
+			metricNamesCounter[match] += 1
+		}
+
+		// check there are no metrics generated other than required
+		for _, s := range tc.required {
+			if v, ok := metricNamesCounter[s]; !ok {
+				assert.Fail(t, "necessary metric not found in the map: ", s)
+			} else {
+				assert.Greater(t, v, 0)
 			}
-			log.Infoln(metric.Desc().String())
 		}
 	}
 }
