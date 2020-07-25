@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"database/sql"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
@@ -132,10 +131,10 @@ func parsePgbouncerPoolsStats(r *store.QueryResult, labelNames []string) map[str
 			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
 			// is in the labelNames, skip that column.
 			if !stringsContains(labelNames, string(colname.Name)) {
-				// Empty (NULL) values are converted to zeros.
+				// Skip empty (NULL) values.
 				if row[i].String == "" {
-					log.Debug("got empty value, convert it to zero")
-					row[i] = sql.NullString{String: "0", Valid: true}
+					log.Debug("got empty (NULL) value, skip")
+					continue
 				}
 
 				// Get data value and convert it to float64 used by Prometheus.

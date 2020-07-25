@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"database/sql"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
@@ -29,10 +28,10 @@ func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typed
 					}
 				}
 
-				// Empty (NULL) values are converted to zeros.
+				// Skip empty (NULL) values.
 				if row[i].String == "" {
-					log.Debug("got empty value, convert it to zero")
-					row[i] = sql.NullString{String: "0", Valid: true}
+					log.Debug("got empty (NULL) value, skip")
+					continue
 				}
 
 				// Get data value and convert it to float64 used by Prometheus.

@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"database/sql"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
@@ -163,10 +162,10 @@ func parsePostgresBgwriterStats(r *store.QueryResult) bgwriterStat {
 
 	for _, row := range r.Rows {
 		for i, colname := range r.Colnames {
-			// Empty (NULL) values are converted to zeros.
+			// Skip empty (NULL) values.
 			if row[i].String == "" {
-				log.Debug("got empty value, convert it to zero")
-				row[i] = sql.NullString{String: "0", Valid: true}
+				log.Debug("got empty (NULL) value, skip")
+				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
