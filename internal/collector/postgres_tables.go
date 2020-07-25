@@ -25,7 +25,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "seq_scan",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "table", "seq_scan_total"),
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
 					"The total number of sequential scans have been done.",
 					tablesLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -33,7 +33,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "seq_tup_read",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "table", "seq_tup_read_total"),
+					prometheus.BuildFQName("postgres", "table", "seq_tup_read_total"),
 					"The total number of tuples have been read by sequential scans.",
 					tablesLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,

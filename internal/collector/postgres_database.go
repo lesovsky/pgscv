@@ -32,7 +32,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "xact_commit",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "xact_commit_total"),
+					prometheus.BuildFQName("postgres", "database", "xact_commit_total"),
 					"The total number of transactions committed.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -40,7 +40,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "xact_rollback",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "xact_rollback_total"),
+					prometheus.BuildFQName("postgres", "database", "xact_rollback_total"),
 					"The total number of transactions rolled back.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -48,7 +48,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "blks_read",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "blks_read_total"),
+					prometheus.BuildFQName("postgres", "database", "blks_read_total"),
 					"Total number of disk blocks read in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -56,7 +56,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "blks_hit",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "blks_hit_total"),
+					prometheus.BuildFQName("postgres", "database", "blks_hit_total"),
 					"Total number of times disk blocks were found already in the buffer cache, so that a read was not necessary.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -64,7 +64,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "tup_returned",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "tup_returned_total"),
+					prometheus.BuildFQName("postgres", "database", "tup_returned_total"),
 					"Total number of rows returned by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -72,7 +72,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "tup_fetched",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "tup_fetched_total"),
+					prometheus.BuildFQName("postgres", "database", "tup_fetched_total"),
 					"Total number of rows fetched by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -80,7 +80,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "tup_inserted",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "tup_inserted_total"),
+					prometheus.BuildFQName("postgres", "database", "tup_inserted_total"),
 					"Total number of rows inserted by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -88,7 +88,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "tup_updated",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "tup_updated_total"),
+					prometheus.BuildFQName("postgres", "database", "tup_updated_total"),
 					"Total number of rows updated by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -96,7 +96,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "tup_deleted",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "tup_deleted_total"),
+					prometheus.BuildFQName("postgres", "database", "tup_deleted_total"),
 					"Total number of rows deleted by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -104,7 +104,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "conflicts",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "conflicts_total"),
+					prometheus.BuildFQName("postgres", "database", "conflicts_total"),
 					"Number of queries canceled due to conflicts with recovery in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -112,7 +112,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "temp_files",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "temp_files_total"),
+					prometheus.BuildFQName("postgres", "database", "temp_files_total"),
 					"Number of temporary files created by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -120,7 +120,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "temp_bytes",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "temp_bytes_total"),
+					prometheus.BuildFQName("postgres", "database", "temp_bytes_total"),
 					"Total amount of data written to temporary files by queries in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -128,7 +128,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "deadlocks",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "deadlocks_total"),
+					prometheus.BuildFQName("postgres", "database", "deadlocks_total"),
 					"Number of deadlocks detected in this database.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -136,7 +136,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "blk_read_time",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "blk_read_time_seconds"),
+					prometheus.BuildFQName("postgres", "database", "blk_read_time_seconds"),
 					"Time spent reading data file blocks by backends in this database, in seconds.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
@@ -144,7 +144,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "blk_write_time",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "blk_write_time_seconds"),
+					prometheus.BuildFQName("postgres", "database", "blk_write_time_seconds"),
 					"Time spent writing data file blocks by backends in this database, in seconds.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
@@ -152,7 +152,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "size_bytes",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "size_bytes_total"),
+					prometheus.BuildFQName("postgres", "database", "size_bytes_total"),
 					"Total size of the database, in bytes.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.GaugeValue,
@@ -160,7 +160,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 			{
 				colname: "stats_age_seconds",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "database", "stats_age_seconds"),
+					prometheus.BuildFQName("postgres", "database", "stats_age_seconds"),
 					"The age of the activity statistics, in seconds.",
 					databaseLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,

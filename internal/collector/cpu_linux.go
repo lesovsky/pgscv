@@ -26,12 +26,12 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 	c := &cpuCollector{
 		fs: fs,
 		cpu: prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "cpu", "seconds_total"),
+			prometheus.BuildFQName("node", "cpu", "seconds_total"),
 			"Seconds the cpus spent in each mode.",
 			[]string{"mode"}, labels,
 		),
 		cpuGuest: prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "cpu", "guest_seconds_total"),
+			prometheus.BuildFQName("node", "cpu", "guest_seconds_total"),
 			"Seconds the cpus spent in guests (VMs) for each mode.",
 			[]string{"mode"}, labels,
 		),
@@ -40,7 +40,7 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 }
 
 // Update implements Collector and exposes cpu related metrics from /proc/stat and /sys/.../cpu/.
-func (c *cpuCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	if err := c.updateStat(ch); err != nil {
 		return err
 	}

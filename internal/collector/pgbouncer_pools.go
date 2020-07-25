@@ -53,12 +53,12 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 
 	return &pgbouncerPoolsCollector{
 		conns: prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "pgbouncer", "pool_conn_total"),
+			prometheus.BuildFQName("pgbouncer", "pool", "conn_total"),
 			"The total number of connections established.",
 			poolsLabelNames, constLabels,
 		),
 		maxwait: prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "pgbouncer", "pool_max_wait_seconds"),
+			prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
 			"Total time the first (oldest) client in the queue has waited, in seconds.",
 			[]string{cnameDatabase, cnameUser, cnamePoolMode}, constLabels,
 		),

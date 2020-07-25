@@ -18,6 +18,7 @@ const (
 FROM pg_stat_bgwriter`
 )
 
+// bgwriterStat describes stats related to Postgres background writes.
 type bgwriterStat struct {
 	ckptTimed        float64
 	ckptReq          float64
@@ -46,63 +47,63 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 		descs: map[string]typedDesc{
 			"checkpoints_timed": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "checkpoints_timed_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_timed_total"),
 					"Total number of scheduled checkpoints that have been performed.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"checkpoints_req": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "checkpoints_req_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_req_total"),
 					"Total number of requested checkpoints that have been performed.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"checkpoint_write_time": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "write_time_seconds_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_write_time_seconds_total"),
 					"Total amount of time that has been spent in the portion of checkpoint processing where files are written to disk, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"checkpoint_sync_time": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "sync_time_seconds_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_sync_time_seconds_total"),
 					"Total amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"buffers_written": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "buffers_written_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "buffers_written_total"),
 					"Total number of buffers written.",
 					labels, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"maxwritten_clean": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "maxwritten_clean_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "bgwr_maxwritten_clean_total"),
 					"Total number of times the background writer stopped a cleaning scan because it had written too many buffers.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"buffers_backend_fsync": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "backend_fsync_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "backend_fsync_total"),
 					"Total number of times a backend had to execute its own fsync call.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"buffers_alloc": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "buffers_allocated_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "backend_buffers_allocated_total"),
 					"Total number of buffers allocated.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"stats_age_seconds": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "postgres", "bgwriter_stats_age_seconds"),
+					prometheus.BuildFQName("postgres", "bgwriter", "stats_age_seconds"),
 					"The age of the activity statistics, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,

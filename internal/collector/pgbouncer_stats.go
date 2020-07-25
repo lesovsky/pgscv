@@ -23,7 +23,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_xact_count",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "xact_total"),
+					prometheus.BuildFQName("pgbouncer", "", "xact_total"),
 					"Total number of SQL transactions pooled by pgbouncer.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -31,7 +31,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_query_count",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "query_total"),
+					prometheus.BuildFQName("pgbouncer", "", "query_total"),
 					"Total number of SQL queries pooled by pgbouncer.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -39,7 +39,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_received",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "received_bytes_total"),
+					prometheus.BuildFQName("pgbouncer", "", "received_bytes_total"),
 					"Total volume of network traffic received by pgbouncer, in bytes.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -47,7 +47,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_sent",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "sent_bytes_total"),
+					prometheus.BuildFQName("pgbouncer", "", "sent_bytes_total"),
 					"Total volume of network traffic sent by pgbouncer, in bytes.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue,
@@ -55,7 +55,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_xact_time",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "xact_time_seconds_total"),
+					prometheus.BuildFQName("pgbouncer", "", "xact_time_seconds_total"),
 					"Total number of time spent by pgbouncer when connected to PostgreSQL in a transaction, either idle in transaction or executing queries, in seconds.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue, factor: .000001,
@@ -63,7 +63,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_query_time",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "query_time_seconds_total"),
+					prometheus.BuildFQName("pgbouncer", "", "query_time_seconds_total"),
 					"Total number of time spent by pgbouncer when actively connected to PostgreSQL, executing queries, in seconds.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue, factor: .000001,
@@ -71,7 +71,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 			{
 				colname: "total_wait_time",
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("pgscv", "pgbouncer", "wait_time_seconds_total"),
+					prometheus.BuildFQName("pgbouncer", "", "wait_time_seconds_total"),
 					"Time spent by clients waiting for a server, in seconds.",
 					pgbouncerLabelNames, constLabels,
 				), valueType: prometheus.CounterValue, factor: .000001,
