@@ -10,4 +10,5 @@ func Test_stringsContains(t *testing.T) {
 
 	assert.True(t, stringsContains(ss, "first_example_string"))
 	assert.False(t, stringsContains(ss, "unknown_string"))
+	assert.False(t, stringsContains(nil, "example"))
 }

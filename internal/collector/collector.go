@@ -35,6 +35,7 @@ func (f Factories) RegisterSystemCollectors() {
 func (f Factories) RegisterPostgresCollectors() {
 	f.register("database", NewPostgresDatabasesCollector)
 	f.register("table", NewPostgresTablesCollector)
+	f.register("bgwriter", NewPostgresBgwriterCollector)
 }
 
 // RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
