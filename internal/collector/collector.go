@@ -36,6 +36,7 @@ func (f Factories) RegisterPostgresCollectors() {
 	f.register("database", NewPostgresDatabasesCollector)
 	f.register("table", NewPostgresTablesCollector)
 	f.register("bgwriter", NewPostgresBgwriterCollector)
+	f.register("function", NewPostgresFunctionsCollector)
 }
 
 // RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
