@@ -69,6 +69,13 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 					nil, constLabels,
 				), valueType: prometheus.GaugeValue,
 			},
+			"executed_queries": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
+					"The total number of queries executed in-flight of each type.",
+					[]string{"type"}, constLabels,
+				), valueType: prometheus.GaugeValue,
+			},
 		},
 	}, nil
 }
@@ -116,6 +123,14 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 			ch <- desc.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
 			ch <- desc.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
 			ch <- desc.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
+		case "executed_queries":
+			ch <- desc.mustNewConstMetric(stats.querySelect, "select")
+			ch <- desc.mustNewConstMetric(stats.queryMod, "mod")
+			ch <- desc.mustNewConstMetric(stats.queryDdl, "ddl")
+			ch <- desc.mustNewConstMetric(stats.queryMaint, "maintenance")
+			ch <- desc.mustNewConstMetric(stats.queryWith, "with")
+			ch <- desc.mustNewConstMetric(stats.queryCopy, "copy")
+			ch <- desc.mustNewConstMetric(stats.queryOther, "other")
 		default:
 			log.Debugf("unknown desc name: %s, skip", name)
 			continue
@@ -160,9 +175,9 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 				stateIdx := colindexes["state"]
 				eventIdx := colindexes["wait_event_type"]
 				queryIdx := colindexes["query"]
-				value := row[i].String
 
 				if row[stateIdx].Valid && row[queryIdx].Valid {
+					value := row[i].String
 					state := row[stateIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
@@ -171,12 +186,20 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 			case "since_change_seconds":
 				eventIdx := colindexes["wait_event_type"]
 				queryIdx := colindexes["query"]
-				value := row[i].String
 
 				if row[eventIdx].Valid && row[queryIdx].Valid {
+					value := row[i].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
 					stats.updateMaxWaittimeDuration(value, event, query)
+				}
+			case "query":
+				stateIdx := colindexes["state"]
+
+				if row[stateIdx].Valid {
+					value := row[i].String
+					state := row[stateIdx].String
+					stats.updateQueryStat(value, state)
 				}
 			default:
 				log.Debugf("unsupported pg_stat_activity stat column: %s, skip", string(colname.Name))
@@ -209,6 +232,13 @@ type postgresActivityStat struct {
 	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
 	maxWaitUser  float64 // longest duration being in waiting state (all activity)
 	maxWaitMaint float64 // longest duration being in waiting state (all activity)
+	querySelect  float64 // number of select queries: SELECT, TABLE
+	queryMod     float64 // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
+	queryDdl     float64 // number of DDL queries: CREATE, ALTER, DROP
+	queryMaint   float64 // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
+	queryWith    float64 // number of CTE queries
+	queryCopy    float64 // number of COPY queries
+	queryOther   float64 // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
 }
 
 // updateState increments counter depending on passed state of the backend.
@@ -305,4 +335,73 @@ func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, etype str
 			s.maxWaitUser = v
 		}
 	}
+}
+
+func (s *postgresActivityStat) updateQueryStat(query string, state string) {
+	if state != stActive {
+		return
+	}
+
+	var pattern = `^(?i)(SELECT|TABLE)`
+	re, err := regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.querySelect++
+		return
+	}
+
+	pattern = `^(?i)(INSERT|UPDATE|DELETE|TRUNCATE)`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.queryMod++
+		return
+	}
+
+	pattern = `^(?i)(CREATE|ALTER|DROP)`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.queryDdl++
+		return
+	}
+
+	pattern = `^(?i)(VACUUM|ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT|autovacuum:)`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.queryMaint++
+		return
+	}
+
+	pattern = `^(?i)WITH`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.queryWith++
+		return
+	}
+
+	pattern = `^(?i)COPY`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+	if re.MatchString(query) {
+		s.queryCopy++
+		return
+	}
+
+	// still here? ok, increment others and return
+	s.queryOther++
 }
