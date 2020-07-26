@@ -18,84 +18,22 @@ const (
 FROM pg_stat_activity
 `
 	postgresPreparedXactQuery = `SELECT count(*) AS total FROM pg_prepared_xacts`
+
+	// Backend states accordingly to pg_stat_activity.state
+	stActive          = "active"
+	stIdle            = "idle"
+	stIdleXact        = "idle in transaction"
+	stIdleXactAborted = "idle in transaction (aborted)"
+	stFastpath        = "fastpath function call"
+	stDisabled        = "disabled"
+	stWaiting         = "waiting" // fake state based on 'wait_event_type'
+
+	// Wait event type names
+	weLock = "Lock"
+
+	// regexpMaintenanceActivity defines what queries should be considered as maintenance operations.
+	regexpMaintenanceActivity = `^(?i)(autovacuum:|vacuum|analyze)`
 )
-
-/*
-   *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
-   wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
-   в active и waiting. Кроме того есть еще backend_type != 'client_backend', который вносит некоторую путаницу при учете через
-   state/wait_event_type. Поэтому нельзя так просто взять и сложить все типы и получить total - полученное значение будет
-   больше чем реальный total. Именно поэтому есть отдельно посчитанный total
-*/
-
-// postgresActivityStat describes current activity
-type postgresActivityStat struct {
-	total    float64 // state IS NOT NULL
-	idle     float64 // state = 'idle'
-	idlexact float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
-	active   float64 // state = 'active'
-	other    float64 // state IN ('fastpath function call','disabled')
-	waiting  float64 // wait_event_type = 'Lock'
-	prepared float64 // FROM pg_prepared_xacts
-	maxuser  float64 // longest duration among client queries
-	maxmaint float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
-}
-
-func (s *postgresActivityStat) updateState(state string) {
-	// increment state-specific counter
-	switch state {
-	case "active":
-		s.total++
-		s.active++
-	case "idle":
-		s.total++
-		s.idle++
-	case "idle in transaction", "idle in transaction (aborted)":
-		s.total++
-		s.idlexact++
-	case "fastpath function call", "disabled":
-		s.total++
-		s.other++
-	case "waiting":
-		// waiting must not increment totals because it isn't based on state column
-		s.waiting++
-	}
-}
-
-func (s *postgresActivityStat) updateMaxDuration(value string, state string, query string) {
-	if value == "" || state == "" || query == "" {
-		return
-	}
-
-	// don't account time for idle connections
-	if state == "idle" {
-		return
-	}
-
-	v, err := strconv.ParseFloat(value, 64)
-	if err != nil {
-		log.Errorf("skip collecting max duration metric: %s", err)
-		return
-	}
-
-	// all validations ok, update stats
-
-	re, err := regexp.Compile(`^(?i)(autovacuum:|vacuum|analyze)`)
-	if err != nil {
-		log.Errorf("skip collecting max duration metric: %s", err)
-		return
-	}
-
-	if re.MatchString(query) {
-		if v > s.maxmaint {
-			s.maxmaint = v
-		}
-	} else {
-		if v > s.maxuser {
-			s.maxuser = v
-		}
-	}
-}
 
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
@@ -121,7 +59,7 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "activity", "max_seconds"),
 					"The current longest activity for each type of activity.",
-					[]string{"type"}, constLabels,
+					[]string{"state", "type"}, constLabels,
 				), valueType: prometheus.GaugeValue,
 			},
 			"prepared_xact": {
@@ -174,8 +112,10 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		case "prepared_xact":
 			ch <- desc.mustNewConstMetric(stats.prepared)
 		case "activity_max_seconds":
-			ch <- desc.mustNewConstMetric(stats.maxuser, "user")
-			ch <- desc.mustNewConstMetric(stats.maxmaint, "maintenance")
+			ch <- desc.mustNewConstMetric(stats.maxRunUser, "running", "user")
+			ch <- desc.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
+			ch <- desc.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
+			ch <- desc.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
 		default:
 			log.Debugf("unknown desc name: %s, skip", name)
 			continue
@@ -213,32 +153,156 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 					stats.updateState(row[i].String)
 				}
 			case "wait_event_type":
-				if row[i].String == "Lock" {
+				if row[i].String == weLock {
 					stats.updateState("waiting")
 				}
 			case "since_start_seconds":
 				stateIdx := colindexes["state"]
+				eventIdx := colindexes["wait_event_type"]
 				queryIdx := colindexes["query"]
 				value := row[i].String
 
-				if row[queryIdx].Valid && row[stateIdx].Valid {
+				if row[stateIdx].Valid && row[queryIdx].Valid {
 					state := row[stateIdx].String
+					event := row[eventIdx].String
 					query := row[queryIdx].String
-					stats.updateMaxDuration(value, state, query)
+					stats.updateMaxRuntimeDuration(value, state, event, query)
+				}
+			case "since_change_seconds":
+				eventIdx := colindexes["wait_event_type"]
+				queryIdx := colindexes["query"]
+				value := row[i].String
+
+				if row[eventIdx].Valid && row[queryIdx].Valid {
+					event := row[eventIdx].String
+					query := row[queryIdx].String
+					stats.updateMaxWaittimeDuration(value, event, query)
 				}
 			default:
 				log.Debugf("unsupported pg_stat_activity stat column: %s, skip", string(colname.Name))
 				continue
 			}
-
-			// Get data value and convert it to float64 used by Prometheus.
-			//v, err := strconv.ParseFloat(row[i].String, 64)
-			//if err != nil {
-			//  log.Errorf("skip collecting metric: %s", err)
-			//  continue
-			//}
 		}
 	}
 
 	return stats
+}
+
+/*
+   *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
+   wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
+   в active и waiting. Кроме того есть еще backend_type != 'client_backend', который вносит некоторую путаницу при учете через
+   state/wait_event_type. Поэтому нельзя так просто взять и сложить все типы и получить total - полученное значение будет
+   больше чем реальный total. Именно поэтому есть отдельно посчитанный total
+*/
+
+// postgresActivityStat describes current activity
+type postgresActivityStat struct {
+	total        float64 // state IS NOT NULL
+	idle         float64 // state = 'idle'
+	idlexact     float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
+	active       float64 // state = 'active'
+	other        float64 // state IN ('fastpath function call','disabled')
+	waiting      float64 // wait_event_type = 'Lock'
+	prepared     float64 // FROM pg_prepared_xacts
+	maxRunUser   float64 // longest duration among client queries
+	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
+	maxWaitUser  float64 // longest duration being in waiting state (all activity)
+	maxWaitMaint float64 // longest duration being in waiting state (all activity)
+}
+
+// updateState increments counter depending on passed state of the backend.
+func (s *postgresActivityStat) updateState(state string) {
+	// increment state-specific counter
+	switch state {
+	case stActive:
+		s.total++
+		s.active++
+	case stIdle:
+		s.total++
+		s.idle++
+	case stIdleXact, stIdleXactAborted:
+		s.total++
+		s.idlexact++
+	case stFastpath, stDisabled:
+		s.total++
+		s.other++
+	case stWaiting:
+		// waiting must not increment totals because it isn't based on state column
+		s.waiting++
+	}
+}
+
+// updateMaxRuntimeDuration updates max duration o frunning activity.
+func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state string, etype string, query string) {
+	// necessary values should not be empty (except wait_event_type)
+	if value == "" || state == "" || query == "" {
+		return
+	}
+
+	// don't account time for idle or blocked connections, interesting only for running activity.
+	if state == stIdle || etype == weLock {
+		return
+	}
+
+	v, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Errorf("skip collecting max duration metric: %s", err)
+		return
+	}
+
+	// all validations ok, update stats
+
+	// inspect query - is ia a user activity like queries, or maintenance tasks like automatic or regular vacuum/analyze.
+	re, err := regexp.Compile(regexpMaintenanceActivity)
+	if err != nil {
+		log.Errorf("skip collecting max run time duration metric: %s", err)
+		return
+	}
+
+	if re.MatchString(query) {
+
+		if v > s.maxRunMaint {
+			s.maxRunMaint = v
+		}
+	} else {
+		if v > s.maxRunUser {
+			s.maxRunUser = v
+		}
+	}
+}
+
+// updateMaxWaittimeDuration updates max duration of waiting activity.
+func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, etype string, query string) {
+	if value == "" || etype == "" || query == "" {
+		return
+	}
+
+	// waiting activity is considered only with wait_event_type = 'Lock'
+	if etype != weLock {
+		return
+	}
+
+	v, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Errorf("skip collecting max wait time duration metric: %s", err)
+		return
+	}
+
+	// all validations ok, update stats
+	re, err := regexp.Compile(regexpMaintenanceActivity)
+	if err != nil {
+		log.Errorf("skip collecting max wait time duration metric: %s", err)
+		return
+	}
+
+	if re.MatchString(query) {
+		if v > s.maxWaitMaint {
+			s.maxWaitMaint = v
+		}
+	} else {
+		if v > s.maxWaitUser {
+			s.maxWaitUser = v
+		}
+	}
 }
