@@ -93,5 +93,5 @@ func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Met
 		return err
 	}
 
-	return parseStats(res, ch, c.descs, c.labelNames)
+	return parsePostgresStats(res, ch, c.descs, c.labelNames)
 }

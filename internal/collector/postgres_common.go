@@ -7,9 +7,9 @@ import (
 	"strconv"
 )
 
-// parseStats extracts values from query result, generates metrics using extracted values and passed
+// parsePostgresStats extracts values from query result, generates metrics using extracted values and passed
 // labels and send them to Prometheus.
-func parseStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typedDesc, labelNames []string) error {
+func parsePostgresStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typedDesc, labelNames []string) error {
 	for _, row := range r.Rows {
 		for i, colname := range r.Colnames {
 			// Column's values act as metric values or as labels values.

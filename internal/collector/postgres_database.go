@@ -182,5 +182,5 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 		return err
 	}
 
-	return parseStats(res, ch, c.descs, c.labelNames)
+	return parsePostgresStats(res, ch, c.descs, c.labelNames)
 }

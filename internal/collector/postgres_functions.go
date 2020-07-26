@@ -82,7 +82,7 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 			continue
 		}
 
-		err = parseStats(res, ch, c.descs, c.labelNames)
+		err = parsePostgresStats(res, ch, c.descs, c.labelNames)
 		if err != nil {
 			log.Warnf("failed parse functions stat for datname %s: %s", err, d)
 			continue

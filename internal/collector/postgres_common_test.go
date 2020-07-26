@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func Test_parseStats(t *testing.T) {
+func Test_parsePostgresStats(t *testing.T) {
 	var testDescs = []typedDesc{
 		{
 			colname: "test_alfa",
@@ -95,7 +95,7 @@ func Test_parseStats(t *testing.T) {
 		var ch = make(chan prometheus.Metric)
 		tcCopy := tc
 		go func() {
-			assert.NoError(t, parseStats(tcCopy.res, ch, testDescs, []string{"testname"}))
+			assert.NoError(t, parsePostgresStats(tcCopy.res, ch, testDescs, []string{"testname"}))
 			close(ch)
 		}()
 
