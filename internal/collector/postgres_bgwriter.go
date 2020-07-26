@@ -34,7 +34,6 @@ type bgwriterStat struct {
 
 type postgresBgwriterCollector struct {
 	descs map[string]typedDesc
-	stats bgwriterStat
 }
 
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.

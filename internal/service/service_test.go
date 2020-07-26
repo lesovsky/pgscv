@@ -10,8 +10,8 @@ import (
 	"time"
 )
 
-func TestServiceRepo_addService(t *testing.T) {
-	r := NewServiceRepo()
+func TestRepository_addService(t *testing.T) {
+	r := NewRepository()
 	s1 := TestSystemService()
 	s2 := TestPostgresService()
 	s3 := TestPgbouncerService()
@@ -21,8 +21,8 @@ func TestServiceRepo_addService(t *testing.T) {
 	assert.Equal(t, 3, r.totalServices())
 }
 
-func TestServiceRepo_getService(t *testing.T) {
-	r := NewServiceRepo()
+func TestRepository_getService(t *testing.T) {
+	r := NewRepository()
 	s := TestSystemService()
 	r.addService(s.ServiceID, s)
 
@@ -32,8 +32,8 @@ func TestServiceRepo_getService(t *testing.T) {
 	assert.Equal(t, s.ConnSettings, got.ConnSettings)
 }
 
-func TestServiceRepo_removeServiceByServiceID(t *testing.T) {
-	r := NewServiceRepo()
+func TestRepository_removeServiceByServiceID(t *testing.T) {
+	r := NewRepository()
 	s := TestSystemService()
 	r.addService(s.ServiceID, s)
 	assert.Equal(t, 1, r.totalServices())
@@ -41,8 +41,8 @@ func TestServiceRepo_removeServiceByServiceID(t *testing.T) {
 	assert.Equal(t, 0, r.totalServices())
 }
 
-func TestServiceRepo_getServiceIDs(t *testing.T) {
-	r := NewServiceRepo()
+func TestRepository_getServiceIDs(t *testing.T) {
+	r := NewRepository()
 	s1 := TestSystemService()
 	s2 := TestPostgresService()
 	s3 := TestPgbouncerService()
@@ -58,7 +58,7 @@ func TestServiceRepo_getServiceIDs(t *testing.T) {
 	}
 }
 
-func TestServiceRepo_addServicesFromConfig(t *testing.T) {
+func TestRepository_addServicesFromConfig(t *testing.T) {
 	testCases := []struct {
 		name     string
 		config   Config
@@ -66,7 +66,7 @@ func TestServiceRepo_addServicesFromConfig(t *testing.T) {
 	}{
 		{
 			name: "valid",
-			config: Config{ConnSettings: []ServiceConnSetting{
+			config: Config{ConnSettings: []ConnSetting{
 				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 			}},
 			expected: 2,
@@ -78,24 +78,24 @@ func TestServiceRepo_addServicesFromConfig(t *testing.T) {
 		},
 		{
 			name:     "invalid service",
-			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid conninfo"}}},
+			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid conninfo"}}},
 			expected: 1,
 		},
 		{
 			name:     "unavailable service",
-			config:   Config{ConnSettings: []ServiceConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=15432"}}},
+			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=15432"}}},
 			expected: 1,
 		},
 	}
 
 	for _, tc := range testCases {
-		r := NewServiceRepo()
+		r := NewRepository()
 		r.addServicesFromConfig(tc.config)
 		assert.Equal(t, tc.expected, r.totalServices())
 	}
 }
 
-func TestServiceRepo_setupServices(t *testing.T) {
+func TestRepository_setupServices(t *testing.T) {
 	testCases := []struct {
 		name     string
 		config   Config
@@ -104,7 +104,7 @@ func TestServiceRepo_setupServices(t *testing.T) {
 		{
 			name: "valid",
 			config: Config{
-				ConnSettings: []ServiceConnSetting{
+				ConnSettings: []ConnSetting{
 					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 				},
 			},
@@ -114,7 +114,7 @@ func TestServiceRepo_setupServices(t *testing.T) {
 			name: "valid with pull mode",
 			config: Config{
 				RuntimeMode: model.RuntimePullMode,
-				ConnSettings: []ServiceConnSetting{
+				ConnSettings: []ConnSetting{
 					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
 				},
 			},
@@ -123,7 +123,7 @@ func TestServiceRepo_setupServices(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		r := NewServiceRepo()
+		r := NewRepository()
 		r.addServicesFromConfig(tc.config)
 		assert.Equal(t, tc.expected, r.totalServices())
 
@@ -134,20 +134,20 @@ func TestServiceRepo_setupServices(t *testing.T) {
 	}
 }
 
-func TestServiceRepo_startBackgroundDiscovery(t *testing.T) {
-	r := NewServiceRepo()
+func TestRepository_startBackgroundDiscovery(t *testing.T) {
+	r := NewRepository()
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	r.startBackgroundDiscovery(ctx, Config{})
 	assert.NotEqual(t, 0, r.totalServices())
 }
 
-func TestServiceRepo_lookupServices(t *testing.T) {
+func TestRepository_lookupServices(t *testing.T) {
 	if uid := os.Geteuid(); uid != 0 {
 		t.Skipf("root privileges required, skip")
 	}
 
-	r := NewServiceRepo()
+	r := NewRepository()
 	assert.NoError(t, r.lookupServices(Config{}))
 	assert.NotEqual(t, 0, r.totalServices())
 }

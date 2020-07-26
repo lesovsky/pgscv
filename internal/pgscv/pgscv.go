@@ -2,7 +2,7 @@ package pgscv
 
 import (
 	"context"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
@@ -19,7 +19,7 @@ import (
 func Start(ctx context.Context, config *Config) error {
 	log.Debug("start application")
 
-	serviceRepo := service.NewServiceRepo()
+	serviceRepo := service.NewRepository()
 
 	serviceConfig := service.Config{
 		RuntimeMode:  config.RuntimeMode,
@@ -83,7 +83,7 @@ func runPullMode(config *Config) error {
 }
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
-func runPushMode(ctx context.Context, config *Config, instanceRepo *service.ServiceRepo) error {
+func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repository) error {
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
 	// this label should be removed with 'metric_relabel_config' rule.
@@ -121,7 +121,7 @@ func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Serv
 }
 
 // pushMetrics collects metrics for discovered services and pushes them to remote service
-func pushMetrics(labelBase string, url string, apiKey string, repo *service.ServiceRepo) {
+func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repository) {
 	log.Debug("job started")
 
 	var servicesIDs = repo.GetServiceIDs()
@@ -212,5 +212,5 @@ func getLabelByHostname() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%x", md5.Sum([]byte(hostname))), nil
+	return fmt.Sprintf("%x", md5.Sum([]byte(hostname))), nil // #nosec G401
 }

@@ -15,6 +15,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +46,7 @@ type Service struct {
 	// metric_xact_rollbacks{db_instance="host-2" sid="postgres:5432", database="test", project_id="1"}
 	ProjectID string
 	// Connection settings required for connecting to the service.
-	ConnSettings ServiceConnSetting
+	ConnSettings ConnSetting
 	// Prometheus-based metrics collector associated with the service. Each 'service' has its own dedicated collector instance
 	// which implements a service-specific set of metric collectors.
 	Collector Collector
@@ -56,7 +57,7 @@ type Config struct {
 	RuntimeMode  int
 	ProjectID    string
 	ConnDefaults map[string]string `json:"defaults"` // Defaults
-	ConnSettings []ServiceConnSetting
+	ConnSettings []ConnSetting
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -65,9 +66,9 @@ type Collector interface {
 	Collect(chan<- prometheus.Metric)
 }
 
-// ServiceConnSetting describes connection settings required for connecting to particular service. This struct primarily
+// ConnSetting describes connection settings required for connecting to particular service. This struct primarily
 // is used for representing services defined by user in the config file.
-type ServiceConnSetting struct {
+type ConnSetting struct {
 	// ServiceType defines type of service for which these connection settings are used.
 	ServiceType string `json:"service_type"`
 	// Conninfo is the connection string in service-specific format.
@@ -86,62 +87,62 @@ type connectionParams struct {
 	// ... other stuff we're not interested in
 }
 
-// ServiceRepo is the repository with services.
-type ServiceRepo struct {
+// Repository is the repository with services.
+type Repository struct {
 	sync.RWMutex                    // protect concurrent access
 	Services     map[string]Service // service repo store
 }
 
-// NewServiceRepo creates new services repository.
-func NewServiceRepo() *ServiceRepo {
-	return &ServiceRepo{
+// NewRepository creates new services repository.
+func NewRepository() *Repository {
+	return &Repository{
 		Services: make(map[string]Service),
 	}
 }
 
-/* Public wrapper-methods of ServiceRepo */
+/* Public wrapper-methods of Repository */
 
 //
-func (repo *ServiceRepo) GetService(id string) Service {
+func (repo *Repository) GetService(id string) Service {
 	return repo.getService(id)
 }
 
 //
-func (repo *ServiceRepo) TotalServices() int {
+func (repo *Repository) TotalServices() int {
 	return repo.totalServices()
 }
 
 //
-func (repo *ServiceRepo) GetServiceIDs() []string {
+func (repo *Repository) GetServiceIDs() []string {
 	return repo.getServiceIDs()
 }
 
 //
-func (repo *ServiceRepo) AddServicesFromConfig(config Config) {
+func (repo *Repository) AddServicesFromConfig(config Config) {
 	repo.addServicesFromConfig(config)
 }
 
 //
-func (repo *ServiceRepo) SetupServices(config Config) error {
+func (repo *Repository) SetupServices(config Config) error {
 	return repo.setupServices(config)
 }
 
 //
-func (repo *ServiceRepo) StartBackgroundDiscovery(ctx context.Context, config Config) {
+func (repo *Repository) StartBackgroundDiscovery(ctx context.Context, config Config) {
 	repo.startBackgroundDiscovery(ctx, config)
 }
 
-/* Private methods of ServiceRepo */
+/* Private methods of Repository */
 
 // addService adds service to the repo.
-func (repo *ServiceRepo) addService(id string, s Service) {
+func (repo *Repository) addService(id string, s Service) {
 	repo.Lock()
 	repo.Services[id] = s
 	repo.Unlock()
 }
 
 // getService returns the service from repo with specified ID.
-func (repo *ServiceRepo) getService(id string) Service {
+func (repo *Repository) getService(id string) Service {
 	repo.RLock()
 	s := repo.Services[id]
 	repo.RUnlock()
@@ -149,7 +150,7 @@ func (repo *ServiceRepo) getService(id string) Service {
 }
 
 // removeService removes service from the repo.
-func (repo *ServiceRepo) removeServiceByServiceID(id string) {
+func (repo *Repository) removeServiceByServiceID(id string) {
 	repo.Lock()
 	for k, v := range repo.Services {
 		if v.ServiceID == id {
@@ -160,7 +161,7 @@ func (repo *ServiceRepo) removeServiceByServiceID(id string) {
 }
 
 // totalServices returns the number of services registered in the repo.
-func (repo *ServiceRepo) totalServices() int {
+func (repo *Repository) totalServices() int {
 	repo.RLock()
 	var size = len(repo.Services)
 	repo.RUnlock()
@@ -168,7 +169,7 @@ func (repo *ServiceRepo) totalServices() int {
 }
 
 // getServiceIDs returns slice of services' IDs in the repo.
-func (repo *ServiceRepo) getServiceIDs() []string {
+func (repo *Repository) getServiceIDs() []string {
 	var serviceIDs = make([]string, 0, repo.totalServices())
 	repo.RLock()
 	for i := range repo.Services {
@@ -179,7 +180,7 @@ func (repo *ServiceRepo) getServiceIDs() []string {
 }
 
 // addServicesFromConfig reads info about services from the config file and fulfill the repo.
-func (repo *ServiceRepo) addServicesFromConfig(config Config) {
+func (repo *Repository) addServicesFromConfig(config Config) {
 	// Sanity check, but basically should be always passed.
 	if config.ConnSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
@@ -187,7 +188,7 @@ func (repo *ServiceRepo) addServicesFromConfig(config Config) {
 	}
 
 	log.Debug("adding system service")
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypeSystem}})
+	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
 
 	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
 	// in the repo.
@@ -224,7 +225,7 @@ func (repo *ServiceRepo) addServicesFromConfig(config Config) {
 }
 
 // setupServices attaches metrics exporters to the services in the repo.
-func (repo *ServiceRepo) setupServices(config Config) error {
+func (repo *Repository) setupServices(config Config) error {
 	var servicesIDs = repo.getServiceIDs()
 
 	for _, id := range servicesIDs {
@@ -266,12 +267,12 @@ func (repo *ServiceRepo) setupServices(config Config) error {
 }
 
 // startBackgroundDiscovery looking for services and add them to the repo.
-func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context, config Config) {
+func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Config) {
 	log.Debug("starting background auto-discovery")
 
 	// add pseudo-service for system metrics
 	log.Debug("adding system service")
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypeSystem}})
+	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
 
 	for {
 		if err := repo.lookupServices(config); err != nil {
@@ -295,7 +296,7 @@ func (repo *ServiceRepo) startBackgroundDiscovery(ctx context.Context, config Co
 }
 
 // lookupServices scans PIDs and looking for required services
-func (repo *ServiceRepo) lookupServices(config Config) error {
+func (repo *Repository) lookupServices(config Config) error {
 	pids, err := process.Pids()
 	if err != nil {
 		return err
@@ -388,7 +389,7 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 	s := Service{
 		ServiceID:    model.ServiceTypePostgresql + ":" + strconv.Itoa(connParams.listenPort),
 		ProjectID:    config.ProjectID,
-		ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypePostgresql, Conninfo: connString},
+		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePostgresql, Conninfo: connString},
 		Collector:    nil,
 	}
 
@@ -409,7 +410,7 @@ func parsePostgresProcessCmdline(cmdline []string) (string, error) {
 // newPostgresConnectionParams reads connection parameters from postmaster.pid
 func newPostgresConnectionParams(pidFilePath string) (connectionParams, error) {
 	p := connectionParams{}
-	content, err := ioutil.ReadFile(pidFilePath)
+	content, err := ioutil.ReadFile(filepath.Clean(pidFilePath))
 	if err != nil {
 		return p, err
 	}
@@ -523,7 +524,7 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 	s := Service{
 		ServiceID:    model.ServiceTypePgbouncer + ":" + strconv.Itoa(connParams.listenPort),
 		ProjectID:    config.ProjectID,
-		ConnSettings: ServiceConnSetting{ServiceType: model.ServiceTypePgbouncer, Conninfo: connString},
+		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePgbouncer, Conninfo: connString},
 		Collector:    nil,
 	}
 
@@ -534,7 +535,7 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 // parsePgbouncerIniFile reads pgbouncer's config ini file and returns connection parameters required for constructing connection string.
 func parsePgbouncerIniFile(iniFilePath string) (connectionParams, error) {
 	// read the content of inifile
-	file, err := os.Open(iniFilePath)
+	file, err := os.Open(filepath.Clean(iniFilePath))
 	if err != nil {
 		return connectionParams{}, err
 	}

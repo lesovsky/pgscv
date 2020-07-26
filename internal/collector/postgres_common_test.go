@@ -105,7 +105,7 @@ func Test_parsePostgresStats(t *testing.T) {
 			re := regexp.MustCompile(`fqName: "([a-z_]+)"`)
 			match := re.FindStringSubmatch(metric.Desc().String())[1]
 			assert.Contains(t, tc.required, match)
-			metricNamesCounter[match] += 1
+			metricNamesCounter[match]++
 		}
 
 		// check there are no metrics generated other than required

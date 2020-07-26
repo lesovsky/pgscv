@@ -38,7 +38,6 @@ FROM pg_stat_activity
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
 	descs map[string]typedDesc
-	postgresActivityStat
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.

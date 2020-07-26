@@ -53,7 +53,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 		re := regexp.MustCompile(`fqName: "([a-z_]+)"`)
 		match := re.FindStringSubmatch(metric.Desc().String())[1]
 		assert.Contains(t, append(input.required, input.optional...), match)
-		metricNamesCounter[match] += 1
+		metricNamesCounter[match]++
 	}
 
 	for _, s := range input.required {

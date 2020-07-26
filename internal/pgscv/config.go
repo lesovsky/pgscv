@@ -8,6 +8,7 @@ import (
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
 	"io/ioutil"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -16,8 +17,6 @@ import (
 
 const (
 	defaultListenAddress     = "127.0.0.1:10090"
-	defaultHost              = "127.0.0.1"
-	defaultPgbouncerPort     = 6432
 	defaultPostgresUsername  = "pgscv"
 	defaultPostgresDbname    = "postgres"
 	defaultPgbouncerUsername = "pgscv"
@@ -28,21 +27,21 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryVersion        string                       // version of the program, required for auto-update procedure
-	RuntimeMode          int                          // application runtime mode
-	ScheduleEnabled      bool                         // use schedule-based metrics collecting
-	ListenAddress        string                       `json:"listen_address"`      // Network address and port where the application should listen on
-	MetricsServiceURL    string                       `json:"metrics_service_url"` // URL of Weaponry service metric gateway
-	MetricsSendInterval  time.Duration                // Metric send interval
-	APIKey               string                       `json:"api_key"` // API key for accessing to Weaponry
-	ProjectID            string                       // ProjectID value obtained from API key
-	ServicesConnSettings []service.ServiceConnSetting `json:"services"` // Slice of connection settings for exact services
-	Defaults             map[string]string            `json:"defaults"` // Defaults
+	BinaryVersion        string                // version of the program, required for auto-update procedure
+	RuntimeMode          int                   // application runtime mode
+	ScheduleEnabled      bool                  // use schedule-based metrics collecting
+	ListenAddress        string                `json:"listen_address"`      // Network address and port where the application should listen on
+	MetricsServiceURL    string                `json:"metrics_service_url"` // URL of Weaponry service metric gateway
+	MetricsSendInterval  time.Duration         // Metric send interval
+	APIKey               string                `json:"api_key"` // API key for accessing to Weaponry
+	ProjectID            string                // ProjectID value obtained from API key
+	ServicesConnSettings []service.ConnSetting `json:"services"` // Slice of connection settings for exact services
+	Defaults             map[string]string     `json:"defaults"` // Defaults
 }
 
 // NewConfig creates new config based on config file.
 func NewConfig(configFilePath string) (*Config, error) {
-	content, err := ioutil.ReadFile(configFilePath)
+	content, err := ioutil.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +126,7 @@ func (c *Config) Validate() error {
 
 		// If services with invalid Conninfo have been found, just build a new slice without invalid services.
 		if foundInvalid {
-			cc := make([]service.ServiceConnSetting, 0, len(c.ServicesConnSettings))
+			cc := make([]service.ConnSetting, 0, len(c.ServicesConnSettings))
 			for _, s := range c.ServicesConnSettings {
 				if s.Conninfo != "__invalid__" {
 					cc = append(cc, s)

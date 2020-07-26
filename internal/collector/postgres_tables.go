@@ -73,7 +73,6 @@ type postgresTablesCollector struct {
 	maintLastAnalyze typedDesc
 	maintenance      typedDesc
 	labelNames       []string
-	tablesStats
 }
 
 // NewPostgresTablesCollector returns a new Collector exposing postgres tables stats.

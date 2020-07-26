@@ -113,9 +113,8 @@ func execute(name string, config Config, c Collector, ch chan<- prometheus.Metri
 	if err != nil {
 		log.Errorf("%s collector failed; duration_seconds %f; err: %s", name, duration.Seconds(), err)
 		//success = 0
-	} else {
-		//success = 1
-	}
+	} // else { success = 1 }
+
 	//ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)
 	//ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, success, name)
 }
