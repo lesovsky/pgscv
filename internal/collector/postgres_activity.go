@@ -5,6 +5,8 @@ import (
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
+	"regexp"
+	"strconv"
 )
 
 const (
@@ -26,28 +28,20 @@ FROM pg_stat_activity
    больше чем реальный total. Именно поэтому есть отдельно посчитанный total
 */
 
-// postgresActivityStateStat describes current activity
-type postgresActivityStateStat struct {
+// postgresActivityStat describes current activity
+type postgresActivityStat struct {
 	total    float64 // state IS NOT NULL
 	idle     float64 // state = 'idle'
 	idlexact float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
 	active   float64 // state = 'active'
 	other    float64 // state IN ('fastpath function call','disabled')
 	waiting  float64 // wait_event_type = 'Lock'
+	prepared float64 // FROM pg_prepared_xacts
+	maxuser  float64 // longest duration among client queries
+	maxmaint float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
 }
 
-// postgresPreparedActivityStat describes current activity
-type postgresPreparedXactStat struct {
-	total float64 // FROM pg_prepared_xacts
-}
-
-// postgresActivityStats is a cumulative activity stat which unions all activity-specific stats
-type postgresActivityStats struct {
-	activity postgresActivityStateStat
-	prepared postgresPreparedXactStat
-}
-
-func (s *postgresActivityStateStat) updateState(state string) {
+func (s *postgresActivityStat) updateState(state string) {
 	// increment state-specific counter
 	switch state {
 	case "active":
@@ -68,10 +62,45 @@ func (s *postgresActivityStateStat) updateState(state string) {
 	}
 }
 
+func (s *postgresActivityStat) updateMaxDuration(value string, state string, query string) {
+	if value == "" || state == "" || query == "" {
+		return
+	}
+
+	// don't account time for idle connections
+	if state == "idle" {
+		return
+	}
+
+	v, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Errorf("skip collecting max duration metric: %s", err)
+		return
+	}
+
+	// all validations ok, update stats
+
+	re, err := regexp.Compile(`^(?i)(autovacuum:|vacuum|analyze)`)
+	if err != nil {
+		log.Errorf("skip collecting max duration metric: %s", err)
+		return
+	}
+
+	if re.MatchString(query) {
+		if v > s.maxmaint {
+			s.maxmaint = v
+		}
+	} else {
+		if v > s.maxuser {
+			s.maxuser = v
+		}
+	}
+}
+
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
 	descs map[string]typedDesc
-	postgresActivityStats
+	postgresActivityStat
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -86,6 +115,13 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 					prometheus.BuildFQName("postgres", "activity", "conn_total"),
 					"The total number of connections in each state.",
 					[]string{"state"}, constLabels,
+				), valueType: prometheus.GaugeValue,
+			},
+			"activity_max_seconds": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "activity", "max_seconds"),
+					"The current longest activity for each type of activity.",
+					[]string{"type"}, constLabels,
 				), valueType: prometheus.GaugeValue,
 			},
 			"prepared_xact": {
@@ -107,7 +143,14 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	}
 	defer conn.Close()
 
-	var stats postgresActivityStats
+	// get pg_stat_activity stats
+	res, err := conn.GetStats(postgresActivityQuery)
+	if err != nil {
+		return err
+	}
+
+	// parse pg_stat_activity stats
+	stats := parsePostgresActivityStats(res)
 
 	// get pg_prepared_xacts stats
 	var count int
@@ -116,29 +159,23 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		log.Warnf("failed to read pg_prepared_xacts: %s; skip", err)
 		delete(c.descs, "prepared_xact")
 	} else {
-		stats.prepared.total = float64(count)
+		stats.prepared = float64(count)
 	}
-
-	// get pg_stat_activity stats
-	res, err := conn.GetStats(postgresActivityQuery)
-	if err != nil {
-		return err
-	}
-
-	// parse pg_stat_activity stats
-	stats.activity = parsePostgresActivityStats(res)
 
 	for name, desc := range c.descs {
 		switch name {
 		case "conn_state":
-			ch <- desc.mustNewConstMetric(stats.activity.total, "total")
-			ch <- desc.mustNewConstMetric(stats.activity.active, "active")
-			ch <- desc.mustNewConstMetric(stats.activity.idle, "idle")
-			ch <- desc.mustNewConstMetric(stats.activity.idlexact, "idlexact")
-			ch <- desc.mustNewConstMetric(stats.activity.other, "other")
-			ch <- desc.mustNewConstMetric(stats.activity.waiting, "waiting")
+			ch <- desc.mustNewConstMetric(stats.total, "total")
+			ch <- desc.mustNewConstMetric(stats.active, "active")
+			ch <- desc.mustNewConstMetric(stats.idle, "idle")
+			ch <- desc.mustNewConstMetric(stats.idlexact, "idlexact")
+			ch <- desc.mustNewConstMetric(stats.other, "other")
+			ch <- desc.mustNewConstMetric(stats.waiting, "waiting")
 		case "prepared_xact":
-			ch <- desc.mustNewConstMetric(stats.prepared.total)
+			ch <- desc.mustNewConstMetric(stats.prepared)
+		case "activity_max_seconds":
+			ch <- desc.mustNewConstMetric(stats.maxuser, "user")
+			ch <- desc.mustNewConstMetric(stats.maxmaint, "maintenance")
 		default:
 			log.Debugf("unknown desc name: %s, skip", name)
 			continue
@@ -148,8 +185,8 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	return nil
 }
 
-func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStateStat {
-	var stats postgresActivityStateStat
+func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
+	var stats postgresActivityStat
 
 	// Make map with column names and their indexes. This map needed to get quick access to values of exact columns within
 	// processed row.
@@ -178,6 +215,16 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStateStat 
 			case "wait_event_type":
 				if row[i].String == "Lock" {
 					stats.updateState("waiting")
+				}
+			case "since_start_seconds":
+				stateIdx := colindexes["state"]
+				queryIdx := colindexes["query"]
+				value := row[i].String
+
+				if row[queryIdx].Valid && row[stateIdx].Valid {
+					state := row[stateIdx].String
+					query := row[queryIdx].String
+					stats.updateMaxDuration(value, state, query)
 				}
 			default:
 				log.Debugf("unsupported pg_stat_activity stat column: %s, skip", string(colname.Name))
