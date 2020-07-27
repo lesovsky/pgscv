@@ -38,6 +38,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 	switch input.service {
 	case model.ServiceTypePostgresql:
 		config.ConnString = "postgres://postgres@postgres/postgres"
+		config.PostgresServiceConfig = NewPostgresServiceConfig(config.ConnString)
 	case model.ServiceTypePgbouncer:
 		config.ConnString = "postgres://pgbouncer@127.0.0.1:6432/pgbouncer"
 	}
@@ -52,6 +53,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 	for metric := range ch {
 		re := regexp.MustCompile(`fqName: "([a-z_]+)"`)
 		match := re.FindStringSubmatch(metric.Desc().String())[1]
+		log.Infoln("lessqq: ", metric.Desc().String())
 		assert.Contains(t, append(input.required, input.optional...), match)
 		metricNamesCounter[match]++
 	}

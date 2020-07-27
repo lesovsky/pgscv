@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v4"
@@ -68,26 +69,33 @@ func (db *DB) GetDatabases() ([]string, error) {
 	return list, nil
 }
 
-// IsPGSSAvailable returns true if pg_stat_statements exists and available
-func (db *DB) IsPGSSAvailable() bool {
-	log.Debug("check pg_stat_statements availability")
-	/* check pg_stat_statements */
-	var pgCheckPGSSExists = `SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = 'pg_stat_statements')`
-	var pgCheckPGSSCount = `SELECT 1 FROM pg_stat_statements LIMIT 1`
-	var vExists bool
-	var vCount int
-	if err := db.Conn.QueryRow(context.Background(), pgCheckPGSSExists).Scan(&vExists); err != nil {
-		log.Debug("failed to check pg_stat_statements view in information_schema")
-		return false // failed to query information_schema
+// IsExtensionAvailable returns true if extension with specified name exists and available
+func (db *DB) IsExtensionAvailable(name string) bool {
+	log.Debugf("check %s availability", name)
+
+	var (
+		checkExtensionQuery = fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = '%s')", name)
+		checkContentQuery   = fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", name)
+		exists              bool
+		count               int
+	)
+
+	if err := db.Conn.QueryRow(context.Background(), checkExtensionQuery).Scan(&exists); err != nil {
+		log.Errorln("failed to check extensions in information_schema: ", err)
+		return false
 	}
-	if !vExists {
-		log.Debug("pg_stat_statements is not available in this database")
-		return false // pg_stat_statements is not available
+
+	// Return false if extension is not installed.
+	if !exists {
+		return false
 	}
-	if err := db.Conn.QueryRow(context.Background(), pgCheckPGSSCount).Scan(&vCount); err != nil {
-		log.Debug("pg_stat_statements exists but not queryable")
-		return false // view exists, but unavailable for queries - empty shared_preload_libraries ?
+
+	// Execute simple query to check extension is queryable.
+	if err := db.Conn.QueryRow(context.Background(), checkContentQuery).Scan(&count); err != nil {
+		log.Errorf("%s exists but not queryable: ", err)
+		return false
 	}
+
 	return true
 }
 

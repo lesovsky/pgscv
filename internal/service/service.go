@@ -234,19 +234,19 @@ func (repo *Repository) setupServices(config Config) error {
 			service.ProjectID = config.ProjectID
 
 			factories := collector.Factories{}
+			collectorConfig := collector.Config{ServiceType: service.ConnSettings.ServiceType, ConnString: service.ConnSettings.Conninfo}
 			switch service.ConnSettings.ServiceType {
 			case model.ServiceTypeSystem:
 				factories.RegisterSystemCollectors()
 			case model.ServiceTypePostgresql:
 				factories.RegisterPostgresCollectors()
+				collectorConfig.PostgresServiceConfig = collector.NewPostgresServiceConfig(collectorConfig.ConnString)
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors()
 			default:
 				continue
 			}
 
-			// create exporter for the service
-			collectorConfig := collector.Config{ServiceType: service.ConnSettings.ServiceType, ConnString: service.ConnSettings.Conninfo}
 			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories, collectorConfig)
 			if err != nil {
 				return err

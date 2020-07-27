@@ -37,6 +37,7 @@ func (f Factories) RegisterPostgresCollectors() {
 	f.register("bgwriter", NewPostgresBgwriterCollector)
 	f.register("database", NewPostgresDatabasesCollector)
 	f.register("function", NewPostgresFunctionsCollector)
+	f.register("statements", NewPostgresStatementsCollector)
 	f.register("table", NewPostgresTablesCollector)
 }
 
@@ -55,12 +56,6 @@ func (f Factories) register(collector string, factory func(prometheus.Labels) (C
 type Collector interface {
 	// Get new metrics and expose them via prometheus registry.
 	Update(config Config, ch chan<- prometheus.Metric) error
-}
-
-// Config defines collector configuration settings
-type Config struct {
-	ServiceType string
-	ConnString  string
 }
 
 // Collector implements the prometheus.Collector interface.
