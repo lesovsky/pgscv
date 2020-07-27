@@ -184,7 +184,7 @@ func parsePostgresStatementsStats(r *store.QueryResult, labelNames []string) map
 			}
 		}
 
-		// Create a pool name consisting of trio database/user/queryid
+		// Create a statement name consisting of trio database/user/queryid
 		statement := strings.Join([]string{stat.datname, stat.usename, stat.queryid}, "/")
 
 		// Put stats with labels (but with no data values yet) into stats store.
