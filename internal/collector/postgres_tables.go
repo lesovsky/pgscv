@@ -20,45 +20,28 @@ const userTablesQuery = `SELECT
   vacuum_count, autovacuum_count, analyze_count, autoanalyze_count
 FROM pg_stat_user_tables`
 
-// scanStat is per-table store for metrics related to how tables are accessed.
-type scanStat struct {
+// postgresTableStat is per-table store for metrics related to how tables are accessed.
+type postgresTableStat struct {
+	datname     string
+	schemaname  string
+	relname     string
 	seqscan     float64
 	seqtupread  float64
 	idxscan     float64
 	idxtupfetch float64
-}
-
-// tuplesStat is a per-table store for metrics related to how many tuples were modified.
-type tuplesStat struct {
-	inserted   float64
-	updated    float64
-	deleted    float64
-	hotUpdated float64
-}
-
-// tuplesTotalStat is a per-table store for metrics related how many tuples in the table.
-type tuplesTotalStat struct {
-	live     float64
-	dead     float64
-	modified float64
-}
-
-// maintenanceStat is a per-table store for metrics related to maintenance operations like vacuum or analyze.
-type maintenanceStat struct {
+	inserted    float64
+	updated     float64
+	deleted     float64
+	hotUpdated  float64
+	live        float64
+	dead        float64
+	modified    float64
 	lastvacuum  float64
+	lastanalyze float64
 	vacuum      float64
 	autovacuum  float64
-	lastanalyze float64
 	analyze     float64
 	autoanalyze float64
-}
-
-// tablesStats is cumulative store for all tables stats in processed database.
-type tablesStats struct {
-	scanStats        map[string]scanStat
-	tupleStats       map[string]tuplesStat
-	tupleTotalStats  map[string]tuplesTotalStat
-	maintenanceStats map[string]maintenanceStat
 }
 
 // postgresTablesCollector defines metric descriptors and stats store.
@@ -190,81 +173,44 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 		stats := parsePostgresTableStats(res, c.labelNames)
 
-		for tablename, stat := range stats.scanStats {
-			props := strings.Split(tablename, "/")
-			if len(props) != 3 {
-				log.Warnf("incomplete pool name: %s; skip", tablename)
-				continue
-			}
-			datname, schema, relname := props[0], props[1], props[2]
-			ch <- c.seqscan.mustNewConstMetric(stat.seqscan, datname, schema, relname)
-			ch <- c.seqtupread.mustNewConstMetric(stat.seqtupread, datname, schema, relname)
-			ch <- c.idxscan.mustNewConstMetric(stat.idxscan, datname, schema, relname)
-			ch <- c.idxtupfetch.mustNewConstMetric(stat.idxtupfetch, datname, schema, relname)
-		}
+		for _, stat := range stats {
+			// scan stats
+			ch <- c.seqscan.mustNewConstMetric(stat.seqscan, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.seqtupread.mustNewConstMetric(stat.seqtupread, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.idxscan.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.idxtupfetch.mustNewConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname)
 
-		for tablename, stat := range stats.tupleStats {
-			props := strings.Split(tablename, "/")
-			if len(props) != 3 {
-				log.Warnf("incomplete pool name: %s; skip", tablename)
-				continue
-			}
-			datname, schema, relname := props[0], props[1], props[2]
-			ch <- c.tuples.mustNewConstMetric(stat.inserted, datname, schema, relname, "inserted")
-			ch <- c.tuples.mustNewConstMetric(stat.updated, datname, schema, relname, "updated")
-			ch <- c.tuples.mustNewConstMetric(stat.deleted, datname, schema, relname, "deleted")
-			ch <- c.tuples.mustNewConstMetric(stat.hotUpdated, datname, schema, relname, "hot_updated")
-		}
+			// tuples stats
+			ch <- c.tuples.mustNewConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname, "inserted")
+			ch <- c.tuples.mustNewConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname, "updated")
+			ch <- c.tuples.mustNewConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname, "deleted")
+			ch <- c.tuples.mustNewConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname, "hot_updated")
 
-		for tablename, stat := range stats.tupleTotalStats {
-			props := strings.Split(tablename, "/")
-			if len(props) != 3 {
-				log.Warnf("incomplete pool name: %s; skip", tablename)
-				continue
-			}
-			datname, schema, relname := props[0], props[1], props[2]
-			ch <- c.tuplestotal.mustNewConstMetric(stat.live, datname, schema, relname, "live")
-			ch <- c.tuplestotal.mustNewConstMetric(stat.dead, datname, schema, relname, "dead")
-			ch <- c.tuplestotal.mustNewConstMetric(stat.modified, datname, schema, relname, "modified")
-		}
+			// tuples total stats
+			ch <- c.tuplestotal.mustNewConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname, "live")
+			ch <- c.tuplestotal.mustNewConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname, "dead")
+			ch <- c.tuplestotal.mustNewConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname, "modified")
 
-		for tablename, stat := range stats.maintenanceStats {
-			props := strings.Split(tablename, "/")
-			if len(props) != 3 {
-				log.Warnf("incomplete pool name: %s; skip", tablename)
-				continue
-			}
-			datname, schema, relname := props[0], props[1], props[2]
-			ch <- c.maintLastVacuum.mustNewConstMetric(stat.lastvacuum, datname, schema, relname)
-			ch <- c.maintLastAnalyze.mustNewConstMetric(stat.lastanalyze, datname, schema, relname)
-			ch <- c.maintenance.mustNewConstMetric(stat.vacuum, datname, schema, relname, "vacuum")
-			ch <- c.maintenance.mustNewConstMetric(stat.autovacuum, datname, schema, relname, "autovacuum")
-			ch <- c.maintenance.mustNewConstMetric(stat.analyze, datname, schema, relname, "analyze")
-			ch <- c.maintenance.mustNewConstMetric(stat.autoanalyze, datname, schema, relname, "autoanalyze")
+			// maintenance stats
+			ch <- c.maintLastVacuum.mustNewConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.maintLastAnalyze.mustNewConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.maintenance.mustNewConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
+			ch <- c.maintenance.mustNewConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
+			ch <- c.maintenance.mustNewConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
+			ch <- c.maintenance.mustNewConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
 		}
 	}
 
 	return nil
 }
 
-func parsePostgresTableStats(r *store.QueryResult, labelNames []string) tablesStats {
-	// ad-hoc struct used to group pool properties (database, user and mode) in one place.
-	type tableFQName struct {
-		datname    string
-		schemaname string
-		relname    string
-	}
+func parsePostgresTableStats(r *store.QueryResult, labelNames []string) map[string]postgresTableStat {
+	var stats = make(map[string]postgresTableStat)
 
-	var stats = tablesStats{
-		scanStats:        map[string]scanStat{},
-		tupleStats:       map[string]tuplesStat{},
-		tupleTotalStats:  map[string]tuplesTotalStat{},
-		maintenanceStats: map[string]maintenanceStat{},
-	}
 	var tablename string
 
 	for _, row := range r.Rows {
-		table := tableFQName{}
+		table := postgresTableStat{}
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
 			case "datname":
@@ -278,6 +224,8 @@ func parsePostgresTableStats(r *store.QueryResult, labelNames []string) tablesSt
 
 		// create a pool name consisting of trio database/user/pool_mode
 		tablename = strings.Join([]string{table.datname, table.schemaname, table.relname}, "/")
+
+		stats[tablename] = table
 
 		for i, colname := range r.Colnames {
 			// Column's values act as metric values or as labels values.
@@ -299,73 +247,73 @@ func parsePostgresTableStats(r *store.QueryResult, labelNames []string) tablesSt
 
 				switch string(colname.Name) {
 				case "seq_scan":
-					s := stats.scanStats[tablename]
+					s := stats[tablename]
 					s.seqscan = v
-					stats.scanStats[tablename] = s
+					stats[tablename] = s
 				case "seq_tup_read":
-					s := stats.scanStats[tablename]
+					s := stats[tablename]
 					s.seqtupread = v
-					stats.scanStats[tablename] = s
+					stats[tablename] = s
 				case "idx_scan":
-					s := stats.scanStats[tablename]
+					s := stats[tablename]
 					s.idxscan = v
-					stats.scanStats[tablename] = s
+					stats[tablename] = s
 				case "idx_tup_fetch":
-					s := stats.scanStats[tablename]
+					s := stats[tablename]
 					s.idxtupfetch = v
-					stats.scanStats[tablename] = s
+					stats[tablename] = s
 				case "n_tup_ins":
-					s := stats.tupleStats[tablename]
+					s := stats[tablename]
 					s.inserted = v
-					stats.tupleStats[tablename] = s
+					stats[tablename] = s
 				case "n_tup_upd":
-					s := stats.tupleStats[tablename]
+					s := stats[tablename]
 					s.updated = v
-					stats.tupleStats[tablename] = s
+					stats[tablename] = s
 				case "n_tup_del":
-					s := stats.tupleStats[tablename]
+					s := stats[tablename]
 					s.deleted = v
-					stats.tupleStats[tablename] = s
+					stats[tablename] = s
 				case "n_tup_hot_upd":
-					s := stats.tupleStats[tablename]
+					s := stats[tablename]
 					s.hotUpdated = v
-					stats.tupleStats[tablename] = s
+					stats[tablename] = s
 				case "n_live_tup":
-					s := stats.tupleTotalStats[tablename]
+					s := stats[tablename]
 					s.live = v
-					stats.tupleTotalStats[tablename] = s
+					stats[tablename] = s
 				case "n_dead_tup":
-					s := stats.tupleTotalStats[tablename]
+					s := stats[tablename]
 					s.dead = v
-					stats.tupleTotalStats[tablename] = s
+					stats[tablename] = s
 				case "n_mod_since_analyze":
-					s := stats.tupleTotalStats[tablename]
+					s := stats[tablename]
 					s.modified = v
-					stats.tupleTotalStats[tablename] = s
+					stats[tablename] = s
 				case "last_vacuum_seconds":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.lastvacuum = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				case "last_analyze_seconds":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.lastanalyze = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				case "vacuum_count":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.vacuum = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				case "autovacuum_count":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.autovacuum = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				case "analyze_count":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.analyze = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				case "autoanalyze_count":
-					s := stats.maintenanceStats[tablename]
+					s := stats[tablename]
 					s.autoanalyze = v
-					stats.maintenanceStats[tablename] = s
+					stats[tablename] = s
 				}
 			}
 		}
