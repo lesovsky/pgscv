@@ -54,10 +54,11 @@ type Service struct {
 
 // Config defines service's configuration.
 type Config struct {
-	RuntimeMode  int
-	ProjectID    string
-	ConnDefaults map[string]string `json:"defaults"` // Defaults
-	ConnSettings []ConnSetting
+	RuntimeMode         int
+	AllowTrackSensitive bool
+	ProjectID           string
+	ConnDefaults        map[string]string `json:"defaults"` // Defaults
+	ConnSettings        []ConnSetting
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -234,7 +235,12 @@ func (repo *Repository) setupServices(config Config) error {
 			service.ProjectID = config.ProjectID
 
 			factories := collector.Factories{}
-			collectorConfig := collector.Config{ServiceType: service.ConnSettings.ServiceType, ConnString: service.ConnSettings.Conninfo}
+			collectorConfig := collector.Config{
+				AllowTrackSensitive: config.AllowTrackSensitive,
+				ServiceType:         service.ConnSettings.ServiceType,
+				ConnString:          service.ConnSettings.Conninfo,
+			}
+
 			switch service.ConnSettings.ServiceType {
 			case model.ServiceTypeSystem:
 				factories.RegisterSystemCollectors()

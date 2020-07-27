@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
@@ -8,12 +9,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
 	"strings"
+	"text/template"
 )
 
 const (
-	postgresStatementsQuery = `SELECT
+	postgresStatementsQueryTemplate = `SELECT
     d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    p.queryid, left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024) AS query,
+    p.queryid, {{if .AllowTrackSensitive }}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{else}}''{{end}} AS query,
     p.calls
 FROM pg_stat_statements p
 JOIN pg_database d ON d.oid=p.dbid`
@@ -67,8 +69,19 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		return err
 	}
 
+	tmpl, err := template.New("query").Parse(postgresStatementsQueryTemplate)
+	if err != nil {
+		return err
+	}
+
+	params := struct{ AllowTrackSensitive bool }{AllowTrackSensitive: config.AllowTrackSensitive}
+	var buf bytes.Buffer
+	if err = tmpl.Execute(&buf, params); err != nil {
+		return err
+	}
+
 	// get pg_stat_statements stats
-	res, err := conn.GetStats(postgresStatementsQuery)
+	res, err := conn.GetStats(buf.String())
 	if err != nil {
 		return err
 	}

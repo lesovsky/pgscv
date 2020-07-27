@@ -22,10 +22,11 @@ func Start(ctx context.Context, config *Config) error {
 	serviceRepo := service.NewRepository()
 
 	serviceConfig := service.Config{
-		RuntimeMode:  config.RuntimeMode,
-		ProjectID:    config.ProjectID,
-		ConnDefaults: config.Defaults,
-		ConnSettings: config.ServicesConnSettings,
+		RuntimeMode:         config.RuntimeMode,
+		AllowTrackSensitive: config.AllowTrackSensitive,
+		ProjectID:           config.ProjectID,
+		ConnDefaults:        config.Defaults,
+		ConnSettings:        config.ServicesConnSettings,
 	}
 
 	if config.ServicesConnSettings == nil {

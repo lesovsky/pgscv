@@ -29,6 +29,7 @@ const (
 type Config struct {
 	BinaryVersion        string                // version of the program, required for auto-update procedure
 	RuntimeMode          int                   // application runtime mode
+	AllowTrackSensitive  bool                  `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
 	ScheduleEnabled      bool                  // use schedule-based metrics collecting
 	ListenAddress        string                `json:"listen_address"`      // Network address and port where the application should listen on
 	MetricsServiceURL    string                `json:"metrics_service_url"` // URL of Weaponry service metric gateway

@@ -15,6 +15,8 @@ type Config struct {
 	ServiceType string
 	// ConnString defines a connection string used to connecting to the service
 	ConnString string
+	// AllowTrackSensitive controls collector to gather and send sensitive information, such as queries texts.
+	AllowTrackSensitive bool
 	// PostgresServiceConfig defines collector's options specific for Postgres service
 	PostgresServiceConfig
 }
