@@ -310,7 +310,7 @@ type postgresStatementsStat struct {
 	tempBlksWritten   float64
 }
 
-// lNewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for qetting stats.
+// NewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for qetting stats.
 // Executing this function supposes pg_stat_statements is already available in shared_preload_libraries (checked when
 // setting up service).
 func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
