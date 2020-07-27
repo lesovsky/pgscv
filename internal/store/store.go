@@ -74,13 +74,13 @@ func (db *DB) IsExtensionAvailable(name string) bool {
 	log.Debugf("check %s availability", name)
 
 	var (
-		checkExtensionQuery = fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = '%s')", name)
-		checkContentQuery   = fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", name)
+		checkExtensionQuery = "SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = $1)"
+		checkContentQuery   = fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", name) // #nosec G201
 		exists              bool
 		count               int
 	)
 
-	if err := db.Conn.QueryRow(context.Background(), checkExtensionQuery).Scan(&exists); err != nil {
+	if err := db.Conn.QueryRow(context.Background(), checkExtensionQuery, name).Scan(&exists); err != nil {
 		log.Errorln("failed to check extensions in information_schema: ", err)
 		return false
 	}
@@ -92,7 +92,7 @@ func (db *DB) IsExtensionAvailable(name string) bool {
 
 	// Execute simple query to check extension is queryable.
 	if err := db.Conn.QueryRow(context.Background(), checkContentQuery).Scan(&count); err != nil {
-		log.Errorf("%s exists but not queryable: ", err)
+		log.Errorf("%s exists but not queryable: %s", name, err)
 		return false
 	}
 
