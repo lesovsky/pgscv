@@ -513,6 +513,7 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 	}
 
 	// inifile is always the last argument in cmdline string, take it
+	// TODO - it's not true, config file also could be between other args. Test it with -R arg.
 	var iniFilePath = cmdline[len(cmdline)-1]
 
 	// parse ini file

@@ -13,20 +13,19 @@ import (
 )
 
 const (
+	// postgresStatementsQueryTemplate defines template for qurying statements metrics.
+	// 1. depending on user-requested AllowTrackSensitive, request or skip queries texts.
+	// 2. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
 	postgresStatementsQueryTemplate = `SELECT
     d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
     p.queryid, {{if .AllowTrackSensitive }}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{else}}''{{end}} AS query,
-    p.calls
-FROM pg_stat_statements p
-JOIN pg_database d ON d.oid=p.dbid`
-
-	postgresStatementsQueryNext = `SELECT
-    d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024) AS query,
-		p.calls, p.rows,
-		p.total_time, p.blk_read_time, p.blk_write_time,
-    p.shared_blks_hit, p.shared_blks_read, p.shared_blks_dirtied, p.shared_blks_written,
-    p.local_blks_hit, p.local_blks_read, p.local_blks_dirtied, p.local_blks_written,
-		p.temp_blks_read, p.temp_blks_written
+    p.calls, p.rows,
+    p.total_time, p.blk_read_time, p.blk_write_time,
+    nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
+    nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written,
+    nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read,
+    nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written,
+    nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written
 FROM pg_stat_statements p
 JOIN pg_database d ON d.oid=p.dbid`
 )
@@ -47,9 +46,30 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		descs: map[string]typedDesc{
 			"calls": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "statements", "calls"),
+					prometheus.BuildFQName("postgres", "statements", "calls_total"),
 					"Total number of times query has been executed.",
 					labelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			"rows": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "statements", "rows_total"),
+					"Total number of rows retrieved or affected by the statement.",
+					labelNames, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			"time": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "statements", "time_total"),
+					"Total time spent in the statement in each mode, in seconds.",
+					append(labelNames, "mode"), constLabels,
+				), valueType: prometheus.CounterValue, factor: .001,
+			},
+			"blocks": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "statements", "blocks_total"),
+					"Total number of block processed by the statement in each mode.",
+					append(labelNames, "type", "access"), constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 		},
@@ -96,6 +116,49 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 			switch name {
 			case "calls":
 				ch <- desc.mustNewConstMetric(stat.calls, stat.datname, stat.usename, stat.queryid, stat.query)
+			case "rows":
+				ch <- desc.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.queryid, stat.query)
+			case "time":
+				ch <- desc.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, stat.query, "total")
+				// avoid metrics spamming and send metrics only if they greater than zero.
+				if stat.blkReadTime > 0 {
+					ch <- desc.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, stat.query, "ioread")
+				}
+				if stat.blkWriteTime > 0 {
+					ch <- desc.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.queryid, stat.query, "iowrite")
+				}
+			case "blocks":
+				// avoid metrics spamming and send metrics only if they greater than zero.
+				if stat.sharedBlksHit > 0 {
+					ch <- desc.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "hit")
+				}
+				if stat.sharedBlksRead > 0 {
+					ch <- desc.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "read")
+				}
+				if stat.sharedBlksDirtied > 0 {
+					ch <- desc.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "dirtied")
+				}
+				if stat.sharedBlksWritten > 0 {
+					ch <- desc.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "written")
+				}
+				if stat.localBlksHit > 0 {
+					ch <- desc.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "local", "hit")
+				}
+				if stat.localBlksRead > 0 {
+					ch <- desc.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "local", "read")
+				}
+				if stat.localBlksDirtied > 0 {
+					ch <- desc.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "local", "dirtied")
+				}
+				if stat.localBlksWritten > 0 {
+					ch <- desc.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "local", "written")
+				}
+				if stat.tempBlksRead > 0 {
+					ch <- desc.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "read")
+				}
+				if stat.tempBlksWritten > 0 {
+					ch <- desc.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "written")
+				}
 			}
 		}
 	}
@@ -158,6 +221,62 @@ func parsePostgresStatementsStats(r *store.QueryResult, labelNames []string) map
 				s := stats[statement]
 				s.calls = v
 				stats[statement] = s
+			case "rows":
+				s := stats[statement]
+				s.rows = v
+				stats[statement] = s
+			case "total_time":
+				s := stats[statement]
+				s.totalTime = v
+				stats[statement] = s
+			case "blk_read_time":
+				s := stats[statement]
+				s.blkReadTime = v
+				stats[statement] = s
+			case "blk_write_time":
+				s := stats[statement]
+				s.blkWriteTime = v
+				stats[statement] = s
+			case "shared_blks_hit":
+				s := stats[statement]
+				s.sharedBlksHit = v
+				stats[statement] = s
+			case "shared_blks_read":
+				s := stats[statement]
+				s.sharedBlksRead = v
+				stats[statement] = s
+			case "shared_blks_dirtied":
+				s := stats[statement]
+				s.sharedBlksDirtied = v
+				stats[statement] = s
+			case "shared_blks_written":
+				s := stats[statement]
+				s.sharedBlksWritten = v
+				stats[statement] = s
+			case "local_blks_hit":
+				s := stats[statement]
+				s.localBlksHit = v
+				stats[statement] = s
+			case "local_blks_read":
+				s := stats[statement]
+				s.localBlksRead = v
+				stats[statement] = s
+			case "local_blks_dirtied":
+				s := stats[statement]
+				s.localBlksDirtied = v
+				stats[statement] = s
+			case "local_blks_written":
+				s := stats[statement]
+				s.localBlksWritten = v
+				stats[statement] = s
+			case "temp_blks_read":
+				s := stats[statement]
+				s.tempBlksRead = v
+				stats[statement] = s
+			case "temp_blks_written":
+				s := stats[statement]
+				s.tempBlksWritten = v
+				stats[statement] = s
 			default:
 				log.Debugf("unsupported pg_stat_statements stat column: %s, skip", string(colname.Name))
 				continue
@@ -170,11 +289,25 @@ func parsePostgresStatementsStats(r *store.QueryResult, labelNames []string) map
 
 // postgresStatementsStat represents stats values for single statement
 type postgresStatementsStat struct {
-	datname string
-	usename string
-	queryid string
-	query   string
-	calls   float64
+	datname           string
+	usename           string
+	queryid           string
+	query             string
+	calls             float64
+	rows              float64
+	totalTime         float64
+	blkReadTime       float64
+	blkWriteTime      float64
+	sharedBlksHit     float64
+	sharedBlksRead    float64
+	sharedBlksDirtied float64
+	sharedBlksWritten float64
+	localBlksHit      float64
+	localBlksRead     float64
+	localBlksDirtied  float64
+	localBlksWritten  float64
+	tempBlksRead      float64
+	tempBlksWritten   float64
 }
 
 // lNewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for qetting stats.
