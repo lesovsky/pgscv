@@ -33,7 +33,10 @@ JOIN pg_database d ON d.oid=p.dbid`
 // postgresStatementsCollector ...
 type postgresStatementsCollector struct {
 	labelNames []string
-	descs      map[string]typedDesc
+	calls      typedDesc
+	rows       typedDesc
+	times      typedDesc
+	blocks     typedDesc
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
@@ -43,35 +46,36 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 
 	return &postgresStatementsCollector{
 		labelNames: labelNames,
-		descs: map[string]typedDesc{
-			"calls": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "statements", "calls_total"),
-					"Total number of times query has been executed.",
-					labelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			"rows": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "statements", "rows_total"),
-					"Total number of rows retrieved or affected by the statement.",
-					labelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			"time": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "statements", "time_total"),
-					"Total time spent in the statement in each mode, in seconds.",
-					append(labelNames, "mode"), constLabels,
-				), valueType: prometheus.CounterValue, factor: .001,
-			},
-			"blocks": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "statements", "blocks_total"),
-					"Total number of block processed by the statement in each mode.",
-					append(labelNames, "type", "access"), constLabels,
-				), valueType: prometheus.CounterValue,
-			},
+		calls: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "calls_total"),
+				"Total number of times query has been executed.",
+				labelNames, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		rows: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "rows_total"),
+				"Total number of rows retrieved or affected by the statement.",
+				labelNames, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		times: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "time_total"),
+				"Total time spent in the statement in each mode, in seconds.",
+				append(labelNames, "mode"), constLabels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
+		blocks: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "blocks_total"),
+				"Total number of block processed by the statement in each mode.",
+				append(labelNames, "type", "access"), constLabels,
+			),
+			valueType: prometheus.CounterValue,
 		},
 	}, nil
 }
@@ -112,54 +116,46 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	stats := parsePostgresStatementsStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		for name, desc := range c.descs {
-			switch name {
-			case "calls":
-				ch <- desc.mustNewConstMetric(stat.calls, stat.datname, stat.usename, stat.queryid, stat.query)
-			case "rows":
-				ch <- desc.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.queryid, stat.query)
-			case "time":
-				ch <- desc.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, stat.query, "total")
-				// avoid metrics spamming and send metrics only if they greater than zero.
-				if stat.blkReadTime > 0 {
-					ch <- desc.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, stat.query, "ioread")
-				}
-				if stat.blkWriteTime > 0 {
-					ch <- desc.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.queryid, stat.query, "iowrite")
-				}
-			case "blocks":
-				// avoid metrics spamming and send metrics only if they greater than zero.
-				if stat.sharedBlksHit > 0 {
-					ch <- desc.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "hit")
-				}
-				if stat.sharedBlksRead > 0 {
-					ch <- desc.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "read")
-				}
-				if stat.sharedBlksDirtied > 0 {
-					ch <- desc.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "dirtied")
-				}
-				if stat.sharedBlksWritten > 0 {
-					ch <- desc.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "written")
-				}
-				if stat.localBlksHit > 0 {
-					ch <- desc.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "local", "hit")
-				}
-				if stat.localBlksRead > 0 {
-					ch <- desc.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "local", "read")
-				}
-				if stat.localBlksDirtied > 0 {
-					ch <- desc.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "local", "dirtied")
-				}
-				if stat.localBlksWritten > 0 {
-					ch <- desc.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "local", "written")
-				}
-				if stat.tempBlksRead > 0 {
-					ch <- desc.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "read")
-				}
-				if stat.tempBlksWritten > 0 {
-					ch <- desc.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "written")
-				}
-			}
+		ch <- c.calls.mustNewConstMetric(stat.calls, stat.datname, stat.usename, stat.queryid, stat.query)
+		ch <- c.rows.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.queryid, stat.query)
+		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, stat.query, "total")
+
+		// avoid metrics spamming and send metrics only if they greater than zero.
+		if stat.blkReadTime > 0 {
+			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, stat.query, "ioread")
+		}
+		if stat.blkWriteTime > 0 {
+			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.queryid, stat.query, "iowrite")
+		}
+		if stat.sharedBlksHit > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "hit")
+		}
+		if stat.sharedBlksRead > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "read")
+		}
+		if stat.sharedBlksDirtied > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "dirtied")
+		}
+		if stat.sharedBlksWritten > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "written")
+		}
+		if stat.localBlksHit > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "local", "hit")
+		}
+		if stat.localBlksRead > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "local", "read")
+		}
+		if stat.localBlksDirtied > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "local", "dirtied")
+		}
+		if stat.localBlksWritten > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "local", "written")
+		}
+		if stat.tempBlksRead > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "read")
+		}
+		if stat.tempBlksWritten > 0 {
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "written")
 		}
 	}
 
