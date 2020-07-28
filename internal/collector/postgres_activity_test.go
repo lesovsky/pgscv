@@ -114,6 +114,25 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 			},
 			want: postgresActivityStat{total: 22, maxRunUser: 1, maxRunMaint: 1, active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4},
 		},
+		{
+			name: "old postgres with waiting instead of wait_event_type",
+			res: &store.QueryResult{
+				Nrows: 1,
+				Ncols: 6,
+				Colnames: []pgproto3.FieldDescription{
+					{Name: []byte("state")},
+					{Name: []byte("waiting")},
+					{Name: []byte("since_start_seconds")},
+					{Name: []byte("since_change_seconds")},
+					{Name: []byte("query")},
+				},
+				Rows: [][]sql.NullString{
+					{{String: "active", Valid: true}, {String: "t", Valid: true}, {String: "10", Valid: true}, {String: "5", Valid: true}, {String: "SELECT test 1", Valid: true}},
+					{{String: "active", Valid: true}, {String: "f", Valid: true}, {String: "10", Valid: true}, {String: "10", Valid: true}, {String: "SELECT test 2", Valid: true}},
+				},
+			},
+			want: postgresActivityStat{total: 2, maxRunUser: 10, maxWaitUser: 5, active: 2, waiting: 1, querySelect: 2},
+		},
 	}
 
 	for _, tc := range testCases {

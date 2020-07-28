@@ -9,6 +9,7 @@ import (
 
 const (
 	// Postgres server versions numeric representations.
+	PostgresV96 = 90600
 	PostgresV10 = 100000
 )
 

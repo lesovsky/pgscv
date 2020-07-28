@@ -10,7 +10,14 @@ import (
 )
 
 const (
-	postgresActivityQuery = `SELECT
+	postgresActivityQuery95 = `SELECT
+    state, waiting,
+    coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
+    coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
+    left(query, 32) as query
+FROM pg_stat_activity`
+
+	postgresActivityQueryLatest = `SELECT
     state, wait_event_type, wait_event,
     coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
     coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
@@ -88,7 +95,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	defer conn.Close()
 
 	// get pg_stat_activity stats
-	res, err := conn.GetStats(postgresActivityQuery)
+	res, err := conn.GetStats(selectActivityQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
@@ -142,11 +149,20 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 	var stats postgresActivityStat
 
+	// Depending on Postgres version, waiting backends are observed using different column: 'waiting' used in 9.5 and older
+	// and 'wait_event_type' from 9.6. waitColumnName defines a name of column which will be used for detecting waitings.
+	// By default use "wait_event_type"
+	var waitColumnName = "wait_event_type"
+
 	// Make map with column names and their indexes. This map needed to get quick access to values of exact columns within
 	// processed row.
 	var colindexes = map[string]int{}
 	for i, colname := range r.Colnames {
 		colindexes[string(colname.Name)] = i
+
+		if string(colname.Name) == "waiting" {
+			waitColumnName = "waiting"
+		}
 	}
 
 	for _, row := range r.Rows {
@@ -166,13 +182,13 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 				if row[idx].String != "" && row[idx].Valid {
 					stats.updateState(row[i].String)
 				}
-			case "wait_event_type":
-				if row[i].String == weLock {
+			case waitColumnName:
+				if row[i].String == weLock || row[i].String == "t" {
 					stats.updateState("waiting")
 				}
 			case "since_start_seconds":
 				stateIdx := colindexes["state"]
-				eventIdx := colindexes["wait_event_type"]
+				eventIdx := colindexes[waitColumnName]
 				queryIdx := colindexes["query"]
 
 				if row[stateIdx].Valid && row[queryIdx].Valid {
@@ -183,7 +199,7 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 					stats.updateMaxRuntimeDuration(value, state, event, query)
 				}
 			case "since_change_seconds":
-				eventIdx := colindexes["wait_event_type"]
+				eventIdx := colindexes[waitColumnName]
 				queryIdx := colindexes["query"]
 
 				if row[eventIdx].Valid && row[queryIdx].Valid {
@@ -225,7 +241,7 @@ type postgresActivityStat struct {
 	idlexact     float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
 	active       float64 // state = 'active'
 	other        float64 // state IN ('fastpath function call','disabled')
-	waiting      float64 // wait_event_type = 'Lock'
+	waiting      float64 // wait_event_type = 'Lock' (or waiting = 't')
 	prepared     float64 // FROM pg_prepared_xacts
 	maxRunUser   float64 // longest duration among client queries
 	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
@@ -302,13 +318,13 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state stri
 }
 
 // updateMaxWaittimeDuration updates max duration of waiting activity.
-func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, etype string, query string) {
-	if value == "" || etype == "" || query == "" {
+func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, waiting string, query string) {
+	if value == "" || waiting == "" || query == "" {
 		return
 	}
 
-	// waiting activity is considered only with wait_event_type = 'Lock'
-	if etype != weLock {
+	// waiting activity is considered only with wait_event_type = 'Lock' (or waiting = 't')
+	if waiting != weLock && waiting != "t" {
 		return
 	}
 
@@ -403,4 +419,14 @@ func (s *postgresActivityStat) updateQueryStat(query string, state string) {
 
 	// still here? ok, increment others and return
 	s.queryOther++
+}
+
+// selectActivityQuery returns suitable activity query depending on passed version.
+func selectActivityQuery(version int) string {
+	switch {
+	case version < PostgresV96:
+		return postgresActivityQuery95
+	default:
+		return postgresActivityQueryLatest
+	}
 }
