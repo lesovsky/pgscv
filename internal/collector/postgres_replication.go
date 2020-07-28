@@ -8,7 +8,23 @@ import (
 )
 
 const (
-	postgresReplicationQuery = `SELECT
+	// Query for Postgres version 9.6 and older.
+	postgresReplicationQuery96 = `SELECT
+    pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
+    pg_is_in_recovery()::int AS recovery,
+		(case pg_is_in_recovery() when 't' then null else pg_current_xlog_location() - '0/00000000' end) AS wal_bytes,
+		pg_current_xlog_location() - sent_lsn AS pending_lag_bytes,
+		sent_location - write_location AS write_lag_bytes,
+		write_location - flush_location AS flush_lag_bytes,
+		flush_location - replay_location AS replay_lag_bytes,
+		pg_current_xlog_location() - replay_location AS total_lag_bytes,
+		NULL as write_lag_seconds,
+		NULL as flush_lag_seconds,
+		NULL as replay_lag_seconds
+FROM pg_stat_replication`
+
+	//  Query for Postgres versions from 10 and newer.
+	postgresReplicationQueryLatest = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
     pg_is_in_recovery()::int AS recovery,
 		(case pg_is_in_recovery() when 't' then null else pg_current_wal_lsn() - '0/00000000' end) AS wal_bytes,
@@ -77,7 +93,7 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	}
 	defer conn.Close()
 
-	res, err := conn.GetStats(postgresReplicationQuery)
+	res, err := conn.GetStats(selectReplicationQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
@@ -218,4 +234,14 @@ func parsePostgresReplicationStats(r *store.QueryResult, labelNames []string) ma
 	}
 
 	return stats
+}
+
+// selectReplicationQuery returns suitable replication query depending on passed version.
+func selectReplicationQuery(version int) string {
+	switch {
+	case version < PostgresV10:
+		return postgresReplicationQuery96
+	default:
+		return postgresReplicationQueryLatest
+	}
 }

@@ -69,3 +69,21 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 		})
 	}
 }
+
+func Test_selectReplicationQuery(t *testing.T) {
+	var testcases = []struct {
+		version int
+		want    string
+	}{
+		{version: 90600, want: postgresReplicationQuery96},
+		{version: 90605, want: postgresReplicationQuery96},
+		{version: 100000, want: postgresReplicationQueryLatest},
+		{version: 100005, want: postgresReplicationQueryLatest},
+	}
+
+	for _, tc := range testcases {
+		t.Run("", func(t *testing.T) {
+			assert.Equal(t, tc.want, selectReplicationQuery(tc.version))
+		})
+	}
+}

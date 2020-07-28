@@ -7,6 +7,11 @@ import (
 	"strconv"
 )
 
+const (
+	// Postgres server versions numeric representations.
+	PostgresV10 = 100000
+)
+
 // parsePostgresStats extracts values from query result, generates metrics using extracted values and passed
 // labels and send them to Prometheus.
 func parsePostgresStats(r *store.QueryResult, ch chan<- prometheus.Metric, descs []typedDesc, labelNames []string) error {
