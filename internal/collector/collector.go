@@ -38,6 +38,7 @@ func (f Factories) RegisterPostgresCollectors() {
 	f.register("database", NewPostgresDatabasesCollector)
 	f.register("function", NewPostgresFunctionsCollector)
 	f.register("replication", NewPostgresReplicationCollector)
+	f.register("replication_slot", NewPostgresReplicationSlotCollector)
 	f.register("statements", NewPostgresStatementsCollector)
 	f.register("table", NewPostgresTablesCollector)
 }

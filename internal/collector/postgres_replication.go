@@ -24,7 +24,7 @@ const (
 		NULL as replay_lag_seconds
 FROM pg_stat_replication`
 
-	//  Query for Postgres versions from 10 and newer.
+	// Query for Postgres versions from 10 and newer.
 	postgresReplicationQueryLatest = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
     pg_is_in_recovery()::int AS recovery,
