@@ -41,7 +41,7 @@ func (f Factories) RegisterPostgresCollectors() {
 	f.register("replication", NewPostgresReplicationCollector)
 	f.register("replication_slot", NewPostgresReplicationSlotCollector)
 	f.register("statements", NewPostgresStatementsCollector)
-	//f.register("storage", NewPostgresStorageCollector)  // TODO: this is a heavyweight check, should be switcher for enable/disable it.
+	f.register("storage", NewPostgresStorageCollector)
 	f.register("table", NewPostgresTablesCollector)
 }
 

@@ -10,7 +10,9 @@ import (
 
 func TestPostgresStorageCollector_Update(t *testing.T) {
 	var input = pipelineInput{
-		required: []string{
+		required: []string{"postgres_directory_size_bytes_total"},
+		// temp files related metrics might not be generated on idle systems.
+		optional: []string{
 			"postgres_temp_files_in_flight",
 			"postgres_temp_bytes_in_flight",
 			"postgres_temp_files_max_age_seconds",
