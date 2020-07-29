@@ -38,7 +38,9 @@ func pipeline(t *testing.T, input pipelineInput) {
 	switch input.service {
 	case model.ServiceTypePostgresql:
 		config.ConnString = "postgres://postgres@postgres/postgres"
-		config.PostgresServiceConfig = NewPostgresServiceConfig(config.ConnString)
+		cfg, err := NewPostgresServiceConfig(config.ConnString)
+		assert.NoError(t, err)
+		config.PostgresServiceConfig = cfg
 	case model.ServiceTypePgbouncer:
 		config.ConnString = "postgres://pgbouncer@127.0.0.1:6432/pgbouncer"
 	}

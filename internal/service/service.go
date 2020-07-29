@@ -246,7 +246,12 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterSystemCollectors()
 			case model.ServiceTypePostgresql:
 				factories.RegisterPostgresCollectors()
-				collectorConfig.PostgresServiceConfig = collector.NewPostgresServiceConfig(collectorConfig.ConnString)
+				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
+				if err != nil {
+					log.Errorf("failed create service config for postgres: %s; skip service", err)
+					continue
+				}
+				collectorConfig.PostgresServiceConfig = cfg
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors()
 			default:

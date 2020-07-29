@@ -34,8 +34,7 @@ type PostgresServiceConfig struct {
 }
 
 // NewPostgresServiceConfig defines new config for Postgres-based collectors
-// TODO: maybe we need return error too, and abort adding service if creating config failed ?
-func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
+func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	var config = PostgresServiceConfig{
 		PgStatStatements:       false,
 		PgStatStatementsSource: "",
@@ -43,14 +42,12 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 
 	pgconfig, err := pgx.ParseConfig(connStr)
 	if err != nil {
-		log.Errorln("failed create new PostgresServiceConfig: ", err)
-		return config
+		return config, err
 	}
 
 	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
-		log.Errorln("failed create new PostgresServiceConfig: ", err)
-		return config
+		return config, err
 	}
 	defer conn.Close()
 
@@ -59,13 +56,11 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 	// Get Postgres server version
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
 	if err != nil {
-		log.Errorln("failed read server_version_num setting: ", err)
-		return config
+		return config, err
 	}
 	version, err := strconv.Atoi(setting)
 	if err != nil {
-		log.Errorln("failed convert server_version_num to int: ", err)
-		return config
+		return config, err
 	}
 
 	config.ServerVersionNum = version
@@ -73,8 +68,7 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 	// Get Postgres data directory
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'data_directory'").Scan(&setting)
 	if err != nil {
-		log.Errorln("failed read data_directory setting: ", err)
-		return config
+		return config, err
 	}
 
 	config.DataDirectory = setting
@@ -82,14 +76,14 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 	// Get shared_preload_libraries (for inspecting enabled extensions).
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
 	if err != nil {
-		log.Errorln("failed read shared_preload_libraries setting: ", err)
-		return config
+		return config, err
 	}
 	if !strings.Contains(setting, "pg_stat_statements") {
 		log.Info("pg_stat_statements is not found in shared_preload_libraries, disable pg_stat_statements metrics collection")
 	}
 
-	config.PgStatStatements = true // leave PgStatStatementsSource empty, it will be filled in first execution of collector's Update method
+	// Enable PgStatStatements, but leave empty PgStatStatementsSource, it will be filled at first execution of collector's Update method.
+	config.PgStatStatements = true
 
-	return config
+	return config, nil
 }
