@@ -3,7 +3,6 @@ package collector
 import (
 	"database/sql"
 	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -28,12 +27,12 @@ func TestPostgresStatementsCollector_Update(t *testing.T) {
 func Test_parsePostgresStatementsStats(t *testing.T) {
 	var testCases = []struct {
 		name string
-		res  *store.QueryResult
-		want map[string]postgresStatementsStat
+		res  *model.PGResult
+		want map[string]postgresStatementStat
 	}{
 		{
 			name: "normal output",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 1,
 				Ncols: 19,
 				Colnames: []pgproto3.FieldDescription{
@@ -55,7 +54,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]postgresStatementsStat{
+			want: map[string]postgresStatementStat{
 				"testdb/testuser/-1856485172033541804": {
 					datname: "testdb", usename: "testuser", queryid: "-1856485172033541804", query: "SELECT test",
 					calls: 1000, rows: 2000,
@@ -68,7 +67,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 		},
 		{
 			name: "lot of nulls and unknown columns",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 1,
 				Ncols: 20,
 				Colnames: []pgproto3.FieldDescription{
@@ -88,7 +87,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 					},
 				},
 			},
-			want: map[string]postgresStatementsStat{
+			want: map[string]postgresStatementStat{
 				"testdb/testuser/-1856485172033541804": {
 					datname: "testdb", usename: "testuser", queryid: "-1856485172033541804", query: "SELECT test",
 					calls: 1000, rows: 2000,

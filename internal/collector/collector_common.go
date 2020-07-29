@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -23,14 +22,4 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 		value *= d.factor
 	}
 	return prometheus.MustNewConstMetric(d.desc, d.valueType, value, labels...)
-}
-
-// lookupDesc returns index of the descriptor with colname specified in pattern
-func lookupByColname(descs []typedDesc, pattern string) (int, error) {
-	for i, desc := range descs {
-		if desc.colname == pattern {
-			return i, nil
-		}
-	}
-	return -1, fmt.Errorf("pattern not found")
 }

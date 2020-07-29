@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
@@ -9,19 +10,6 @@ import (
 )
 
 const (
-	// names of columns used in "SHOW POOLS" output. For details see https://www.pgbouncer.org/usage.html#show-pools
-	cnameDatabase  = "database"
-	cnameUser      = "user"
-	cnameClActive  = "cl_active"
-	cnameClWaiting = "cl_waiting"
-	cnameSvActive  = "sv_active"
-	cnameSvIdle    = "sv_idle"
-	cnameSvUsed    = "sv_used"
-	cnameSvTested  = "sv_tested"
-	cnameSvLogin   = "sv_login"
-	cnameMaxwait   = "maxwait"
-	cnamePoolMode  = "pool_mode"
-
 	// admin console query used for retrieving pools stats
 	poolQuery = "SHOW POOLS"
 )
@@ -32,22 +20,10 @@ type pgbouncerPoolsCollector struct {
 	maxwait    typedDesc
 }
 
-// connStat is a per-pool store for connections metrics.
-type connStat struct {
-	clActive  float64
-	clWaiting float64
-	svActive  float64
-	svIdle    float64
-	svUsed    float64
-	svTested  float64
-	svLogin   float64
-	maxWait   float64
-}
-
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
 // For details see https://www.pgbouncer.org/usage.html#show-pools.
 func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error) {
-	var poolsLabelNames = []string{cnameDatabase, cnameUser, cnamePoolMode, "state"}
+	var poolsLabelNames = []string{"database", "user", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
 		conns: typedDesc{
@@ -62,7 +38,7 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
 				"Total time the first (oldest) client in the queue has waited, in seconds.",
-				[]string{cnameDatabase, cnameUser, cnamePoolMode}, constLabels,
+				[]string{"database", "user", "pool_mode"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -72,64 +48,69 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	res, err := conn.GetStats(poolQuery)
+	res, err := conn.Query(poolQuery)
 	if err != nil {
 		return err
 	}
 
 	stats := parsePgbouncerPoolsStats(res, c.labelNames)
 
-	for poolname, poolstat := range stats {
-		props := strings.Split(poolname, "/")
-		if len(props) != 3 {
-			log.Warnf("incomplete pool name: %s; skip", poolname)
-			continue
-		}
-		ch <- c.conns.mustNewConstMetric(poolstat.clActive, props[0], props[1], props[2], cnameClActive)
-		ch <- c.conns.mustNewConstMetric(poolstat.clWaiting, props[0], props[1], props[2], cnameClWaiting)
-		ch <- c.conns.mustNewConstMetric(poolstat.svActive, props[0], props[1], props[2], cnameSvActive)
-		ch <- c.conns.mustNewConstMetric(poolstat.svIdle, props[0], props[1], props[2], cnameSvIdle)
-		ch <- c.conns.mustNewConstMetric(poolstat.svUsed, props[0], props[1], props[2], cnameSvUsed)
-		ch <- c.conns.mustNewConstMetric(poolstat.svTested, props[0], props[1], props[2], cnameSvTested)
-		ch <- c.conns.mustNewConstMetric(poolstat.svLogin, props[0], props[1], props[2], cnameSvLogin)
-		ch <- c.maxwait.mustNewConstMetric(poolstat.maxWait, props[0], props[1], props[2])
+	for _, stat := range stats {
+		ch <- c.conns.mustNewConstMetric(stat.clActive, stat.database, stat.user, stat.mode, "cl_active")
+		ch <- c.conns.mustNewConstMetric(stat.clWaiting, stat.database, stat.user, stat.mode, "cl_waiting")
+		ch <- c.conns.mustNewConstMetric(stat.svActive, stat.database, stat.user, stat.mode, "sv_active")
+		ch <- c.conns.mustNewConstMetric(stat.svIdle, stat.database, stat.user, stat.mode, "sv_idle")
+		ch <- c.conns.mustNewConstMetric(stat.svUsed, stat.database, stat.user, stat.mode, "sv_used")
+		ch <- c.conns.mustNewConstMetric(stat.svTested, stat.database, stat.user, stat.mode, "sv_tested")
+		ch <- c.conns.mustNewConstMetric(stat.svLogin, stat.database, stat.user, stat.mode, "sv_login")
+		ch <- c.maxwait.mustNewConstMetric(stat.maxWait, stat.database, stat.user, stat.mode)
 	}
 
 	return nil
 }
 
-func parsePgbouncerPoolsStats(r *store.QueryResult, labelNames []string) map[string]connStat {
-	// ad-hoc struct used to group pool properties (database, user and mode) in one place.
-	type poolProperties struct {
-		database string
-		user     string
-		mode     string
-	}
+// pgbouncerPoolStat is a per-pool store for connections metrics.
+type pgbouncerPoolStat struct {
+	database  string
+	user      string
+	mode      string
+	clActive  float64
+	clWaiting float64
+	svActive  float64
+	svIdle    float64
+	svUsed    float64
+	svTested  float64
+	svLogin   float64
+	maxWait   float64
+}
 
-	var stats = map[string]connStat{}
-	var poolname string
+func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string]pgbouncerPoolStat {
+	var stats = map[string]pgbouncerPoolStat{}
 
 	for _, row := range r.Rows {
-		props := poolProperties{}
+		stat := pgbouncerPoolStat{}
+
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case cnameDatabase:
-				props.database = row[i].String
-			case cnameUser:
-				props.user = row[i].String
-			case cnamePoolMode:
-				props.mode = row[i].String
+			case "database":
+				stat.database = row[i].String
+			case "user":
+				stat.user = row[i].String
+			case "pool_mode":
+				stat.mode = row[i].String
 			}
 		}
 
 		// create a pool name consisting of trio database/user/pool_mode
-		poolname = strings.Join([]string{props.database, props.user, props.mode}, "/")
+		poolname := strings.Join([]string{stat.database, stat.user, stat.mode}, "/")
+
+		stats[poolname] = stat
 
 		for i, colname := range r.Colnames {
 			// Column's values act as metric values or as labels values.
@@ -151,40 +132,40 @@ func parsePgbouncerPoolsStats(r *store.QueryResult, labelNames []string) map[str
 
 				// Update stats struct
 				switch string(colname.Name) {
-				case cnameClActive:
+				case "cl_active":
 					s := stats[poolname]
 					s.clActive = v
 					stats[poolname] = s
-				case cnameClWaiting:
+				case "cl_waiting":
 					s := stats[poolname]
 					s.clWaiting = v
 					stats[poolname] = s
-				case cnameSvActive:
+				case "sv_active":
 					s := stats[poolname]
 					s.svActive = v
 					stats[poolname] = s
-				case cnameSvIdle:
+				case "sv_idle":
 					s := stats[poolname]
 					s.svIdle = v
 					stats[poolname] = s
-				case cnameSvUsed:
+				case "sv_used":
 					s := stats[poolname]
 					s.svUsed = v
 					stats[poolname] = s
-				case cnameSvTested:
+				case "sv_tested":
 					s := stats[poolname]
 					s.svTested = v
 					stats[poolname] = s
-				case cnameSvLogin:
+				case "sv_login":
 					s := stats[poolname]
 					s.svLogin = v
 					stats[poolname] = s
-				case cnameMaxwait:
+				case "maxwait":
 					s := stats[poolname]
 					s.maxWait = v
 					stats[poolname] = s
 				default:
-					log.Debugf("unsupported pool stat column: %s, skip", string(colname.Name))
+					log.Debugf("unsupported 'SHOW POOLS' stat column: %s, skip", string(colname.Name))
 					continue
 				}
 			}

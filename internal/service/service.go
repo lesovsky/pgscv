@@ -204,7 +204,7 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 		}
 
 		// Check connection using created *ConnConfig, go next if connection failed.
-		db, err := store.NewDBConfig(pgconfig)
+		db, err := store.NewWithConfig(pgconfig)
 		if err != nil {
 			log.Warnf("%s: %s, skip", cs.Conninfo, err)
 			continue
@@ -639,7 +639,7 @@ func newPgbouncerConnectionString(connParams connectionParams, defaults map[stri
 
 // attemptConnect tries to make a real connection using passed connection string.
 func attemptConnect(connString string) error {
-	db, err := store.NewDB(connString)
+	db, err := store.New(connString)
 	if err != nil {
 		return err
 	}

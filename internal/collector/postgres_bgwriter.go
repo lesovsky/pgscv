@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
@@ -16,21 +17,6 @@ const (
   coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds
 FROM pg_stat_bgwriter`
 )
-
-// bgwriterStat describes stats related to Postgres background writes.
-type bgwriterStat struct {
-	ckptTimed        float64
-	ckptReq          float64
-	ckptWriteTime    float64
-	ckptSyncTime     float64
-	ckptBuffers      float64
-	bgwrBuffers      float64
-	bgwrMaxWritten   float64
-	backendBuffers   float64
-	backendFsync     float64
-	backendAllocated float64
-	statsAgeSeconds  float64
-}
 
 type postgresBgwriterCollector struct {
 	descs map[string]typedDesc
@@ -112,13 +98,13 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	res, err := conn.GetStats(postgresBgwriterQuery)
+	res, err := conn.Query(postgresBgwriterQuery)
 	if err != nil {
 		return err
 	}
@@ -156,8 +142,24 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 	return nil
 }
 
-func parsePostgresBgwriterStats(r *store.QueryResult) bgwriterStat {
-	var stats bgwriterStat
+// postgresBgwriterStat describes stats related to Postgres background writes.
+type postgresBgwriterStat struct {
+	ckptTimed        float64
+	ckptReq          float64
+	ckptWriteTime    float64
+	ckptSyncTime     float64
+	ckptBuffers      float64
+	bgwrBuffers      float64
+	bgwrMaxWritten   float64
+	backendBuffers   float64
+	backendFsync     float64
+	backendAllocated float64
+	statsAgeSeconds  float64
+}
+
+// parsePostgresBgwriterStats parses PGResult and returns struct with data values
+func parsePostgresBgwriterStats(r *model.PGResult) postgresBgwriterStat {
+	var stats postgresBgwriterStat
 
 	for _, row := range r.Rows {
 		for i, colname := range r.Colnames {

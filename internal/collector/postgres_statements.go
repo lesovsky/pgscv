@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,7 +14,7 @@ import (
 )
 
 const (
-	// postgresStatementsQueryTemplate defines template for qurying statements metrics.
+	// postgresStatementsQueryTemplate defines template for querying statements metrics.
 	// 1. depending on user-requested AllowTrackSensitive, request or skip queries texts.
 	// 2. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
 	postgresStatementsQueryTemplate = `SELECT
@@ -105,7 +106,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	}
 
 	// get pg_stat_statements stats
-	res, err := conn.GetStats(buf.String())
+	res, err := conn.Query(buf.String())
 	if err != nil {
 		return err
 	}
@@ -162,13 +163,37 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	return nil
 }
 
-func parsePostgresStatementsStats(r *store.QueryResult, labelNames []string) map[string]postgresStatementsStat {
-	var stats = make(map[string]postgresStatementsStat)
+// postgresStatementsStat represents stats values for single statement based on pg_stat_statements.
+type postgresStatementStat struct {
+	datname           string
+	usename           string
+	queryid           string
+	query             string
+	calls             float64
+	rows              float64
+	totalTime         float64
+	blkReadTime       float64
+	blkWriteTime      float64
+	sharedBlksHit     float64
+	sharedBlksRead    float64
+	sharedBlksDirtied float64
+	sharedBlksWritten float64
+	localBlksHit      float64
+	localBlksRead     float64
+	localBlksDirtied  float64
+	localBlksWritten  float64
+	tempBlksRead      float64
+	tempBlksWritten   float64
+}
+
+// parsePostgresStatementsStats parses PGResult and return structs with stats values.
+func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[string]postgresStatementStat {
+	var stats = make(map[string]postgresStatementStat)
 
 	// process row by row - on every row construct 'statement' using datname/usename/queryid trio. Next process other row's
 	// fields and collect stats for constructed 'statement'.
 	for _, row := range r.Rows {
-		stat := postgresStatementsStat{}
+		stat := postgresStatementStat{}
 
 		// collect label values
 		for i, colname := range r.Colnames {
@@ -283,29 +308,6 @@ func parsePostgresStatementsStats(r *store.QueryResult, labelNames []string) map
 	return stats
 }
 
-// postgresStatementsStat represents stats values for single statement
-type postgresStatementsStat struct {
-	datname           string
-	usename           string
-	queryid           string
-	query             string
-	calls             float64
-	rows              float64
-	totalTime         float64
-	blkReadTime       float64
-	blkWriteTime      float64
-	sharedBlksHit     float64
-	sharedBlksRead    float64
-	sharedBlksDirtied float64
-	sharedBlksWritten float64
-	localBlksHit      float64
-	localBlksRead     float64
-	localBlksDirtied  float64
-	localBlksWritten  float64
-	tempBlksRead      float64
-	tempBlksWritten   float64
-}
-
 // NewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for qetting stats.
 // Executing this function supposes pg_stat_statements is already available in shared_preload_libraries (checked when
 // setting up service).
@@ -321,16 +323,16 @@ func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
 	}
 
 	// Establish connection using config.
-	conn, err := store.NewDBConfig(pgconfig)
+	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
 		return nil, err
 	}
 
 	// Check for pg_stat_statements.
-	if conn.IsExtensionAvailable("pg_stat_statements") {
+	if isExtensionAvailable(conn, "pg_stat_statements") {
 		// Set up pg_stat_statements source. It's unnecessary here, because it's already set on previous execution of that
 		// function in pessimistic case, but do it explicitly.
-		config.PgStatStatementsSource = conn.Config.Database
+		config.PgStatStatementsSource = conn.Conn().Config().Database
 		return conn, nil
 	}
 
@@ -341,7 +343,7 @@ func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
 	config.PgStatStatementsSource = ""
 
 	// Get databases list from current connection.
-	databases, err := conn.GetDatabases()
+	databases, err := listDatabases(conn)
 	if err != nil {
 		conn.Close()
 		return nil, err
@@ -353,15 +355,15 @@ func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
 	// Establish connection to each database in the list and check where pg_stat_statements is installed.
 	for _, d := range databases {
 		pgconfig.Database = d
-		conn, err := store.NewDBConfig(pgconfig)
+		conn, err := store.NewWithConfig(pgconfig)
 		if err != nil {
 			log.Warnf("failed connect to database: %s; skip", err)
 			continue
 		}
 
 		// If pg_stat_statements found, update source and return connection.
-		if conn.IsExtensionAvailable("pg_stat_statements") {
-			config.PgStatStatementsSource = conn.Config.Database
+		if isExtensionAvailable(conn, "pg_stat_statements") {
+			config.PgStatStatementsSource = conn.Conn().Config().Database
 			return conn, nil
 		}
 

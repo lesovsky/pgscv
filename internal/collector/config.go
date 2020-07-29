@@ -45,7 +45,7 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 		return config
 	}
 
-	conn, err := store.NewDBConfig(pgconfig)
+	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
 		log.Errorln("failed create new PostgresServiceConfig: ", err)
 		return config
@@ -55,7 +55,7 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 	var setting string
 
 	// Get Postgres server version
-	err = conn.Conn.QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
 	if err != nil {
 		log.Errorln("failed create new PostgresServiceConfig: ", err)
 		return config
@@ -69,7 +69,7 @@ func NewPostgresServiceConfig(connStr string) PostgresServiceConfig {
 	config.ServerVersionNum = version
 
 	// Get shared_preload_libraries (for inspecting enabled extensions).
-	err = conn.Conn.QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
 	if err != nil {
 		log.Errorln("failed create new PostgresServiceConfig: ", err)
 		return config

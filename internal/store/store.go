@@ -3,24 +3,18 @@ package store
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/jackc/pgproto3/v2"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/jackc/pgx/v4"
-)
-
-const (
-	queryDatabasesList = "SELECT datname FROM pg_database WHERE NOT datistemplate AND datallowconn"
 )
 
 // DB is the database representation
 type DB struct {
-	Config *pgx.ConnConfig // config used for connecting this database
-	Conn   *pgx.Conn       // database connection object
+	conn *pgx.Conn // database connection object
 }
 
-// NewConn creates new connection to Postgres/Pgbouncer using passed DSN
-func NewDB(connString string) (*DB, error) {
+// New creates new connection to Postgres/Pgbouncer using passed DSN
+func New(connString string) (*DB, error) {
 	config, err := pgx.ParseConfig(connString)
 	if err != nil {
 		return nil, err
@@ -34,11 +28,11 @@ func NewDB(connString string) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{Config: config, Conn: conn}, nil
+	return &DB{conn: conn}, nil
 }
 
-// NewConnConfig creates new connection to Postgres/Pgbouncer using passed Config
-func NewDBConfig(config *pgx.ConnConfig) (*DB, error) {
+// NewWithConfig creates new connection to Postgres/Pgbouncer using passed Config
+func NewWithConfig(config *pgx.ConnConfig) (*DB, error) {
 	// enable compatibility with pgbouncer
 	config.PreferSimpleProtocol = true
 
@@ -47,77 +41,25 @@ func NewDBConfig(config *pgx.ConnConfig) (*DB, error) {
 		return nil, err
 	}
 
-	return &DB{Config: config, Conn: conn}, nil
+	return &DB{conn: conn}, nil
 }
 
-func (db *DB) GetDatabases() ([]string, error) {
-	// getDBList returns the list of databases that allowed for connection
-	rows, err := db.Conn.Query(context.Background(), queryDatabasesList)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+/* public db methods */
 
-	var list = make([]string, 0, 10)
-	for rows.Next() {
-		var dbname string
-		if err := rows.Scan(&dbname); err != nil {
-			return nil, err
-		}
-		list = append(list, dbname)
-	}
-	return list, nil
-}
+// Query is a wrapper on private query() method.
+func (db *DB) Query(query string) (*model.PGResult, error) { return db.query(query) }
 
-// IsExtensionAvailable returns true if extension with specified name exists and available
-func (db *DB) IsExtensionAvailable(name string) bool {
-	log.Debugf("check %s availability", name)
+// Close is wrapper on private close() method.
+func (db *DB) Close() { db.close() }
 
-	var (
-		checkExtensionQuery = "SELECT EXISTS (SELECT 1 FROM information_schema.views WHERE table_name = $1)"
-		checkContentQuery   = fmt.Sprintf("SELECT 1 FROM %s LIMIT 1", name) // #nosec G201
-		exists              bool
-		count               int
-	)
+// Conn provides access to public methods of *pgx.Conn struct
+func (db *DB) Conn() *pgx.Conn { return db.conn }
 
-	if err := db.Conn.QueryRow(context.Background(), checkExtensionQuery, name).Scan(&exists); err != nil {
-		log.Errorln("failed to check extensions in information_schema: ", err)
-		return false
-	}
+/* private db methods */
 
-	// Return false if extension is not installed.
-	if !exists {
-		return false
-	}
-
-	// Execute simple query to check extension is queryable.
-	if err := db.Conn.QueryRow(context.Background(), checkContentQuery).Scan(&count); err != nil {
-		log.Errorf("%s exists but not queryable: %s", name, err)
-		return false
-	}
-
-	return true
-}
-
-// Close database connections gracefully
-func (db *DB) Close() {
-	err := db.Conn.Close(context.Background())
-	if err != nil {
-		log.Warnf("failed to close database connection: %s; ignore", err)
-	}
-}
-
-// QueryResult is the iterable store that contains result of query - data (values) and metadata (number of rows, columns and names).
-type QueryResult struct {
-	Nrows    int
-	Ncols    int
-	Colnames []pgproto3.FieldDescription
-	Rows     [][]sql.NullString
-}
-
-// GetStats executed query and wraps result into QueryResult struct
-func (db *DB) GetStats(query string) (*QueryResult, error) {
-	rows, err := db.Conn.Query(context.Background(), query)
+// Query method executes passed query and wraps result into model.PGResult struct.
+func (db *DB) query(query string) (*model.PGResult, error) {
+	rows, err := db.Conn().Query(context.Background(), query)
 	if err != nil {
 		return nil, err
 	}
@@ -155,10 +97,18 @@ func (db *DB) GetStats(query string) (*QueryResult, error) {
 
 	rows.Close()
 
-	return &QueryResult{
+	return &model.PGResult{
 		Nrows:    nrows,
 		Ncols:    ncols,
 		Colnames: colnames,
 		Rows:     rowsStore,
 	}, nil
+}
+
+// Close method closes database connections gracefully.
+func (db *DB) close() {
+	err := db.Conn().Close(context.Background())
+	if err != nil {
+		log.Warnf("failed to close database connection: %s; ignore", err)
+	}
 }

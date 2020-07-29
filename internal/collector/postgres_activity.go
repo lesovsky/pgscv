@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
@@ -44,7 +45,10 @@ FROM pg_stat_activity
 
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
-	descs map[string]typedDesc
+	states   typedDesc
+	activity typedDesc
+	prepared typedDesc
+	inflight typedDesc
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -53,49 +57,47 @@ type postgresActivityCollector struct {
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
 func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, error) {
 	return &postgresActivityCollector{
-		descs: map[string]typedDesc{
-			"conn_state": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "activity", "conn_total"),
-					"The total number of connections in each state.",
-					[]string{"state"}, constLabels,
-				), valueType: prometheus.GaugeValue,
-			},
-			"activity_max_seconds": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "activity", "max_seconds"),
-					"The current longest activity for each type of activity.",
-					[]string{"state", "type"}, constLabels,
-				), valueType: prometheus.GaugeValue,
-			},
-			"prepared_xact": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "activity", "prepared_xact_total"),
-					"The total number of transactions that are currently prepared for two-phase commit.",
-					nil, constLabels,
-				), valueType: prometheus.GaugeValue,
-			},
-			"executed_queries": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
-					"The total number of queries executed in-flight of each type.",
-					[]string{"type"}, constLabels,
-				), valueType: prometheus.GaugeValue,
-			},
+		states: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "conn_total"),
+				"The total number of connections in each state.",
+				[]string{"state"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		activity: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "max_seconds"),
+				"The current longest activity for each type of activity.",
+				[]string{"state", "type"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		prepared: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "prepared_xact_total"),
+				"The total number of transactions that are currently prepared for two-phase commit.",
+				nil, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		inflight: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
+				"The total number of queries executed in-flight of each type.",
+				[]string{"type"}, constLabels,
+			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
 }
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
 	// get pg_stat_activity stats
-	res, err := conn.GetStats(selectActivityQuery(config.ServerVersionNum))
+	res, err := conn.Query(selectActivityQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
@@ -105,48 +107,74 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 
 	// get pg_prepared_xacts stats
 	var count int
-	err = conn.Conn.QueryRow(context.Background(), postgresPreparedXactQuery).Scan(&count)
+	err = conn.Conn().QueryRow(context.Background(), postgresPreparedXactQuery).Scan(&count)
 	if err != nil {
 		log.Warnf("failed to read pg_prepared_xacts: %s; skip", err)
-		delete(c.descs, "prepared_xact")
 	} else {
 		stats.prepared = float64(count)
 	}
 
-	for name, desc := range c.descs {
-		switch name {
-		case "conn_state":
-			ch <- desc.mustNewConstMetric(stats.total, "total")
-			ch <- desc.mustNewConstMetric(stats.active, "active")
-			ch <- desc.mustNewConstMetric(stats.idle, "idle")
-			ch <- desc.mustNewConstMetric(stats.idlexact, "idlexact")
-			ch <- desc.mustNewConstMetric(stats.other, "other")
-			ch <- desc.mustNewConstMetric(stats.waiting, "waiting")
-		case "prepared_xact":
-			ch <- desc.mustNewConstMetric(stats.prepared)
-		case "activity_max_seconds":
-			ch <- desc.mustNewConstMetric(stats.maxRunUser, "running", "user")
-			ch <- desc.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
-			ch <- desc.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
-			ch <- desc.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
-		case "executed_queries":
-			ch <- desc.mustNewConstMetric(stats.querySelect, "select")
-			ch <- desc.mustNewConstMetric(stats.queryMod, "mod")
-			ch <- desc.mustNewConstMetric(stats.queryDdl, "ddl")
-			ch <- desc.mustNewConstMetric(stats.queryMaint, "maintenance")
-			ch <- desc.mustNewConstMetric(stats.queryWith, "with")
-			ch <- desc.mustNewConstMetric(stats.queryCopy, "copy")
-			ch <- desc.mustNewConstMetric(stats.queryOther, "other")
-		default:
-			log.Debugf("unknown desc name: %s, skip", name)
-			continue
-		}
-	}
+	// connection states
+	// totals doesn't account waitings because they have 'active' state.
+	var total = stats.active + stats.idle + stats.idlexact + stats.other
+	ch <- c.states.mustNewConstMetric(total, "total")
+	ch <- c.states.mustNewConstMetric(stats.active, "active")
+	ch <- c.states.mustNewConstMetric(stats.idle, "idle")
+	ch <- c.states.mustNewConstMetric(stats.idlexact, "idlexact")
+	ch <- c.states.mustNewConstMetric(stats.other, "other")
+	ch <- c.states.mustNewConstMetric(stats.waiting, "waiting")
+
+	// prepared xacts
+	ch <- c.prepared.mustNewConstMetric(stats.prepared)
+
+	// activity max times
+	ch <- c.activity.mustNewConstMetric(stats.maxRunUser, "running", "user")
+	ch <- c.activity.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
+	ch <- c.activity.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
+	ch <- c.activity.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
+	ch <- c.inflight.mustNewConstMetric(stats.querySelect, "select")
+
+	// in flight queries
+	ch <- c.inflight.mustNewConstMetric(stats.queryMod, "mod")
+	ch <- c.inflight.mustNewConstMetric(stats.queryDdl, "ddl")
+	ch <- c.inflight.mustNewConstMetric(stats.queryMaint, "maintenance")
+	ch <- c.inflight.mustNewConstMetric(stats.queryWith, "with")
+	ch <- c.inflight.mustNewConstMetric(stats.queryCopy, "copy")
+	ch <- c.inflight.mustNewConstMetric(stats.queryOther, "other")
 
 	return nil
 }
 
-func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
+/*
+   *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
+   wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
+   в active и waiting. Кроме того есть еще backend_type != 'client_backend', который вносит некоторую путаницу при учете через
+   state/wait_event_type. Поэтому нельзя так просто взять и сложить все типы и получить total - полученное значение будет
+   больше чем реальный total. Именно поэтому есть отдельно посчитанный total.
+*/
+
+// postgresActivityStat describes current activity
+type postgresActivityStat struct {
+	idle         float64 // state = 'idle'
+	idlexact     float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
+	active       float64 // state = 'active'
+	other        float64 // state IN ('fastpath function call','disabled')
+	waiting      float64 // wait_event_type = 'Lock' (or waiting = 't')
+	prepared     float64 // FROM pg_prepared_xacts
+	maxRunUser   float64 // longest duration among client queries
+	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
+	maxWaitUser  float64 // longest duration being in waiting state (all activity)
+	maxWaitMaint float64 // longest duration being in waiting state (all activity)
+	querySelect  float64 // number of select queries: SELECT, TABLE
+	queryMod     float64 // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
+	queryDdl     float64 // number of DDL queries: CREATE, ALTER, DROP
+	queryMaint   float64 // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
+	queryWith    float64 // number of CTE queries
+	queryCopy    float64 // number of COPY queries
+	queryOther   float64 // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
+}
+
+func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
 	var stats postgresActivityStat
 
 	// Depending on Postgres version, waiting backends are observed using different column: 'waiting' used in 9.5 and older
@@ -226,51 +254,17 @@ func parsePostgresActivityStats(r *store.QueryResult) postgresActivityStat {
 	return stats
 }
 
-/*
-   *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
-   wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
-   в active и waiting. Кроме того есть еще backend_type != 'client_backend', который вносит некоторую путаницу при учете через
-   state/wait_event_type. Поэтому нельзя так просто взять и сложить все типы и получить total - полученное значение будет
-   больше чем реальный total. Именно поэтому есть отдельно посчитанный total
-*/
-
-// postgresActivityStat describes current activity
-type postgresActivityStat struct {
-	total        float64 // state IS NOT NULL
-	idle         float64 // state = 'idle'
-	idlexact     float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
-	active       float64 // state = 'active'
-	other        float64 // state IN ('fastpath function call','disabled')
-	waiting      float64 // wait_event_type = 'Lock' (or waiting = 't')
-	prepared     float64 // FROM pg_prepared_xacts
-	maxRunUser   float64 // longest duration among client queries
-	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
-	maxWaitUser  float64 // longest duration being in waiting state (all activity)
-	maxWaitMaint float64 // longest duration being in waiting state (all activity)
-	querySelect  float64 // number of select queries: SELECT, TABLE
-	queryMod     float64 // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
-	queryDdl     float64 // number of DDL queries: CREATE, ALTER, DROP
-	queryMaint   float64 // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
-	queryWith    float64 // number of CTE queries
-	queryCopy    float64 // number of COPY queries
-	queryOther   float64 // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
-}
-
 // updateState increments counter depending on passed state of the backend.
 func (s *postgresActivityStat) updateState(state string) {
 	// increment state-specific counter
 	switch state {
 	case stActive:
-		s.total++
 		s.active++
 	case stIdle:
-		s.total++
 		s.idle++
 	case stIdleXact, stIdleXactAborted:
-		s.total++
 		s.idlexact++
 	case stFastpath, stDisabled:
-		s.total++
 		s.other++
 	case stWaiting:
 		// waiting must not increment totals because it isn't based on state column

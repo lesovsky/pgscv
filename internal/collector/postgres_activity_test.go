@@ -3,7 +3,6 @@ package collector
 import (
 	"database/sql"
 	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -27,12 +26,12 @@ func TestPostgresActivityCollector_Update(t *testing.T) {
 func Test_parsePostgresActivityStats(t *testing.T) {
 	var testCases = []struct {
 		name string
-		res  *store.QueryResult
+		res  *model.PGResult
 		want postgresActivityStat
 	}{
 		{
 			name: "normal output",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 10,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
@@ -69,14 +68,14 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				},
 			},
 			want: postgresActivityStat{
-				total: 10, active: 6, idle: 1, idlexact: 2, other: 1, waiting: 2,
+				active: 6, idle: 1, idlexact: 2, other: 1, waiting: 2,
 				maxRunUser: 20, maxRunMaint: 9, maxWaitUser: 13, maxWaitMaint: 12,
 				querySelect: 1, queryMod: 1, queryMaint: 4,
 			},
 		},
 		{
 			name: "queries",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 10,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
@@ -112,11 +111,11 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 					{{String: "active", Valid: true}, {}, {}, {String: "1", Valid: true}, {String: "1", Valid: true}, {String: "COMMIT test", Valid: true}},
 				},
 			},
-			want: postgresActivityStat{total: 22, maxRunUser: 1, maxRunMaint: 1, active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4},
+			want: postgresActivityStat{maxRunUser: 1, maxRunMaint: 1, active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4},
 		},
 		{
 			name: "old postgres with waiting instead of wait_event_type",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 1,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
@@ -131,7 +130,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 					{{String: "active", Valid: true}, {String: "f", Valid: true}, {String: "10", Valid: true}, {String: "10", Valid: true}, {String: "SELECT test 2", Valid: true}},
 				},
 			},
-			want: postgresActivityStat{total: 2, maxRunUser: 10, maxWaitUser: 5, active: 2, waiting: 1, querySelect: 2},
+			want: postgresActivityStat{maxRunUser: 10, maxWaitUser: 5, active: 2, waiting: 1, querySelect: 2},
 		},
 	}
 

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -19,30 +20,6 @@ const userTablesQuery = `SELECT
   coalesce(extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))), 0) as last_analyze_seconds,
   vacuum_count, autovacuum_count, analyze_count, autoanalyze_count
 FROM pg_stat_user_tables`
-
-// postgresTableStat is per-table store for metrics related to how tables are accessed.
-type postgresTableStat struct {
-	datname     string
-	schemaname  string
-	relname     string
-	seqscan     float64
-	seqtupread  float64
-	idxscan     float64
-	idxtupfetch float64
-	inserted    float64
-	updated     float64
-	deleted     float64
-	hotUpdated  float64
-	live        float64
-	dead        float64
-	modified    float64
-	lastvacuum  float64
-	lastanalyze float64
-	vacuum      float64
-	autovacuum  float64
-	analyze     float64
-	autoanalyze float64
-}
 
 // postgresTablesCollector defines metric descriptors and stats store.
 type postgresTablesCollector struct {
@@ -142,12 +119,12 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 
-	databases, err := conn.GetDatabases()
+	databases, err := listDatabases(conn)
 	if err != nil {
 		return err
 	}
@@ -161,12 +138,12 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 	for _, d := range databases {
 		pgconfig.Database = d
-		conn, err := store.NewDBConfig(pgconfig)
+		conn, err := store.NewWithConfig(pgconfig)
 		if err != nil {
 			return err
 		}
 
-		res, err := conn.GetStats(userTablesQuery)
+		res, err := conn.Query(userTablesQuery)
 		if err != nil {
 			return err
 		}
@@ -204,7 +181,32 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 	return nil
 }
 
-func parsePostgresTableStats(r *store.QueryResult, labelNames []string) map[string]postgresTableStat {
+// postgresTableStat is per-table store for metrics related to how tables are accessed.
+type postgresTableStat struct {
+	datname     string
+	schemaname  string
+	relname     string
+	seqscan     float64
+	seqtupread  float64
+	idxscan     float64
+	idxtupfetch float64
+	inserted    float64
+	updated     float64
+	deleted     float64
+	hotUpdated  float64
+	live        float64
+	dead        float64
+	modified    float64
+	lastvacuum  float64
+	lastanalyze float64
+	vacuum      float64
+	autovacuum  float64
+	analyze     float64
+	autoanalyze float64
+}
+
+// parsePostgresTableStats parses PGResult and returns structs with stats values.
+func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]postgresTableStat {
 	var stats = make(map[string]postgresTableStat)
 
 	var tablename string

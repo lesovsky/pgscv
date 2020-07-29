@@ -1,8 +1,11 @@
 package collector
 
 import (
+	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
+	"strconv"
 )
 
 const databaseQuery = `SELECT
@@ -17,7 +20,13 @@ const databaseQuery = `SELECT
 FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)`
 
 type postgresDatabasesCollector struct {
-	descs      []typedDesc
+	blocks     typedDesc
+	tuples     typedDesc
+	events     typedDesc
+	tempbytes  typedDesc
+	blockstime typedDesc
+	sizes      typedDesc
+	statsage   typedDesc
 	labelNames []string
 }
 
@@ -28,159 +37,238 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 
 	return &postgresDatabasesCollector{
 		labelNames: databaseLabelNames,
-		descs: []typedDesc{
-			{
-				colname: "xact_commit",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "xact_commit_total"),
-					"The total number of transactions committed.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "xact_rollback",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "xact_rollback_total"),
-					"The total number of transactions rolled back.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "blks_read",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "blks_read_total"),
-					"Total number of disk blocks read in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "blks_hit",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "blks_hit_total"),
-					"Total number of times disk blocks were found already in the buffer cache, so that a read was not necessary.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "tup_returned",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tup_returned_total"),
-					"Total number of rows returned by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "tup_fetched",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tup_fetched_total"),
-					"Total number of rows fetched by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "tup_inserted",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tup_inserted_total"),
-					"Total number of rows inserted by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "tup_updated",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tup_updated_total"),
-					"Total number of rows updated by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "tup_deleted",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tup_deleted_total"),
-					"Total number of rows deleted by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "conflicts",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "conflicts_total"),
-					"Number of queries canceled due to conflicts with recovery in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "temp_files",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "temp_files_total"),
-					"Number of temporary files created by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "temp_bytes",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "temp_bytes_total"),
-					"Total amount of data written to temporary files by queries in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "deadlocks",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "deadlocks_total"),
-					"Number of deadlocks detected in this database.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			{
-				colname: "blk_read_time",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "blk_read_time_seconds"),
-					"Time spent reading data file blocks by backends in this database, in seconds.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue, factor: .001,
-			},
-			{
-				colname: "blk_write_time",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "blk_write_time_seconds"),
-					"Time spent writing data file blocks by backends in this database, in seconds.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue, factor: .001,
-			},
-			{
-				colname: "size_bytes",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "size_bytes_total"),
-					"Total size of the database, in bytes.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.GaugeValue,
-			},
-			{
-				colname: "stats_age_seconds",
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "stats_age_seconds"),
-					"The age of the activity statistics, in seconds.",
-					databaseLabelNames, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
+		events: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "events_total"),
+				"Total number of events occurred in this database in each event type.",
+				[]string{"datname", "type"}, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		blocks: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "blocks_total"),
+				"Total number of disk blocks accesses in this database in each access type.",
+				[]string{"datname", "access"}, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		tuples: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "tuples_total"),
+				"Total number of rows processed in this database in each operation type.",
+				[]string{"datname", "op"}, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		tempbytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "temp_bytes_total"),
+				"Total amount of data written to temporary files by queries in this database.",
+				[]string{"datname"}, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		blockstime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "blk_time_seconds"),
+				"Time spent accessing data file blocks by backends in this database in each access type, in seconds.",
+				[]string{"datname", "type"}, constLabels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
+		sizes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "size_bytes_total"),
+				"Total size of the database, in bytes.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		statsage: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "stats_age_seconds"),
+				"The age of the activity statistics, in seconds.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.CounterValue,
 		},
 	}, nil
 }
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	res, err := conn.GetStats(databaseQuery)
+	res, err := conn.Query(databaseQuery)
 	if err != nil {
 		return err
 	}
 
-	return parsePostgresStats(res, ch, c.descs, c.labelNames)
+	stats := parsePostgresDatabasesStats(res, c.labelNames)
+
+	for _, stat := range stats {
+		ch <- c.events.mustNewConstMetric(stat.xactcommit, stat.datname, "xact_commit")
+		ch <- c.events.mustNewConstMetric(stat.xactrollback, stat.datname, "xact_rollback")
+		ch <- c.events.mustNewConstMetric(stat.conflicts, stat.datname, "conflicts")
+		ch <- c.events.mustNewConstMetric(stat.tempfiles, stat.datname, "tempfiles")
+		ch <- c.events.mustNewConstMetric(stat.deadlocks, stat.datname, "deadlocks")
+		ch <- c.blocks.mustNewConstMetric(stat.blksread, stat.datname, "read")
+		ch <- c.blocks.mustNewConstMetric(stat.blkshit, stat.datname, "hit")
+		ch <- c.tuples.mustNewConstMetric(stat.tupreturned, stat.datname, "returned")
+		ch <- c.tuples.mustNewConstMetric(stat.tupfetched, stat.datname, "fetched")
+		ch <- c.tuples.mustNewConstMetric(stat.tupinserted, stat.datname, "inserted")
+		ch <- c.tuples.mustNewConstMetric(stat.tupupdated, stat.datname, "updated")
+		ch <- c.tuples.mustNewConstMetric(stat.tupdeleted, stat.datname, "deleted")
+
+		ch <- c.tempbytes.mustNewConstMetric(stat.tempbytes, stat.datname)
+		ch <- c.blockstime.mustNewConstMetric(stat.blkreadtime, stat.datname, "read")
+		ch <- c.blockstime.mustNewConstMetric(stat.blkwritetime, stat.datname, "write")
+		ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname)
+		ch <- c.statsage.mustNewConstMetric(stat.statsage, stat.datname)
+	}
+
+	return nil
+}
+
+// postgresDatabaseStat represents per-database stats based on pg_stat_database.
+type postgresDatabaseStat struct {
+	datname      string
+	xactcommit   float64
+	xactrollback float64
+	blksread     float64
+	blkshit      float64
+	tupreturned  float64
+	tupfetched   float64
+	tupinserted  float64
+	tupupdated   float64
+	tupdeleted   float64
+	conflicts    float64
+	tempfiles    float64
+	tempbytes    float64
+	deadlocks    float64
+	blkreadtime  float64
+	blkwritetime float64
+	sizebytes    float64
+	statsage     float64
+}
+
+// parsePostgresDatabasesStats parses PGResult, extract data and return struct with stats values.
+func parsePostgresDatabasesStats(r *model.PGResult, labelNames []string) map[string]postgresDatabaseStat {
+	var stats = make(map[string]postgresDatabaseStat)
+
+	// process row by row
+	for _, row := range r.Rows {
+		stat := postgresDatabaseStat{}
+
+		// collect label values
+		for i, colname := range r.Colnames {
+			switch string(colname.Name) {
+			case "datname":
+				stat.datname = row[i].String
+			}
+		}
+
+		// Define a map key as a database name.
+		databaseFQName := stat.datname
+
+		// Put stats with labels (but with no data values yet) into stats store.
+		stats[databaseFQName] = stat
+
+		// fetch data values from columns
+		for i, colname := range r.Colnames {
+			// skip columns if its value used as a label
+			if stringsContains(labelNames, string(colname.Name)) {
+				log.Debug("skip label mapped column")
+				continue
+			}
+
+			// Skip empty (NULL) values.
+			if row[i].String == "" {
+				log.Debug("got empty (NULL) value, skip")
+				continue
+			}
+
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("skip collecting metric: %s", err)
+				continue
+			}
+
+			// Run column-specific logic
+			switch string(colname.Name) {
+			case "xact_commit":
+				s := stats[databaseFQName]
+				s.xactcommit = v
+				stats[databaseFQName] = s
+			case "xact_rollback":
+				s := stats[databaseFQName]
+				s.xactrollback = v
+				stats[databaseFQName] = s
+			case "blks_read":
+				s := stats[databaseFQName]
+				s.blksread = v
+				stats[databaseFQName] = s
+			case "blks_hit":
+				s := stats[databaseFQName]
+				s.blkshit = v
+				stats[databaseFQName] = s
+			case "tup_returned":
+				s := stats[databaseFQName]
+				s.tupreturned = v
+				stats[databaseFQName] = s
+			case "tup_fetched":
+				s := stats[databaseFQName]
+				s.tupfetched = v
+				stats[databaseFQName] = s
+			case "tup_inserted":
+				s := stats[databaseFQName]
+				s.tupinserted = v
+				stats[databaseFQName] = s
+			case "tup_updated":
+				s := stats[databaseFQName]
+				s.tupupdated = v
+				stats[databaseFQName] = s
+			case "tup_deleted":
+				s := stats[databaseFQName]
+				s.tupdeleted = v
+				stats[databaseFQName] = s
+			case "conflicts":
+				s := stats[databaseFQName]
+				s.conflicts = v
+				stats[databaseFQName] = s
+			case "temp_files":
+				s := stats[databaseFQName]
+				s.tempfiles = v
+				stats[databaseFQName] = s
+			case "temp_bytes":
+				s := stats[databaseFQName]
+				s.tempbytes = v
+				stats[databaseFQName] = s
+			case "deadlocks":
+				s := stats[databaseFQName]
+				s.deadlocks = v
+				stats[databaseFQName] = s
+			case "blk_read_time":
+				s := stats[databaseFQName]
+				s.blkreadtime = v
+				stats[databaseFQName] = s
+			case "blk_write_time":
+				s := stats[databaseFQName]
+				s.blkwritetime = v
+				stats[databaseFQName] = s
+			case "size_bytes":
+				s := stats[databaseFQName]
+				s.sizebytes = v
+				stats[databaseFQName] = s
+			case "stats_age_seconds":
+				s := stats[databaseFQName]
+				s.statsage = v
+				stats[databaseFQName] = s
+			default:
+				log.Debugf("unsupported pg_stat_database stat column: %s, skip", string(colname.Name))
+				continue
+			}
+		}
+	}
+
+	return stats
 }

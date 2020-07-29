@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 	"strconv"
@@ -87,13 +88,13 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, 
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.NewDB(config.ConnString)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 	defer conn.Close()
 
-	res, err := conn.GetStats(selectReplicationQuery(config.ServerVersionNum))
+	res, err := conn.Query(selectReplicationQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
@@ -117,6 +118,7 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	return nil
 }
 
+// postgresReplicationStat represents per-replica stats based on pg_stat_replication.
 type postgresReplicationStat struct {
 	pid              string
 	clientaddr       string
@@ -135,7 +137,8 @@ type postgresReplicationStat struct {
 	replayLagSeconds float64
 }
 
-func parsePostgresReplicationStats(r *store.QueryResult, labelNames []string) map[string]postgresReplicationStat {
+// parsePostgresReplicationStats parses PGResult and returns struct with stats values.
+func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[string]postgresReplicationStat {
 	var stats = make(map[string]postgresReplicationStat)
 
 	for _, row := range r.Rows {

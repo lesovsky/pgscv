@@ -3,7 +3,6 @@ package collector
 import (
 	"database/sql"
 	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -33,12 +32,12 @@ func TestPostgresTablesCollector_Update(t *testing.T) {
 func Test_parsePostgresTableStats(t *testing.T) {
 	var testCases = []struct {
 		name string
-		res  *store.QueryResult
+		res  *model.PGResult
 		want map[string]postgresTableStat
 	}{
 		{
 			name: "normal output",
-			res: &store.QueryResult{
+			res: &model.PGResult{
 				Nrows: 1,
 				Ncols: 20,
 				Colnames: []pgproto3.FieldDescription{
