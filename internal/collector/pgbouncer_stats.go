@@ -14,8 +14,7 @@ type pgbouncerStatsCollector struct {
 	xacts      typedDesc
 	queries    typedDesc
 	bytes      typedDesc
-	runtime    typedDesc
-	waittime   typedDesc
+	time       typedDesc
 	labelNames []string
 }
 
@@ -47,18 +46,11 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 				[]string{"database", "type"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
-		runtime: typedDesc{
+		time: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("pgbouncer", "", "time_seconds_total"),
 				"Total number of time spent by pgbouncer when connected to PostgreSQL executing queries or processing transactions, in seconds.",
 				[]string{"database", "type", "mode"}, constLabels,
-			), valueType: prometheus.CounterValue, factor: .000001,
-		},
-		waittime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "time_seconds_total"),
-				"Time spent by clients waiting for a server, in seconds.",
-				[]string{"database", "type"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .000001,
 		},
 	}, nil
@@ -84,9 +76,9 @@ func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Met
 		ch <- c.queries.mustNewConstMetric(stat.queries, stat.database)
 		ch <- c.bytes.mustNewConstMetric(stat.received, stat.database, "received")
 		ch <- c.bytes.mustNewConstMetric(stat.sent, stat.database, "sent")
-		ch <- c.runtime.mustNewConstMetric(stat.xacttime, stat.database, "running", "xact")
-		ch <- c.runtime.mustNewConstMetric(stat.querytime, stat.database, "running", "query")
-		ch <- c.waittime.mustNewConstMetric(stat.querytime, stat.database, "waiting")
+		ch <- c.time.mustNewConstMetric(stat.xacttime, stat.database, "running", "xact")
+		ch <- c.time.mustNewConstMetric(stat.querytime, stat.database, "running", "query")
+		ch <- c.time.mustNewConstMetric(stat.waittime, stat.database, "waiting", "none")
 	}
 
 	return nil

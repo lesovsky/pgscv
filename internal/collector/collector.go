@@ -35,18 +35,20 @@ func (f Factories) RegisterSystemCollectors() {
 func (f Factories) RegisterPostgresCollectors() {
 	f.register("activity", NewPostgresActivityCollector)
 	f.register("bgwriter", NewPostgresBgwriterCollector)
+	f.register("conflicts", NewPostgresConflictsCollector)
 	f.register("database", NewPostgresDatabasesCollector)
 	f.register("function", NewPostgresFunctionsCollector)
 	f.register("replication", NewPostgresReplicationCollector)
 	f.register("replication_slot", NewPostgresReplicationSlotCollector)
 	f.register("statements", NewPostgresStatementsCollector)
+	//f.register("storage", NewPostgresStorageCollector)  // TODO: this is a heavyweight check, should be switcher for enable/disable it.
 	f.register("table", NewPostgresTablesCollector)
 }
 
 // RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
 func (f Factories) RegisterPgbouncerCollectors() {
 	f.register("pool", NewPgbouncerPoolsCollector)
-	f.register("pool", NewPgbouncerStatsCollector)
+	f.register("stats", NewPgbouncerStatsCollector)
 }
 
 // register is the generic routine which register any kind of collectors.
