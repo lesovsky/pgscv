@@ -21,7 +21,9 @@ func TestPostgresTablesCollector_Update(t *testing.T) {
 			"postgres_table_last_analyze_seconds",
 			"postgres_table_maintenance_total",
 		},
-		optional:  []string{},
+		optional: []string{
+			"postgres_table_io_blocks_total",
+		},
 		collector: NewPostgresTablesCollector,
 		service:   model.ServiceTypePostgresql,
 	}
@@ -39,7 +41,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 			name: "normal output",
 			res: &model.PGResult{
 				Nrows: 1,
-				Ncols: 20,
+				Ncols: 28,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("datname")}, {Name: []byte("schemaname")}, {Name: []byte("relname")},
 					{Name: []byte("seq_scan")}, {Name: []byte("seq_tup_read")}, {Name: []byte("idx_scan")}, {Name: []byte("idx_tup_fetch")},
@@ -47,6 +49,8 @@ func Test_parsePostgresTableStats(t *testing.T) {
 					{Name: []byte("n_live_tup")}, {Name: []byte("n_dead_tup")}, {Name: []byte("n_mod_since_analyze")},
 					{Name: []byte("last_vacuum_seconds")}, {Name: []byte("last_analyze_seconds")},
 					{Name: []byte("vacuum_count")}, {Name: []byte("autovacuum_count")}, {Name: []byte("analyze_count")}, {Name: []byte("autoanalyze_count")},
+					{Name: []byte("heap_blks_read")}, {Name: []byte("heap_blks_hit")}, {Name: []byte("idx_blks_read")}, {Name: []byte("idx_blks_hit")},
+					{Name: []byte("toast_blks_read")}, {Name: []byte("toast_blks_hit")}, {Name: []byte("tidx_blks_read")}, {Name: []byte("tidx_blks_hit")},
 				},
 				Rows: [][]sql.NullString{
 					{
@@ -56,6 +60,8 @@ func Test_parsePostgresTableStats(t *testing.T) {
 						{String: "600", Valid: true}, {String: "100", Valid: true}, {String: "500", Valid: true},
 						{String: "700", Valid: true}, {String: "800", Valid: true},
 						{String: "910", Valid: true}, {String: "920", Valid: true}, {String: "930", Valid: true}, {String: "940", Valid: true},
+						{String: "4528", Valid: true}, {String: "5845", Valid: true}, {String: "458", Valid: true}, {String: "698", Valid: true},
+						{String: "125", Valid: true}, {String: "825", Valid: true}, {String: "699", Valid: true}, {String: "375", Valid: true},
 					},
 				},
 			},
@@ -65,6 +71,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 					seqscan: 100, seqtupread: 1000, idxscan: 200, idxtupfetch: 2000,
 					inserted: 300, updated: 400, deleted: 500, hotUpdated: 150, live: 600, dead: 100, modified: 500,
 					lastvacuum: 700, lastanalyze: 800, vacuum: 910, autovacuum: 920, analyze: 930, autoanalyze: 940,
+					heapread: 4528, heaphit: 5845, idxread: 458, idxhit: 698, toastread: 125, toasthit: 825, tidxread: 699, tidxhit: 375,
 				},
 			},
 		},

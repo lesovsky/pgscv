@@ -10,16 +10,20 @@ import (
 	"strings"
 )
 
-const userTablesQuery = `SELECT
-  current_database() AS datname, schemaname, relname,
-  seq_scan, seq_tup_read,
-  idx_scan, idx_tup_fetch,
-  n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd,
-  n_live_tup, n_dead_tup, n_mod_since_analyze,
-  coalesce(extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))), 0) as last_vacuum_seconds,
-  coalesce(extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))), 0) as last_analyze_seconds,
-  vacuum_count, autovacuum_count, analyze_count, autoanalyze_count
-FROM pg_stat_user_tables`
+const (
+	userTablesQuery = `SELECT
+    current_database() AS datname, s1.schemaname, s1.relname,
+    seq_scan, seq_tup_read,
+    idx_scan, idx_tup_fetch,
+    n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd,
+    n_live_tup, n_dead_tup, n_mod_since_analyze,
+    extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds,
+    extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds,
+    vacuum_count, autovacuum_count, analyze_count, autoanalyze_count,
+    heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit
+FROM pg_stat_user_tables s1
+JOIN pg_statio_user_tables s2 USING (schemaname, relname)`
+)
 
 // postgresTablesCollector defines metric descriptors and stats store.
 type postgresTablesCollector struct {
@@ -32,11 +36,14 @@ type postgresTablesCollector struct {
 	maintLastVacuum  typedDesc
 	maintLastAnalyze typedDesc
 	maintenance      typedDesc
+	io               typedDesc
 	labelNames       []string
 }
 
 // NewPostgresTablesCollector returns a new Collector exposing postgres tables stats.
-// For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-TABLES-VIEW
+// For details see
+// https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-TABLES-VIEW
+// https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-TABLES-VIEW
 func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error) {
 	var tablesLabelNames = []string{"datname", "schemaname", "relname"}
 
@@ -114,6 +121,14 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 			),
 			valueType: prometheus.CounterValue,
 		},
+		io: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table_io", "blocks_total"),
+				"Total number of table's blocks processed.",
+				[]string{"datname", "schemaname", "relname", "type", "cache_hit"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
 	}, nil
 }
 
@@ -168,13 +183,51 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 			ch <- c.tuplestotal.mustNewConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname, "dead")
 			ch <- c.tuplestotal.mustNewConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname, "modified")
 
-			// maintenance stats
-			ch <- c.maintLastVacuum.mustNewConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.maintLastAnalyze.mustNewConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.maintenance.mustNewConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
-			ch <- c.maintenance.mustNewConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
-			ch <- c.maintenance.mustNewConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
-			ch <- c.maintenance.mustNewConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
+			// maintenance stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
+			if stat.lastvacuum > 0 {
+				ch <- c.maintLastVacuum.mustNewConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
+			}
+			if stat.lastanalyze > 0 {
+				ch <- c.maintLastAnalyze.mustNewConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
+			}
+			if stat.vacuum > 0 {
+				ch <- c.maintenance.mustNewConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
+			}
+			if stat.autovacuum > 0 {
+				ch <- c.maintenance.mustNewConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
+			}
+			if stat.analyze > 0 {
+				ch <- c.maintenance.mustNewConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
+			}
+			if stat.autoanalyze > 0 {
+				ch <- c.maintenance.mustNewConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
+			}
+
+			// io stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
+			if stat.heapread > 0 {
+				ch <- c.io.mustNewConstMetric(stat.heapread, stat.datname, stat.schemaname, stat.relname, "heap", "false")
+			}
+			if stat.heaphit > 0 {
+				ch <- c.io.mustNewConstMetric(stat.heaphit, stat.datname, stat.schemaname, stat.relname, "heap", "true")
+			}
+			if stat.idxread > 0 {
+				ch <- c.io.mustNewConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, "idx", "false")
+			}
+			if stat.idxhit > 0 {
+				ch <- c.io.mustNewConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, "idx", "true")
+			}
+			if stat.toastread > 0 {
+				ch <- c.io.mustNewConstMetric(stat.toastread, stat.datname, stat.schemaname, stat.relname, "toast", "false")
+			}
+			if stat.toasthit > 0 {
+				ch <- c.io.mustNewConstMetric(stat.toasthit, stat.datname, stat.schemaname, stat.relname, "toast", "true")
+			}
+			if stat.tidxread > 0 {
+				ch <- c.io.mustNewConstMetric(stat.tidxread, stat.datname, stat.schemaname, stat.relname, "tidx", "false")
+			}
+			if stat.tidxhit > 0 {
+				ch <- c.io.mustNewConstMetric(stat.tidxhit, stat.datname, stat.schemaname, stat.relname, "tidx", "true")
+			}
 		}
 	}
 
@@ -203,6 +256,14 @@ type postgresTableStat struct {
 	autovacuum  float64
 	analyze     float64
 	autoanalyze float64
+	heapread    float64
+	heaphit     float64
+	idxread     float64
+	idxhit      float64
+	toastread   float64
+	toasthit    float64
+	tidxread    float64
+	tidxhit     float64
 }
 
 // parsePostgresTableStats parses PGResult and returns structs with stats values.
@@ -316,6 +377,41 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 					s := stats[tablename]
 					s.autoanalyze = v
 					stats[tablename] = s
+				case "heap_blks_read":
+					s := stats[tablename]
+					s.heapread = v
+					stats[tablename] = s
+				case "heap_blks_hit":
+					s := stats[tablename]
+					s.heaphit = v
+					stats[tablename] = s
+				case "idx_blks_read":
+					s := stats[tablename]
+					s.idxread = v
+					stats[tablename] = s
+				case "idx_blks_hit":
+					s := stats[tablename]
+					s.idxhit = v
+					stats[tablename] = s
+				case "toast_blks_read":
+					s := stats[tablename]
+					s.toastread = v
+					stats[tablename] = s
+				case "toast_blks_hit":
+					s := stats[tablename]
+					s.toasthit = v
+					stats[tablename] = s
+				case "tidx_blks_read":
+					s := stats[tablename]
+					s.tidxread = v
+					stats[tablename] = s
+				case "tidx_blks_hit":
+					s := stats[tablename]
+					s.tidxhit = v
+					stats[tablename] = s
+				default:
+					log.Debugf("unsupported pg_stat_user_tables (or pg_statio_user_tables) stat column: %s, skip", string(colname.Name))
+					continue
 				}
 			}
 		}
