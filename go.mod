@@ -13,5 +13,6 @@ require (
 	github.com/shirou/gopsutil v2.20.6+incompatible
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/crypto v0.0.0-20200709230013-948cd5f35899 // indirect
+	golang.org/x/net v0.0.0-20190813141303-74dc4d7220e7
 	gopkg.in/alecthomas/kingpin.v2 v2.2.6
 )
