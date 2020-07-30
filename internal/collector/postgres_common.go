@@ -6,6 +6,7 @@ import (
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -40,6 +41,9 @@ func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[strin
 				key = key + "/" + row[i].String
 			}
 		}
+
+		// trim leading slash
+		key = strings.TrimLeft(key, "/")
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		stats[key] = stat

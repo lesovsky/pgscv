@@ -183,7 +183,7 @@ LEFT OUTER JOIN pg_constraint c ON c.contype in ('p', 'u') AND c.conrelid = t.oi
 
 	rows, err := conn.Conn().Query(context.Background(), query)
 	if err != nil {
-		log.Errorf("collect non-pl tables in database %s failed: %s; skip", conn.Conn().Config().Database, err)
+		log.Errorf("collect non-pk tables in database %s failed: %s; skip", conn.Conn().Config().Database, err)
 		return nil
 	}
 
@@ -239,7 +239,7 @@ FROM pg_index i JOIN pg_class c1 ON i.indexrelid = c1.oid JOIN pg_class c2 ON i.
 		return nil
 	}
 
-	return parsePostgresGenericStats(res, []string{"shemaname", "relname", "indexrelname"})
+	return parsePostgresGenericStats(res, []string{"schemaname", "relname", "indexrelname"})
 }
 
 // collectSchemaNonIndexedFK collects metrics related to non indexed foreign key constraints.
@@ -384,17 +384,20 @@ func collectSchemaFKDatatypeMismatch(conn *store.DB, ch chan<- prometheus.Metric
 
 	for k, s := range stats {
 		var (
-			schemaname = s.labels["schemaname"]
-			seqname    = s.labels["seqname"]
-			value      = s.values["ratio"]
+			schemaname    = s.labels["schemaname"]
+			relname       = s.labels["relname"]
+			colname       = s.labels["colname"]
+			refschemaname = s.labels["refschemaname"]
+			refrelname    = s.labels["refrelname"]
+			refcolname    = s.labels["refcolname"]
 		)
 
-		if schemaname == "" || seqname == "" {
+		if schemaname == "" || relname == "" || colname == "" || refschemaname == "" || refrelname == "" || refcolname == "" {
 			log.Warnf("incomplete sequence FQ name: %s; skip", k)
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(value, datname, schemaname, seqname)
+		ch <- desc.mustNewConstMetric(1, datname, schemaname, relname, colname, refschemaname, refrelname, refcolname)
 	}
 }
 

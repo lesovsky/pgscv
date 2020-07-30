@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-const testPostgresConnStr = "host=postgres dbname=postgres user=postgres sslmode=disable"
+const testPostgresConnStr = "host=postgres dbname=pgscv_fixtures user=postgres sslmode=disable"
 
 func NewTest(t *testing.T) *DB {
 	db, err := New(testPostgresConnStr)

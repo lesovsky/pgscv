@@ -36,11 +36,11 @@ func Test_parsePostgresGenericStats(t *testing.T) {
 				},
 			},
 			want: map[string]postgresGenericStat{
-				"/name1/name2": {
+				"name1/name2": {
 					labels: map[string]string{"label1": "name1", "label2": "name2"},
 					values: map[string]float64{"value1": 1, "value2": 2, "value3": 3, "value4": 4},
 				},
-				"/name3/name4": {
+				"name3/name4": {
 					labels: map[string]string{"label1": "name3", "label2": "name4"},
 					values: map[string]float64{"value1": 5, "value2": 6, "value3": 7, "value4": 8},
 				},
