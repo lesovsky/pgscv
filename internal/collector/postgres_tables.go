@@ -285,7 +285,7 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 			}
 		}
 
-		// create a pool name consisting of trio database/user/pool_mode
+		// create a table name consisting of trio database/schema/table
 		tablename = strings.Join([]string{table.datname, table.schemaname, table.relname}, "/")
 
 		stats[tablename] = table
