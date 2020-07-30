@@ -14,6 +14,13 @@ func TestPostgresSchemaCollector_Update(t *testing.T) {
 			"postgres_schema_system_catalog_bytes_total",
 			"postgres_schema_non_pk_tables_total",
 		},
+		optional: []string{
+			"postgres_schema_invalid_index_bytes_total",
+			"postgres_schema_non_indexed_fk_total",
+			"postgres_schema_redundant_indexes_bytes_total",
+			"postgres_schema_seq_exhaustion_ratio",
+			"postgres_schema_mistyped_fkeys_total",
+		},
 		collector: NewPostgresSchemaCollector,
 		service:   model.ServiceTypePostgresql,
 	}
@@ -29,11 +36,56 @@ func Test_getSystemCatalogSize(t *testing.T) {
 	assert.Equal(t, float64(0), getSystemCatalogSize(conn))
 }
 
-func Test_(t *testing.T) {
+func Test_getSchemaNonPKTables(t *testing.T) {
 	conn := store.NewTest(t)
 	// TODO: should be enabled only for integration tests with predefined fixtures
 	//assert.Greater(t, 0, len(getSchemaNonPKTables(conn)))
 
 	_ = conn.Conn().Close(context.Background())
 	assert.Equal(t, 0, len(getSchemaNonPKTables(conn)))
+}
+
+func Test_getSchemaInvalidIndexes(t *testing.T) {
+	conn := store.NewTest(t)
+	// TODO: should be enabled only for integration tests with predefined fixtures
+	//assert.Greater(t, 0, len(getSchemaInvalidIndexes(conn)))
+
+	_ = conn.Conn().Close(context.Background())
+	assert.Equal(t, 0, len(getSchemaInvalidIndexes(conn)))
+}
+
+func Test_getSchemaNonIndexedFK(t *testing.T) {
+	conn := store.NewTest(t)
+	// TODO: should be enabled only for integration tests with predefined fixtures
+	//assert.Greater(t, 0, len(getSchemaNonIndexedFK(conn)))
+
+	_ = conn.Conn().Close(context.Background())
+	assert.Equal(t, 0, len(getSchemaNonIndexedFK(conn)))
+}
+
+func Test_getSchemaRedundantIndexes(t *testing.T) {
+	conn := store.NewTest(t)
+	// TODO: should be enabled only for integration tests with predefined fixtures
+	//assert.Greater(t, 0, len(getSchemaRedundantIndexes(conn)))
+
+	_ = conn.Conn().Close(context.Background())
+	assert.Equal(t, 0, len(getSchemaRedundantIndexes(conn)))
+}
+
+func Test_getSchemaSequences(t *testing.T) {
+	conn := store.NewTest(t)
+	// TODO: should be enabled only for integration tests with predefined fixtures
+	//assert.Greater(t, 0, len(getSchemaSequences(conn)))
+
+	_ = conn.Conn().Close(context.Background())
+	assert.Equal(t, 0, len(getSchemaSequences(conn)))
+}
+
+func Test_getSchemaFKDatatypeMismatch(t *testing.T) {
+	conn := store.NewTest(t)
+	// TODO: should be enabled only for integration tests with predefined fixtures
+	//assert.Greater(t, 0, len(getSchemaFKDatatypeMismatch(conn)))
+
+	_ = conn.Conn().Close(context.Background())
+	assert.Equal(t, 0, len(getSchemaFKDatatypeMismatch(conn)))
 }
