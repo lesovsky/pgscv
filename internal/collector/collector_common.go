@@ -7,7 +7,7 @@ import (
 // typedDesc is the descriptor wrapper with extra properties
 type typedDesc struct {
 	// name is the name of column in a query output used for getting value for metric.
-	colname string
+	// colname string
 	// desc is the descriptor used by every Prometheus Metric.
 	desc *prometheus.Desc
 	// valueType is an enumeration of metric types that represent a simple value.
