@@ -7,8 +7,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"os"
-	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -58,55 +58,39 @@ func (c *netdevCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		return fmt.Errorf("get /proc/net/dev stats failed: %s", err)
 	}
 
-	for _, s := range stats {
-		// bytes received/sent
-		ch <- c.bytes.mustNewConstMetric(s.rbytes, s.device, "recv")
-		ch <- c.bytes.mustNewConstMetric(s.tbytes, s.device, "sent")
-		// packets received/sent
-		ch <- c.packets.mustNewConstMetric(s.rpackets, s.device, "recv")
-		ch <- c.packets.mustNewConstMetric(s.tpackets, s.device, "sent")
-		// events (errors/drops occurred)
-		ch <- c.events.mustNewConstMetric(s.rerrs, s.device, "recv", "errs")
-		ch <- c.events.mustNewConstMetric(s.rdrop, s.device, "recv", "drop")
-		ch <- c.events.mustNewConstMetric(s.rfifo, s.device, "recv", "fifo")
-		ch <- c.events.mustNewConstMetric(s.rframe, s.device, "recv", "frame")
-		ch <- c.events.mustNewConstMetric(s.rcompressed, s.device, "recv", "compressed")
-		ch <- c.events.mustNewConstMetric(s.rmulticast, s.device, "recv", "multicast")
-		ch <- c.events.mustNewConstMetric(s.terrs, s.device, "sent", "errs")
-		ch <- c.events.mustNewConstMetric(s.tdrop, s.device, "sent", "drop")
-		ch <- c.events.mustNewConstMetric(s.tfifo, s.device, "sent", "fifo")
-		ch <- c.events.mustNewConstMetric(s.tcolls, s.device, "sent", "colls")
-		ch <- c.events.mustNewConstMetric(s.tcarrier, s.device, "sent", "carrier")
-		ch <- c.events.mustNewConstMetric(s.tcompressed, s.device, "sent", "compressed")
+	for device, stat := range stats {
+		if len(stat) < 16 {
+			log.Warnf("too few stats columns (%d), skip", len(stat))
+			continue
+		}
+
+		// recv
+		ch <- c.bytes.mustNewConstMetric(stat[0], device, "recv")
+		ch <- c.packets.mustNewConstMetric(stat[1], device, "recv")
+		ch <- c.events.mustNewConstMetric(stat[2], device, "recv", "errs")
+		ch <- c.events.mustNewConstMetric(stat[3], device, "recv", "drop")
+		ch <- c.events.mustNewConstMetric(stat[4], device, "recv", "fifo")
+		ch <- c.events.mustNewConstMetric(stat[5], device, "recv", "frame")
+		ch <- c.events.mustNewConstMetric(stat[6], device, "recv", "compressed")
+		ch <- c.events.mustNewConstMetric(stat[7], device, "recv", "multicast")
+
+		// sent
+		ch <- c.bytes.mustNewConstMetric(stat[8], device, "sent")
+		ch <- c.packets.mustNewConstMetric(stat[9], device, "sent")
+		ch <- c.events.mustNewConstMetric(stat[10], device, "sent", "errs")
+		ch <- c.events.mustNewConstMetric(stat[11], device, "sent", "drop")
+		ch <- c.events.mustNewConstMetric(stat[12], device, "sent", "fifo")
+		ch <- c.events.mustNewConstMetric(stat[13], device, "sent", "colls")
+		ch <- c.events.mustNewConstMetric(stat[14], device, "sent", "carrier")
+		ch <- c.events.mustNewConstMetric(stat[15], device, "sent", "compressed")
 	}
 
 	return nil
 }
 
-// netdevStat represents network devices stats from /proc/net/dev.
-type netdevStat struct {
-	device      string
-	rbytes      float64
-	rpackets    float64
-	rerrs       float64
-	rdrop       float64
-	rfifo       float64
-	rframe      float64
-	rcompressed float64
-	rmulticast  float64
-	tbytes      float64
-	tpackets    float64
-	terrs       float64
-	tdrop       float64
-	tfifo       float64
-	tcolls      float64
-	tcarrier    float64
-	tcompressed float64
-}
-
 // getNetdevStats is the intermediate function which opens stats file and run stats parser for extracting stats.
-func getNetdevStats(ignore *regexp.Regexp) ([]netdevStat, error) {
-	file, err := os.Open(filepath.Clean("/proc/net/dev"))
+func getNetdevStats(ignore *regexp.Regexp) (map[string][]float64, error) {
+	file, err := os.Open("/proc/net/dev")
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +100,7 @@ func getNetdevStats(ignore *regexp.Regexp) ([]netdevStat, error) {
 }
 
 // parseNetdevStats accepts file descriptor, reads file content and produces stats.
-func parseNetdevStats(r io.Reader, ignore *regexp.Regexp) ([]netdevStat, error) {
+func parseNetdevStats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64, error) {
 	scanner := bufio.NewScanner(r)
 
 	// Stats file /proc/net/dev has header consisting of two lines. Read the header and check content to make sure this is proper file.
@@ -128,31 +112,29 @@ func parseNetdevStats(r io.Reader, ignore *regexp.Regexp) ([]netdevStat, error) 
 		}
 	}
 
-	var stats []netdevStat
+	var stats = map[string][]float64{}
 
 	for scanner.Scan() {
-		// Read the line and looking for device name and stats values
-		line := strings.TrimLeft(scanner.Text(), " ")
+		values := strings.Fields(scanner.Text())
 
-		var s = netdevStat{}
-
-		_, err := fmt.Sscanln(line,
-			&s.device,
-			&s.rbytes, &s.rpackets, &s.rerrs, &s.rdrop, &s.rfifo, &s.rframe, &s.rcompressed, &s.rmulticast,
-			&s.tbytes, &s.tpackets, &s.terrs, &s.tdrop, &s.tfifo, &s.tcolls, &s.tcarrier, &s.tcompressed)
-		if err != nil {
-			log.Errorf("scan stats from /proc/net/dev failed: %s; skip", err)
+		device := strings.TrimRight(values[0], ":")
+		if ignore != nil && ignore.MatchString(device) {
+			log.Debugln("ignore device ", device)
 			continue
 		}
 
-		if ignore != nil && ignore.MatchString(s.device) {
-			log.Debugln("ignore device ", s.device)
-			continue
+		// Create float64 slice for values, parse line except first three values (major/minor/device)
+		stat := make([]float64, len(values)-1)
+		for i := range stat {
+			value, err := strconv.ParseFloat(values[i+1], 64)
+			if err != nil {
+				log.Errorf("convert string to float64 failed: %s; skip", err)
+				continue
+			}
+			stat[i] = value
 		}
 
-		s.device = strings.TrimRight(s.device, ":")
-
-		stats = append(stats, s)
+		stats[device] = stat
 	}
 
 	return stats, scanner.Err()
