@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
@@ -10,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"syscall"
+	"time"
 )
 
 const (
@@ -81,6 +83,7 @@ type filesystemStat struct {
 	avail      float64
 	files      float64
 	filesfree  float64
+	err        error // error occurred during polling stats
 }
 
 // getFilesystemStats opens stats file and execute stats parser.
@@ -101,28 +104,64 @@ func parseFilesystemStats(r io.Reader, filter *regexp.Regexp) ([]filesystemStat,
 		return nil, err
 	}
 
+	statCh := make(chan filesystemStat)
+	defer close(statCh)
+
 	for i, s := range stats {
-		// TODO: add context with timeout
-		var statFS syscall.Statfs_t
-		if err := syscall.Statfs(s.mountpoint, &statFS); err != nil {
-			log.Errorf("get stats for %s mountpoint failed: %s; skip", s.mountpoint, err)
+		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too. To avoid such situations wrap
+		// stats requests into context with timeout. One second timeout should be sufficient for machines.
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+
+		// Requesting stats.
+		go readMountpointStat(s.mountpoint, statCh)
+
+		// Awaiting the stats response from the channel, or context cancellation by timeout.
+		select {
+		case response := <-statCh:
+			if response.err != nil {
+				log.Errorf("get filesystem %s stats failed: %s; skip", s.mountpoint, err)
+				cancel()
+				continue
+			}
+
+			stats[i] = filesystemStat{
+				device:     s.device,
+				mountpoint: s.mountpoint,
+				fstype:     s.fstype,
+				options:    s.options,
+				size:       response.size,
+				free:       response.free,
+				avail:      response.avail,
+				files:      response.files,
+				filesfree:  response.filesfree,
+			}
+		case <-ctx.Done():
+			log.Warnf("filesystem %s doesn't respond: %s; skip", s.mountpoint, ctx.Err())
 			continue
 		}
 
-		stats[i] = filesystemStat{
-			device:     s.device,
-			mountpoint: s.mountpoint,
-			fstype:     s.fstype,
-			options:    s.options,
-			size:       float64(statFS.Blocks) * float64(statFS.Bsize),
-			free:       float64(statFS.Bfree) * float64(statFS.Bsize),
-			avail:      float64(statFS.Bavail) * float64(statFS.Bsize),
-			files:      float64(statFS.Files),
-			filesfree:  float64(statFS.Ffree),
-		}
+		cancel()
 	}
 
 	return stats, nil
+}
+
+// readMountpointStat requests stats from kernel and sends stats to channel.
+func readMountpointStat(mountpoint string, ch chan filesystemStat) {
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(mountpoint, &stat); err != nil {
+		ch <- filesystemStat{err: err}
+	}
+
+	// Syscall successful - send stat to the channel.
+	ch <- filesystemStat{
+		mountpoint: mountpoint,
+		size:       float64(stat.Blocks) * float64(stat.Bsize),
+		free:       float64(stat.Bfree) * float64(stat.Bsize),
+		avail:      float64(stat.Bavail) * float64(stat.Bsize),
+		files:      float64(stat.Files),
+		filesfree:  float64(stat.Ffree),
+	}
 }
 
 // parseProcMounts parses /proc/mounts and returns slice of stats with filled filesystems properties (but without stats values).

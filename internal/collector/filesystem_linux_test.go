@@ -1,11 +1,13 @@
 package collector
 
 import (
+	"context"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
 	"regexp"
 	"testing"
+	"time"
 )
 
 func TestFilesystemCollector_Update(t *testing.T) {
@@ -72,4 +74,24 @@ func Test_parseFilesystemStats(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, stats)
 	_ = file.Close()
+}
+
+func Test_readMountpointStat(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	ch := make(chan filesystemStat)
+	go readMountpointStat("/", ch)
+
+	select {
+	case response := <-ch:
+		assert.Greater(t, response.size, float64(0))
+		assert.Greater(t, response.free, float64(0))
+		assert.Greater(t, response.avail, float64(0))
+		assert.Greater(t, response.files, float64(0))
+		assert.Greater(t, response.filesfree, float64(0))
+	case <-ctx.Done():
+		assert.Fail(t, "context cancelled: ", ctx.Err())
+	}
+
 }
