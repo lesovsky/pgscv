@@ -1,10 +1,14 @@
 package collector
 
 import (
+	"bufio"
+	"bytes"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
 	"path"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -12,6 +16,7 @@ import (
 type systemCollector struct {
 	sysctlList []string
 	sysctl     typedDesc
+	cpucores   typedDesc
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
@@ -38,6 +43,13 @@ func NewSystemCollector(labels prometheus.Labels) (Collector, error) {
 				[]string{"sysctl"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
+		cpucores: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "system", "cpu_cores_total"),
+				"Total number of CPU cores in each state.",
+				[]string{"state"}, labels,
+			), valueType: prometheus.GaugeValue,
+		},
 	}, nil
 }
 
@@ -47,6 +59,15 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 	for name, value := range sysctls {
 		ch <- c.sysctl.mustNewConstMetric(value, name)
+	}
+
+	// Count CPU cores by state.
+	cpuonline, cpuoffline, err := countCPUCores("/sys/devices/system/cpu/cpu*")
+	if err != nil {
+		log.Warnf("cpu count failed: %s; skip", err)
+	} else {
+		ch <- c.cpucores.mustNewConstMetric(cpuonline, "online")
+		ch <- c.cpucores.mustNewConstMetric(cpuoffline, "offline")
 	}
 
 	return nil
@@ -70,4 +91,49 @@ func readSysctls(list []string) map[string]float64 {
 		sysctls[item] = value
 	}
 	return sysctls
+}
+
+// countCPUCores counts states of CPU cores present in the system.
+func countCPUCores(path string) (float64, float64, error) {
+	var onlineCnt, offlineCnt float64
+
+	dirs, err := filepath.Glob(path)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	re, err := regexp.Compile(`cpu[0-9]+$`)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	for _, d := range dirs {
+		if strings.HasSuffix(d, "/cpu0") { // cpu0 has no 'online' file and always online, just increment counter
+			onlineCnt++
+			continue
+		}
+
+		file := d + "/online"
+		if re.MatchString(d) {
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				return 0, 0, err
+			}
+			reader := bufio.NewReader(bytes.NewBuffer(content))
+			line, _, err := reader.ReadLine()
+			if err != nil {
+				return 0, 0, err
+			}
+
+			switch string(line) {
+			case "0":
+				offlineCnt += 1
+			case "1":
+				onlineCnt += 1
+			default:
+				log.Warnf("count cpu cores failed, bad value in %s: %s; skip", file, line)
+			}
+		}
+	}
+	return onlineCnt, offlineCnt, nil
 }

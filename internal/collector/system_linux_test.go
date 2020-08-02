@@ -9,6 +9,7 @@ func TestSystemCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"node_system_sysctl",
+			"node_system_cpu_cores_total",
 		},
 		collector: NewSystemCollector,
 	}
@@ -38,4 +39,11 @@ func Test_readSysctls(t *testing.T) {
 	// non-float64 sysctl
 	res = readSysctls([]string{"kernel.version"})
 	assert.Len(t, res, 0)
+}
+
+func Test_countCPUCores(t *testing.T) {
+	online, offline, err := countCPUCores("testdata/sys.devices.system.cpu/cpu*")
+	assert.NoError(t, err)
+	assert.Equal(t, float64(2), online)
+	assert.Equal(t, float64(1), offline)
 }
