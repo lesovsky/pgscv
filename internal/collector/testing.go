@@ -53,9 +53,9 @@ func pipeline(t *testing.T, input pipelineInput) {
 
 	// receive metrics from channel, extract name from the metric and check name of received metric exists in the test slice
 	for metric := range ch {
-		re := regexp.MustCompile(`fqName: "([a-z_]+)"`)
-		match := re.FindStringSubmatch(metric.Desc().String())[1]
 		//log.Infoln("debug purpose: ", metric.Desc().String())
+		re := regexp.MustCompile(`fqName: "([a-zA-Z0-9_]+)"`)
+		match := re.FindStringSubmatch(metric.Desc().String())[1]
 		assert.Contains(t, append(input.required, input.optional...), match)
 		metricNamesCounter[match]++
 	}
