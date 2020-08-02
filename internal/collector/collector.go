@@ -32,6 +32,7 @@ func (f Factories) RegisterSystemCollectors() {
 	f.register("filesystem", NewFilesystemCollector)
 	f.register("network", NewNetdevCollector)
 	f.register("memory", NewMeminfoCollector)
+	f.register("system", NewSystemCollector)
 }
 
 // RegisterPostgresCollectors unions all postgres-related collectors and registers them in single place.
