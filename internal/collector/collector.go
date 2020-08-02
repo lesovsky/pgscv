@@ -29,6 +29,7 @@ type Factories map[string]func(prometheus.Labels) (Collector, error)
 func (f Factories) RegisterSystemCollectors() {
 	f.register("cpu", NewCPUCollector)
 	f.register("disk", NewDiskstatsCollector)
+	f.register("filesystem", NewFilesystemCollector)
 	f.register("network", NewNetdevCollector)
 	f.register("memory", NewMeminfoCollector)
 }
