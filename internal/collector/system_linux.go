@@ -6,6 +6,7 @@ import (
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -17,6 +18,7 @@ type systemCollector struct {
 	sysctlList []string
 	sysctl     typedDesc
 	cpucores   typedDesc
+	governors  typedDesc
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
@@ -50,6 +52,13 @@ func NewSystemCollector(labels prometheus.Labels) (Collector, error) {
 				[]string{"state"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
+		governors: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "system", "scaling_governors_total"),
+				"Total number of CPU scaling governors used of each type.",
+				[]string{"type"}, labels,
+			), valueType: prometheus.GaugeValue,
+		},
 	}, nil
 }
 
@@ -68,6 +77,15 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	} else {
 		ch <- c.cpucores.mustNewConstMetric(cpuonline, "online")
 		ch <- c.cpucores.mustNewConstMetric(cpuoffline, "offline")
+	}
+
+	governors, err := countScalingGovernors("/sys/devices/system/cpu/cpu*")
+	if err != nil {
+		log.Warnf("count CPU scaling governors failed: %s; skip", err)
+	} else {
+		for governor, total := range governors {
+			ch <- c.governors.mustNewConstMetric(total, governor)
+		}
 	}
 
 	return nil
@@ -136,4 +154,47 @@ func countCPUCores(path string) (float64, float64, error) {
 		}
 	}
 	return onlineCnt, offlineCnt, nil
+}
+
+func countScalingGovernors(path string) (map[string]float64, error) {
+	re, err := regexp.Compile(`cpu[0-9]+$`)
+	if err != nil {
+		return nil, err
+	}
+
+	dirs, err := filepath.Glob(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var governors = map[string]float64{}
+
+	for _, d := range dirs {
+		if !re.MatchString(d) { // skip other than 'cpu*' dirs
+			continue
+		}
+
+		fi, err := os.Stat(d + "/cpufreq")
+		if err != nil {
+			continue // cpufreq dir not found -- no cpu scaling used
+		}
+
+		if !fi.IsDir() {
+			log.Errorf("%s should be a directory; skip", fi.Name())
+			continue
+		}
+
+		file := d + "/cpufreq" + "/scaling_governor"
+		content, err := ioutil.ReadFile(file)
+		if err != nil {
+			return nil, err
+		}
+		reader := bufio.NewReader(bytes.NewBuffer(content))
+		line, _, err := reader.ReadLine()
+		if err != nil {
+			return nil, err
+		}
+		governors[string(line)]++
+	}
+	return governors, nil
 }

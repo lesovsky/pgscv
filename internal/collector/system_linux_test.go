@@ -10,6 +10,7 @@ func TestSystemCollector_Update(t *testing.T) {
 		required: []string{
 			"node_system_sysctl",
 			"node_system_cpu_cores_total",
+			"node_system_scaling_governors_total",
 		},
 		collector: NewSystemCollector,
 	}
@@ -46,4 +47,15 @@ func Test_countCPUCores(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, float64(2), online)
 	assert.Equal(t, float64(1), offline)
+}
+
+func Test_countScalingGovernors(t *testing.T) {
+	want := map[string]float64{
+		"powersave":   2,
+		"performance": 2,
+	}
+
+	governors, err := countScalingGovernors("testdata/sys.devices.system.cpu/cpu*")
+	assert.NoError(t, err)
+	assert.Equal(t, want, governors)
 }
