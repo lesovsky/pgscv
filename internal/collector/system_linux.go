@@ -19,6 +19,7 @@ type systemCollector struct {
 	sysctl     typedDesc
 	cpucores   typedDesc
 	governors  typedDesc
+	numanodes  typedDesc
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
@@ -59,6 +60,13 @@ func NewSystemCollector(labels prometheus.Labels) (Collector, error) {
 				[]string{"type"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
+		numanodes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "system", "numa_nodes_total"),
+				"Total number of NUMA nodes in the system.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
+		},
 	}, nil
 }
 
@@ -79,6 +87,7 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		ch <- c.cpucores.mustNewConstMetric(cpuoffline, "offline")
 	}
 
+	// Count CPU scaling governors.
 	governors, err := countScalingGovernors("/sys/devices/system/cpu/cpu*")
 	if err != nil {
 		log.Warnf("count CPU scaling governors failed: %s; skip", err)
@@ -86,6 +95,14 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		for governor, total := range governors {
 			ch <- c.governors.mustNewConstMetric(total, governor)
 		}
+	}
+
+	// Count NUMA nodes.
+	nodes, err := countNumaNodes("/sys/devices/system/node/node*")
+	if err != nil {
+		log.Warnf("count NUMA nodes failed: %s; skip", err)
+	} else {
+		ch <- c.numanodes.mustNewConstMetric(nodes)
 	}
 
 	return nil
@@ -197,4 +214,13 @@ func countScalingGovernors(path string) (map[string]float64, error) {
 		governors[string(line)]++
 	}
 	return governors, nil
+}
+
+// countNumaNodes counts NUMA nodes in the system.
+func countNumaNodes(path string) (n float64, err error) {
+	d, err := filepath.Glob(path)
+	if err != nil {
+		return 0, err
+	}
+	return float64(len(d)), nil
 }

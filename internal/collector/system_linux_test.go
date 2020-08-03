@@ -11,6 +11,7 @@ func TestSystemCollector_Update(t *testing.T) {
 			"node_system_sysctl",
 			"node_system_cpu_cores_total",
 			"node_system_scaling_governors_total",
+			"node_system_numa_nodes_total",
 		},
 		collector: NewSystemCollector,
 	}
@@ -43,7 +44,7 @@ func Test_readSysctls(t *testing.T) {
 }
 
 func Test_countCPUCores(t *testing.T) {
-	online, offline, err := countCPUCores("testdata/sys.devices.system.cpu/cpu*")
+	online, offline, err := countCPUCores("testdata/sys/devices.system/cpu/cpu*")
 	assert.NoError(t, err)
 	assert.Equal(t, float64(2), online)
 	assert.Equal(t, float64(1), offline)
@@ -55,7 +56,13 @@ func Test_countScalingGovernors(t *testing.T) {
 		"performance": 2,
 	}
 
-	governors, err := countScalingGovernors("testdata/sys.devices.system.cpu/cpu*")
+	governors, err := countScalingGovernors("testdata/sys/devices.system/cpu/cpu*")
 	assert.NoError(t, err)
 	assert.Equal(t, want, governors)
+}
+
+func Test_countNumaNodes(t *testing.T) {
+	n, err := countNumaNodes("testdata/sys/devices.system/node/node*")
+	assert.NoError(t, err)
+	assert.Equal(t, float64(2), n)
 }
