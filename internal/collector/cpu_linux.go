@@ -1,30 +1,37 @@
 package collector
 
 import (
+	"bufio"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/procfs"
-	"sync"
+	"io"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 )
 
 type cpuCollector struct {
-	fs            procfs.FS
-	cpu           typedDesc
-	cpuGuest      typedDesc
-	cpuStats      []procfs.CPUStat // per-CPU stats
-	cpuStatsSum   procfs.CPUStat   // summary stats across all CPUs
-	cpuStatsMutex sync.Mutex
+	systicks float64
+	cpu      typedDesc
+	cpuGuest typedDesc
 }
 
 // NewCPUCollector returns a new Collector exposing kernel/system statistics.
 func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
-	fs, err := procfs.NewFS(procfs.DefaultMountPoint)
+	cmdOutput, err := exec.Command("getconf", "CLK_TCK").Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to open procfs: %w", err)
+		return nil, fmt.Errorf("determine clock frequency failed: %s", err)
 	}
+
+	systicks, err := strconv.ParseFloat(strings.TrimSpace(string(cmdOutput)), 64)
+	if err != nil {
+		return nil, fmt.Errorf("parse clock frequency value failed: %s", err)
+	}
+
 	c := &cpuCollector{
-		fs: fs,
+		systicks: systicks,
 		cpu: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "cpu", "seconds_total"),
@@ -47,130 +54,102 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 
 // Update implements Collector and exposes cpu related metrics from /proc/stat and /sys/.../cpu/.
 func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
-	if err := c.updateStat(ch); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (c *cpuCollector) updateStat(ch chan<- prometheus.Metric) error {
-	stats, err := c.fs.Stat()
+	stat, err := getCPUStat(c.systicks)
 	if err != nil {
-		return err
+		return fmt.Errorf("collect cpu usage stats failed: %s; skip", err)
 	}
 
-	c.updateCPUStats(stats.CPU)
-
-	// Acquire a lock to read the stats.
-	c.cpuStatsMutex.Lock()
-	defer c.cpuStatsMutex.Unlock()
-
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.User, "user")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Nice, "nice")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.System, "system")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Idle, "idle")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Iowait, "iowait")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.IRQ, "irq")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.SoftIRQ, "softirq")
-	ch <- c.cpu.mustNewConstMetric(c.cpuStatsSum.Steal, "steal")
+	ch <- c.cpu.mustNewConstMetric(stat.user, "user")
+	ch <- c.cpu.mustNewConstMetric(stat.nice, "nice")
+	ch <- c.cpu.mustNewConstMetric(stat.system, "system")
+	ch <- c.cpu.mustNewConstMetric(stat.idle, "idle")
+	ch <- c.cpu.mustNewConstMetric(stat.iowait, "iowait")
+	ch <- c.cpu.mustNewConstMetric(stat.irq, "irq")
+	ch <- c.cpu.mustNewConstMetric(stat.softirq, "softirq")
+	ch <- c.cpu.mustNewConstMetric(stat.steal, "steal")
 
 	// Guest CPU is also accounted for in cpuStat.User and cpuStat.Nice, expose these as separate metrics.
-	ch <- c.cpuGuest.mustNewConstMetric(c.cpuStatsSum.Guest, "user")
-	ch <- c.cpuGuest.mustNewConstMetric(c.cpuStatsSum.GuestNice, "nice")
+	ch <- c.cpuGuest.mustNewConstMetric(stat.guest, "user")
+	ch <- c.cpuGuest.mustNewConstMetric(stat.guestnice, "nice")
 
 	return nil
 }
 
-// updateCPUStats updates the internal cache of CPU stats.
-func (c *cpuCollector) updateCPUStats(newStats []procfs.CPUStat) {
-	// Acquire a lock to update the stats.
-	c.cpuStatsMutex.Lock()
-	defer c.cpuStatsMutex.Unlock()
+// systemProcStatCPU ...
+type cpuStat struct {
+	user      float64
+	nice      float64
+	system    float64
+	idle      float64
+	iowait    float64
+	irq       float64
+	softirq   float64
+	steal     float64
+	guest     float64
+	guestnice float64
+}
 
-	// Reset the cache if the list of CPUs has changed.
-	if len(c.cpuStats) != len(newStats) {
-		c.cpuStats = make([]procfs.CPUStat, len(newStats))
+// getCPUStat opens stat file and executes parser.
+func getCPUStat(systicks float64) (cpuStat, error) {
+	file, err := os.Open("/proc/stat")
+	if err != nil {
+		return cpuStat{}, err
+	}
+	defer func() { _ = file.Close() }()
+
+	return parseProcCPUStat(file, systicks)
+}
+
+// parseProcCPUStat parses stat file and returns total CPU usage stat.
+func parseProcCPUStat(r io.Reader, systicks float64) (cpuStat, error) {
+	var scanner = bufio.NewScanner(r)
+
+	for scanner.Scan() {
+		parts := strings.Fields(scanner.Text())
+		if len(parts) < 2 {
+			log.Debugf("/proc/stat bad line; skip")
+			continue
+		}
+
+		// Looking only for total stat. We're not interested in per-CPU stats.
+		if parts[0] != "cpu" {
+			continue
+		}
+
+		return parseCPUStat(scanner.Text(), systicks)
 	}
 
-	// Сначала собирем per-CPU статистику, если Idle для какого-то из ядер скакнуло назад то мы сбрасываем его стату, не сбрасывая при этом стату для других ядер.
-	// После того как стата собрана можем ее агрегировать
+	return cpuStat{}, fmt.Errorf("total cpu stats not found")
+}
 
-	// update current snapshot of CPU stats, skip those counters who jumped backwards
-	for i, n := range newStats {
-		// If idle jumps backwards, assume we had a hotplug event and reset the stats for this CPU.
-		if n.Idle < c.cpuStats[i].Idle {
-			log.Warnln("CPU Idle counter jumped backwards, possible hotplug event, resetting CPU stats", "cpu", i, "old_value", c.cpuStats[i].Idle, "new_value", n.Idle)
-			c.cpuStats[i] = procfs.CPUStat{}
-		}
-		c.cpuStats[i].Idle = n.Idle
+// parseCPUStat parses single line from stats file and returns parsed stats.
+func parseCPUStat(line string, systicks float64) (cpuStat, error) {
+	s := cpuStat{}
+	var cpu string
 
-		if n.User >= c.cpuStats[i].User {
-			c.cpuStats[i].User = n.User
-		} else {
-			log.Warnln("CPU User counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].User, "new_value", n.User)
-		}
+	count, err := fmt.Sscanf(
+		line,
+		"%s %f %f %f %f %f %f %f %f %f %f",
+		&cpu, &s.user, &s.nice, &s.system, &s.idle, &s.iowait, &s.irq, &s.softirq, &s.steal, &s.guest, &s.guestnice,
+	)
 
-		if n.Nice >= c.cpuStats[i].Nice {
-			c.cpuStats[i].Nice = n.Nice
-		} else {
-			log.Warnln("CPU Nice counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].Nice, "new_value", n.Nice)
-		}
-
-		if n.System >= c.cpuStats[i].System {
-			c.cpuStats[i].System = n.System
-		} else {
-			log.Warnln("CPU System counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].System, "new_value", n.System)
-		}
-
-		if n.Iowait >= c.cpuStats[i].Iowait {
-			c.cpuStats[i].Iowait = n.Iowait
-		} else {
-			log.Warnln("CPU Iowait counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].Iowait, "new_value", n.Iowait)
-		}
-
-		if n.IRQ >= c.cpuStats[i].IRQ {
-			c.cpuStats[i].IRQ = n.IRQ
-		} else {
-			log.Warnln("CPU IRQ counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].IRQ, "new_value", n.IRQ)
-		}
-
-		if n.SoftIRQ >= c.cpuStats[i].SoftIRQ {
-			c.cpuStats[i].SoftIRQ = n.SoftIRQ
-		} else {
-			log.Warnln("CPU SoftIRQ counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].SoftIRQ, "new_value", n.SoftIRQ)
-		}
-
-		if n.Steal >= c.cpuStats[i].Steal {
-			c.cpuStats[i].Steal = n.Steal
-		} else {
-			log.Warnln("CPU Steal counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].Steal, "new_value", n.Steal)
-		}
-
-		if n.Guest >= c.cpuStats[i].Guest {
-			c.cpuStats[i].Guest = n.Guest
-		} else {
-			log.Warnln("CPU Guest counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].Guest, "new_value", n.Guest)
-		}
-
-		if n.GuestNice >= c.cpuStats[i].GuestNice {
-			c.cpuStats[i].GuestNice = n.GuestNice
-		} else {
-			log.Warnln("CPU GuestNice counter jumped backwards", "cpu", i, "old_value", c.cpuStats[i].GuestNice, "new_value", n.GuestNice)
-		}
+	if err != nil && err != io.EOF {
+		return cpuStat{}, fmt.Errorf("parse %s (cpu) failed: %s", line, err)
+	}
+	if count != 11 {
+		return cpuStat{}, fmt.Errorf("parse %s (cpu) failed: insufficient elements parsed", line)
 	}
 
-	// Produce aggregated CPU stats based on updated local snapshot.
-	c.cpuStatsSum = procfs.CPUStat{}
-	for _, n := range newStats {
-		c.cpuStatsSum.Idle += n.Idle
-		c.cpuStatsSum.User += n.User
-		c.cpuStatsSum.Nice += n.Nice
-		c.cpuStatsSum.System += n.System
-		c.cpuStatsSum.Iowait += n.Iowait
-		c.cpuStatsSum.IRQ += n.IRQ
-		c.cpuStatsSum.SoftIRQ += n.SoftIRQ
-		c.cpuStatsSum.Steal += n.Steal
-		c.cpuStatsSum.Guest += n.Guest
-		c.cpuStatsSum.GuestNice += n.GuestNice
-	}
+	s.user /= systicks
+	s.nice /= systicks
+	s.system /= systicks
+	s.idle /= systicks
+	s.iowait /= systicks
+	s.irq /= systicks
+	s.softirq /= systicks
+	s.steal /= systicks
+	s.guest /= systicks
+	s.guestnice /= systicks
+
+	return s, nil
 }
