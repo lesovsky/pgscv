@@ -36,7 +36,7 @@ func TestMeminfoCollector_Update(t *testing.T) {
 }
 
 func Test_parseMeminfoStats(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/procmeminfo.golden"))
+	file, err := os.Open(filepath.Clean("testdata/proc/meminfo.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
@@ -102,7 +102,7 @@ func Test_parseMeminfoStats(t *testing.T) {
 	assert.Equal(t, want, stats)
 
 	// test with wrong format file
-	file, err = os.Open(filepath.Clean("testdata/procnetdev.golden"))
+	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 

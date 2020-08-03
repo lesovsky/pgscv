@@ -27,7 +27,7 @@ func TestDiskstatsCollector_Update(t *testing.T) {
 }
 
 func Test_parseDiskstats(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/procdiskstats.golden"))
+	file, err := os.Open(filepath.Clean("testdata/proc/diskstats.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
@@ -67,7 +67,7 @@ func Test_getDeviceRotational(t *testing.T) {
 	assert.Equal(t, "", r)
 
 	// Read unknown file
-	r, err = getDeviceRotational("testdata/procmeminfo.golden")
+	r, err = getDeviceRotational("testdata/proc/meminfo.golden")
 	assert.Error(t, err)
 	assert.Equal(t, "", r)
 }
@@ -83,7 +83,7 @@ func Test_getDeviceScheduler(t *testing.T) {
 	assert.Equal(t, "", r)
 
 	// Read unknown file
-	r, err = getDeviceScheduler("testdata/procmeminfo.golden")
+	r, err = getDeviceScheduler("testdata/proc/meminfo.golden")
 	assert.Error(t, err)
 	assert.Equal(t, "", r)
 }

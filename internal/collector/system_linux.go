@@ -3,8 +3,10 @@ package collector
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -20,6 +22,9 @@ type systemCollector struct {
 	cpucores   typedDesc
 	governors  typedDesc
 	numanodes  typedDesc
+	ctxt       typedDesc
+	forks      typedDesc
+	btime      typedDesc
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
@@ -67,6 +72,27 @@ func NewSystemCollector(labels prometheus.Labels) (Collector, error) {
 				nil, labels,
 			), valueType: prometheus.GaugeValue,
 		},
+		ctxt: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "", "context_switches_total"),
+				"Total number of context switches.",
+				nil, labels,
+			), valueType: prometheus.CounterValue,
+		},
+		forks: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "", "forks_total"),
+				"Total number of forks.",
+				nil, labels,
+			), valueType: prometheus.CounterValue,
+		},
+		btime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "", "boot_time_seconds"),
+				"Node boot time, in unixtime.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
+		},
 	}, nil
 }
 
@@ -103,6 +129,16 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		log.Warnf("count NUMA nodes failed: %s; skip", err)
 	} else {
 		ch <- c.numanodes.mustNewConstMetric(nodes)
+	}
+
+	// Collect /proc/stat based metrics.
+	stat, err := getProcStat()
+	if err != nil {
+		log.Warnf("parse /proc/stat failed: %s; skip", err)
+	} else {
+		ch <- c.ctxt.mustNewConstMetric(stat.ctxt)
+		ch <- c.btime.mustNewConstMetric(stat.btime)
+		ch <- c.forks.mustNewConstMetric(stat.forks)
 	}
 
 	return nil
@@ -223,4 +259,59 @@ func countNumaNodes(path string) (n float64, err error) {
 		return 0, err
 	}
 	return float64(len(d)), nil
+}
+
+// systemProcStat represents some stats from /proc/stat file.
+type systemProcStat struct {
+	ctxt  float64
+	btime float64
+	forks float64
+}
+
+func getProcStat() (systemProcStat, error) {
+	file, err := os.Open("/proc/stat")
+	if err != nil {
+		return systemProcStat{}, err
+	}
+	defer func() { _ = file.Close() }()
+
+	return parseProcStat(file)
+}
+
+func parseProcStat(r io.Reader) (systemProcStat, error) {
+	var (
+		scanner = bufio.NewScanner(r)
+		stat    = systemProcStat{}
+		err     error
+	)
+
+	for scanner.Scan() {
+		parts := strings.Fields(scanner.Text())
+		if len(parts) < 2 {
+			log.Debugf("/proc/stat bad line; skip")
+			continue
+		}
+
+		switch parts[0] {
+		case "ctxt":
+			stat.ctxt, err = strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				return stat, fmt.Errorf("parse %s (ctxt) failed: %s; skip", parts[1], err)
+			}
+		case "btime":
+			stat.btime, err = strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				return stat, fmt.Errorf("parse %s (btime) failed: %s; skip", parts[1], err)
+			}
+		case "processes":
+			stat.forks, err = strconv.ParseFloat(parts[1], 64)
+			if err != nil {
+				return stat, fmt.Errorf("parse %s (processes) failed: %s, skip", parts[1], err)
+			}
+		default:
+			continue
+		}
+	}
+
+	return stat, nil
 }

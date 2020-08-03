@@ -2,6 +2,8 @@ package collector
 
 import (
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -12,6 +14,9 @@ func TestSystemCollector_Update(t *testing.T) {
 			"node_system_cpu_cores_total",
 			"node_system_scaling_governors_total",
 			"node_system_numa_nodes_total",
+			"node_context_switches_total",
+			"node_forks_total",
+			"node_boot_time_seconds",
 		},
 		collector: NewSystemCollector,
 	}
@@ -65,4 +70,26 @@ func Test_countNumaNodes(t *testing.T) {
 	n, err := countNumaNodes("testdata/sys/devices.system/node/node*")
 	assert.NoError(t, err)
 	assert.Equal(t, float64(2), n)
+}
+
+func Test_parseProcStat(t *testing.T) {
+	file, err := os.Open(filepath.Clean("testdata/proc/stat.golden"))
+	assert.NoError(t, err)
+	defer func() { _ = file.Close() }()
+
+	want := systemProcStat{
+		ctxt:  3253088019,
+		btime: 1596255715,
+		forks: 214670,
+	}
+
+	got, err := parseProcStat(file)
+	assert.NoError(t, err)
+	assert.Equal(t, want, got)
+
+	// open invalid file
+	file, err = os.Open(filepath.Clean("testdata/proc/stat.invalid.golden"))
+	_, err = parseProcStat(file)
+	assert.Error(t, err)
+
 }

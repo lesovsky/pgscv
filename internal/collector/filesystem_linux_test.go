@@ -23,7 +23,7 @@ func TestFilesystemCollector_Update(t *testing.T) {
 }
 
 func Test_parseProcMounts(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/procmounts.golden"))
+	file, err := os.Open(filepath.Clean("testdata/proc/mounts.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
@@ -42,7 +42,7 @@ func Test_parseProcMounts(t *testing.T) {
 	assert.Equal(t, want, stats)
 
 	// test with wrong format file
-	file, err = os.Open(filepath.Clean("testdata/procnetdev.golden"))
+	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
@@ -67,7 +67,7 @@ func Test_parseFilesystemStats(t *testing.T) {
 	_ = file.Close()
 
 	// test with wrong format file
-	file, err = os.Open(filepath.Clean("testdata/procnetdev.golden"))
+	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
 
 	stats, err = parseProcMounts(file, nil)

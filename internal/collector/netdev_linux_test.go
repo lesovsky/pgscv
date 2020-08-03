@@ -22,7 +22,7 @@ func TestNetdevCollector_Update(t *testing.T) {
 }
 
 func Test_parseNetdevStats(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/procnetdev.golden"))
+	file, err := os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
