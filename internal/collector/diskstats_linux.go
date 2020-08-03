@@ -2,11 +2,14 @@ package collector
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
+	"io/ioutil"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -26,6 +29,7 @@ type diskstatsCollector struct {
 	ionow                 typedDesc
 	iotime                typedDesc
 	iotimeweighted        typedDesc
+	storages              typedDesc
 }
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
@@ -84,6 +88,13 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 				[]string{"device"}, labels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
+		storages: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "system", "storage_info"),
+				"Labeled information about storage devices present in the system.",
+				[]string{"device", "rotational", "scheduler"}, labels,
+			), valueType: prometheus.GaugeValue,
+		},
 	}, nil
 }
 
@@ -120,6 +131,16 @@ func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error
 		if len(stat) >= 17 {
 			ch <- c.completed.mustNewConstMetric(stat[15], dev, "flush")
 			ch <- c.times.mustNewConstMetric(stat[16], dev, "flush")
+		}
+	}
+
+	// Collect storages properties.
+	storages, err := getStorageProperties("/sys/block/*", c.ignoredDevicesPattern)
+	if err != nil {
+		log.Warnf("get storage devices properties failed: %s; skip", err)
+	} else {
+		for _, s := range storages {
+			ch <- c.storages.mustNewConstMetric(1, s.device, s.rotational, s.scheduler)
 		}
 	}
 
@@ -172,4 +193,100 @@ func parseDiskstats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64, e
 	}
 
 	return stats, scanner.Err()
+}
+
+// storageDeviceProperties defines storage devices properties observed through /sys/block/* interface.
+type storageDeviceProperties struct {
+	device     string
+	rotational string
+	scheduler  string
+}
+
+// getStorageProperties reads storages properties.
+func getStorageProperties(path string, ignore *regexp.Regexp) ([]storageDeviceProperties, error) {
+	dirs, err := filepath.Glob(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var storages = []storageDeviceProperties{}
+
+	for _, devpath := range dirs {
+		parts := strings.Split(devpath, "/")
+		device := parts[len(parts)-1]
+
+		if ignore != nil && ignore.MatchString(device) {
+			log.Debugln("skip device ", device)
+			continue
+		}
+
+		// Read 'rotational' property.
+		rotational, err := getDeviceRotational(devpath)
+		if err != nil {
+			log.Warnf("get 'rotational' for %s failed: %s; skip", device, err)
+			continue
+		}
+
+		// Read 'scheduler' property.
+		scheduler, err := getDeviceScheduler(devpath)
+		if err != nil {
+			log.Warnf("get 'scheduler' for %s failed: %s; skip", device, err)
+			continue
+		}
+
+		storages = append(storages, storageDeviceProperties{
+			device:     device,
+			scheduler:  scheduler,
+			rotational: rotational,
+		})
+	}
+	return storages, nil
+}
+
+// getDeviceRotational returns device's 'rotational' property.
+func getDeviceRotational(devpath string) (string, error) {
+	rotationalFile := devpath + "/queue/rotational"
+
+	content, err := ioutil.ReadFile(rotationalFile)
+	if err != nil {
+		return "", err
+	}
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		return "", err
+	}
+
+	switch string(line) {
+	case "0", "1":
+		return string(line), nil
+	default:
+		return "", fmt.Errorf("unknown rotational %s", string(line))
+	}
+}
+
+// getDeviceScheduler returns name of the IO scheduler used by device.
+func getDeviceScheduler(devpath string) (sched string, err error) {
+	re, err := regexp.Compile(`[[a-z-]+]|none`)
+	if err != nil {
+		return "", err
+	}
+
+	schedulerFile := devpath + "/queue/scheduler"
+
+	content, err := ioutil.ReadFile(schedulerFile)
+	if err != nil {
+		return "", err
+	}
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		return "", err
+	}
+
+	if sched := re.Find(line); sched != nil {
+		return string(bytes.Trim(sched, "[]")), nil
+	}
+
+	return "", fmt.Errorf("unknown scheduler: %s", line)
 }

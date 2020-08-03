@@ -18,6 +18,7 @@ func TestDiskstatsCollector_Update(t *testing.T) {
 			"node_disk_io_now",
 			"node_disk_io_time_seconds_total",
 			"node_disk_io_time_weighted_seconds_total",
+			"node_system_storage_info",
 		},
 		collector: NewDiskstatsCollector,
 	}
@@ -40,4 +41,49 @@ func Test_parseDiskstats(t *testing.T) {
 	}
 
 	assert.Equal(t, want, stats)
+}
+
+func Test_getStorageProperties(t *testing.T) {
+	re := regexp.MustCompile(ignoredDevicesPattern)
+
+	want := []storageDeviceProperties{
+		{device: "sda", rotational: "0", scheduler: "mq-deadline"},
+		{device: "sdb", rotational: "1", scheduler: "deadline"},
+	}
+
+	storages, err := getStorageProperties("testdata/sys/block/*", re)
+	assert.NoError(t, err)
+	assert.Equal(t, want, storages)
+}
+
+func Test_getDeviceRotational(t *testing.T) {
+	r, err := getDeviceRotational("testdata/sys/block/sda")
+	assert.NoError(t, err)
+	assert.Equal(t, "0", r)
+
+	// Read file with bad content
+	r, err = getDeviceRotational("testdata/sys/block/sdy")
+	assert.Error(t, err)
+	assert.Equal(t, "", r)
+
+	// Read unknown file
+	r, err = getDeviceRotational("testdata/procmeminfo.golden")
+	assert.Error(t, err)
+	assert.Equal(t, "", r)
+}
+
+func Test_getDeviceScheduler(t *testing.T) {
+	r, err := getDeviceScheduler("testdata/sys/block/sda")
+	assert.NoError(t, err)
+	assert.Equal(t, "mq-deadline", r)
+
+	// Read file with bad content
+	r, err = getDeviceScheduler("testdata/sys/block/sdz")
+	assert.Error(t, err)
+	assert.Equal(t, "", r)
+
+	// Read unknown file
+	r, err = getDeviceScheduler("testdata/procmeminfo.golden")
+	assert.Error(t, err)
+	assert.Equal(t, "", r)
 }
