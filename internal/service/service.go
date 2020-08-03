@@ -182,14 +182,16 @@ func (repo *Repository) getServiceIDs() []string {
 
 // addServicesFromConfig reads info about services from the config file and fulfill the repo.
 func (repo *Repository) addServicesFromConfig(config Config) {
+	log.Debug("config: add services from config file")
+
 	// Sanity check, but basically should be always passed.
 	if config.ConnSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
 		return
 	}
 
-	log.Debug("adding system service")
 	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
+	log.Info("registered new service [system:0]")
 
 	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
 	// in the repo.
@@ -221,12 +223,15 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 		// Add "host", because user might manually specify services with the same port (but the are running on different hosts).
 		var key = strings.Join([]string{cs.ServiceType, pgconfig.Host, strconv.Itoa(int(pgconfig.Port))}, ":")
 		repo.addService(key, s)
-		log.Infof("service [%s] registered successfully", s.ServiceID)
+		log.Infof("registered new service [%s]", s.ServiceID)
+		log.Debugf("new service available through: %s@%s:%d/%s", pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
 	}
 }
 
 // setupServices attaches metrics exporters to the services in the repo.
 func (repo *Repository) setupServices(config Config) error {
+	log.Debug("config: setting up services")
+
 	var servicesIDs = repo.getServiceIDs()
 
 	for _, id := range servicesIDs {
@@ -248,7 +253,7 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterPostgresCollectors()
 				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
 				if err != nil {
-					log.Errorf("failed create service config for postgres: %s; skip service", err)
+					log.Errorf("service [%s] setup failed: %s; skip", service.ServiceID, err)
 					continue
 				}
 				collectorConfig.PostgresServiceConfig = cfg
@@ -271,6 +276,7 @@ func (repo *Repository) setupServices(config Config) error {
 
 			// put updated service copy into repo
 			repo.addService(id, service)
+			log.Debugf("service configured [%s]", id)
 		}
 	}
 
@@ -279,19 +285,19 @@ func (repo *Repository) setupServices(config Config) error {
 
 // startBackgroundDiscovery looking for services and add them to the repo.
 func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Config) {
-	log.Debug("starting background auto-discovery")
+	log.Debug("starting background auto-discovery loop")
 
 	// add pseudo-service for system metrics
-	log.Debug("adding system service")
 	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
+	log.Infoln("auto-discovery: service added [system:0]")
 
 	for {
 		if err := repo.lookupServices(config); err != nil {
-			log.Warnln("auto-discovery: lookup failed, skip; ", err)
+			log.Warnf("auto-discovery: services lookup failed: %s; skip", err)
 			continue
 		}
 		if err := repo.setupServices(config); err != nil {
-			log.Warnln("auto-discovery: create exporter failed, skip; ", err)
+			log.Warnf("auto-discovery: services setup failed: %s; skip", err)
 			continue
 		}
 
@@ -300,7 +306,7 @@ func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Con
 		case <-time.After(60 * time.Second):
 			continue
 		case <-ctx.Done():
-			log.Info("exit signaled, stop auto-discovery")
+			log.Info("auto-discovery: exit signaled")
 			return
 		}
 	}
@@ -308,6 +314,8 @@ func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Con
 
 // lookupServices scans PIDs and looking for required services
 func (repo *Repository) lookupServices(config Config) error {
+	log.Debug("auto-discovery: looking up for new services...")
+
 	pids, err := process.Pids()
 	if err != nil {
 		return err
@@ -333,34 +341,34 @@ func (repo *Repository) lookupServices(config Config) error {
 			if ppid == 1 {
 				postgres, err := discoverPostgres(proc, config)
 				if err != nil {
-					log.Warnf("auto-discovery: postgres service discovery failed: %s; skip", err)
+					log.Warnf("auto-discovery [postgres]: discovery failed: %s; skip", err)
 					break
 				}
 
 				// check service in the repo
 				if s := repo.getService(postgres.ServiceID); s.ServiceID == postgres.ServiceID {
-					log.Debugf("auto-discovery: postgres service [%s] already in the repository, skip", s.ServiceID)
+					log.Debugf("auto-discovery [postgres]: service [%s] already in the repository, skip", s.ServiceID)
 					break
 				}
 
 				repo.addService(postgres.ServiceID, postgres) // add postgresql service to the repo
-				log.Infof("auto-discovery: discovered new postgres service [%s]", postgres.ServiceID)
+				log.Infof("auto-discovery [postgres]: service added [%s]", postgres.ServiceID)
 			}
 		case "pgbouncer":
 			pgbouncer, err := discoverPgbouncer(proc, config)
 			if err != nil {
-				log.Warnf("auto-discovery: pgbouncer service discovery failed: %s; skip", err)
+				log.Warnf("auto-discovery [pgbouncer]: discovery failed: %s; skip", err)
 				break
 			}
 
 			// check service in the repo
 			if s := repo.getService(pgbouncer.ServiceID); s.ServiceID == pgbouncer.ServiceID {
-				log.Debugf("auto-discovery: pgbouncer service [%s] already in the repository, skip", s.ServiceID)
+				log.Debugf("auto-discovery [pgbouncer]: service [%s] already in the repository, skip", s.ServiceID)
 				break
 			}
 
 			repo.addService(pgbouncer.ServiceID, pgbouncer) // add pgbouncer service to the repo
-			log.Infof("auto-discovery: discovered new pgbouncer service [%s]", pgbouncer.ServiceID)
+			log.Infof("auto-discovery [pgbouncer]: service added [%s]", pgbouncer.ServiceID)
 		default:
 			continue // others are not interesting
 		}
@@ -371,6 +379,8 @@ func (repo *Repository) lookupServices(config Config) error {
 // discoverPostgres reads "datadir" argument from Postmaster's cmdline string and reads postmaster.pid stored in data
 // directory. Using postmaster.pid data construct "conninfo" string and test it through making a connection.
 func discoverPostgres(proc *process.Process, config Config) (Service, error) {
+	log.Debugf("auto-discovery [postgres]: analyzing process with pid %d", proc.Pid)
+
 	cmdline, err := proc.CmdlineSlice()
 	if err != nil {
 		return Service{}, err
@@ -404,7 +414,7 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 		Collector:    nil,
 	}
 
-	log.Debugf("auto-discovery: postgres service has been found, pid %d, available through %s:%d", proc.Pid, connParams.listenAddr, connParams.listenPort)
+	log.Debugf("auto-discovery [postgres]: service has been found, pid %d, available through %s", proc.Pid, connString)
 	return s, nil
 }
 
@@ -506,7 +516,7 @@ func newPostgresConnectionString(connParams connectionParams, defaults map[strin
 
 // discoverPgbouncer check passed process is it a Pgbouncer process or not.
 func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
-	log.Debug("looking for pgbouncer services")
+	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", proc.Pid)
 
 	cmdline, err := proc.CmdlineSlice()
 	if err != nil {
@@ -556,8 +566,6 @@ func parsePgbouncerIniFile(iniFilePath string) (connectionParams, error) {
 	var paramName, paramValue string
 	var connParams connectionParams
 
-	log.Debugf("auto-discovery: start reading %s", iniFilePath)
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		if err := scanner.Err(); err != nil {
@@ -575,7 +583,6 @@ func parsePgbouncerIniFile(iniFilePath string) (connectionParams, error) {
 		vals := strings.Split(line, "=")
 		if len(vals) != 2 {
 			// if parameter is not set it means default valus is used, can skip that line
-			log.Debugf("no value parameter %s; skip", line)
 			continue
 		}
 
@@ -644,11 +651,15 @@ func newPgbouncerConnectionString(connParams connectionParams, defaults map[stri
 
 // attemptConnect tries to make a real connection using passed connection string.
 func attemptConnect(connString string) error {
+	log.Debugln("making test connection: ", connString)
 	db, err := store.New(connString)
 	if err != nil {
 		return err
 	}
+
 	db.Close()
+	log.Debug("test connection success")
+
 	return nil
 }
 

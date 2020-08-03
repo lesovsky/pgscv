@@ -85,6 +85,8 @@ func runPullMode(config *Config) error {
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
 func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repository) error {
+	log.Infof("use PUSH mode, sending metrics to %s every %d seconds", config.MetricsServiceURL, config.MetricsSendInterval/time.Second)
+
 	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
 	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
 	// this label should be removed with 'metric_relabel_config' rule.
@@ -95,14 +97,14 @@ func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repo
 
 	// Before sending metrics wait until any services appear in the repo, else need to wait an one MetricsSendInterval.
 	// This is the one-time operation and here is using a naive approach with 'for loop + sleep' instead of channels/sync stuff.
+	log.Debugln("waiting for services appear in service repo...")
 	for {
-		if instanceRepo.TotalServices() > 0 {
+		if n := instanceRepo.TotalServices(); n > 0 {
+			log.Debugln("done, services found: ", n)
 			break
 		}
 		time.Sleep(time.Second)
 	}
-
-	log.Infof("use PUSH mode, sending metrics to %s every %d seconds", config.MetricsServiceURL, config.MetricsSendInterval/time.Second)
 
 	ticker := time.NewTicker(config.MetricsSendInterval)
 	for {
@@ -123,7 +125,7 @@ func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repo
 
 // pushMetrics collects metrics for discovered services and pushes them to remote service
 func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repository) {
-	log.Debug("job started")
+	log.Debug("start push metrics job")
 
 	var servicesIDs = repo.GetServiceIDs()
 
@@ -131,7 +133,7 @@ func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repo
 	for _, id := range servicesIDs {
 		var svc = repo.GetService(id)
 		if svc.Collector == nil {
-			log.Infof("service [%s] exists, but exporter is not initialized yet, skip", svc.ServiceID)
+			log.Infof("service [%s] exists, but collector is not initialized yet, skip", svc.ServiceID)
 			continue
 		}
 
@@ -150,11 +152,11 @@ func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repo
 		// push metrics
 		if err := pusher.Add(); err != nil {
 			// it is not critical error, just show it and continue
-			log.Warnln("could not push metrics: ", err)
+			log.Warnln("push metrics failed: ", err)
 		}
 	}
 
-	log.Debug("job finished")
+	log.Debug("metrics push job finished successfully")
 }
 
 // httpClient is the custom realization of HTTP client which wrap API key processing.
@@ -177,7 +179,7 @@ func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
 
 // getJobLabelBase returns a unique string for job label. The string is based on machine-id or hostname.
 func getJobLabelBase() (string, error) {
-	log.Debug("calculating job label for pushed metrics")
+	log.Debugln("calculating job label for pushed metrics")
 
 	// try to use machine-id-based label
 	machineID, err := getLabelByMachineID()
@@ -186,10 +188,10 @@ func getJobLabelBase() (string, error) {
 	}
 
 	// if getting machine-id failed, try to use hostname-based label
-	log.Warnln("read machine-id failed, fallback to use hostname: ", err)
+	log.Warnf("read machine-id failed: %s; fallback to use hostname", err)
 	machineID, err = getLabelByHostname()
 	if err != nil {
-		log.Warnln("get hostname failed, can't create job label: ", err)
+		log.Warnln("can't create job label: ", err)
 		return "", err
 	}
 	return machineID, nil
