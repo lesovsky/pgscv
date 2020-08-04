@@ -4,22 +4,6 @@ import (
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"sync"
-	"time"
-)
-
-var (
-//scrapeDurationDesc = prometheus.NewDesc(
-//	prometheus.BuildFQName("pgscv", "scrape", "collector_duration_seconds"),
-//	"pgscv_collector: Duration of a collector scrape.",
-//	[]string{"collector"},
-//	nil,
-//)
-//scrapeSuccessDesc = prometheus.NewDesc(
-//	prometheus.BuildFQName("pgscv", "scrape", "collector_success"),
-//	"node_collector: Whether a collector succeeded.",
-//	[]string{"collector"},
-//	nil,
-//)
 )
 
 // Factories defines collector functions which used for collecting metrics.
@@ -78,9 +62,10 @@ type PgscvCollector struct {
 // NewPgscvCollector accepts Factories and creates per-service instance of Collector.
 func NewPgscvCollector(projectID string, serviceID string, factories Factories, config Config) (*PgscvCollector, error) {
 	collectors := make(map[string]Collector)
+	constLabels := prometheus.Labels{"project_id": projectID, "service_id": serviceID}
 
 	for key := range factories {
-		collector, err := factories[key](prometheus.Labels{"project_id": projectID, "service_id": serviceID})
+		collector, err := factories[key](constLabels)
 		if err != nil {
 			return nil, err
 		}
@@ -91,10 +76,7 @@ func NewPgscvCollector(projectID string, serviceID string, factories Factories, 
 }
 
 // Describe implements the prometheus.Collector interface.
-func (n PgscvCollector) Describe(_ chan<- *prometheus.Desc) {
-	//ch <- scrapeDurationDesc
-	//ch <- scrapeSuccessDesc
-}
+func (n PgscvCollector) Describe(_ chan<- *prometheus.Desc) {}
 
 // Collect implements the prometheus.Collector interface.
 func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
@@ -111,16 +93,8 @@ func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
 
 // execute acts like a middleware - it runs metric collection function and wraps it into instrumenting logic.
 func execute(name string, config Config, c Collector, ch chan<- prometheus.Metric) {
-	begin := time.Now()
 	err := c.Update(config, ch)
-	duration := time.Since(begin)
-	//var success float64
-
 	if err != nil {
-		log.Errorf("%s collector failed; duration_seconds %f; err: %s", name, duration.Seconds(), err)
-		//success = 0
-	} // else { success = 1 }
-
-	//ch <- prometheus.MustNewConstMetric(scrapeDurationDesc, prometheus.GaugeValue, duration.Seconds(), name)
-	//ch <- prometheus.MustNewConstMetric(scrapeSuccessDesc, prometheus.GaugeValue, success, name)
+		log.Errorf("%s collector failed; %s", name, err)
+	}
 }
