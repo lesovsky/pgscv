@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 )
@@ -104,31 +105,34 @@ func parseFilesystemStats(r io.Reader, filter *regexp.Regexp) ([]filesystemStat,
 		return nil, err
 	}
 
+	wg := sync.WaitGroup{}
 	statCh := make(chan filesystemStat)
-	defer close(statCh)
 
+	wg.Add(len(stats))
 	for i, s := range stats {
+		stat := s
+
 		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too. To avoid such situations wrap
 		// stats requests into context with timeout. One second timeout should be sufficient for machines.
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
 		// Requesting stats.
-		go readMountpointStat(s.mountpoint, statCh)
+		go readMountpointStat(stat.mountpoint, statCh, &wg)
 
 		// Awaiting the stats response from the channel, or context cancellation by timeout.
 		select {
 		case response := <-statCh:
 			if response.err != nil {
-				log.Errorf("get filesystem %s stats failed: %s; skip", s.mountpoint, err)
+				log.Errorf("get filesystem %s stats failed: %s; skip", stat.mountpoint, err)
 				cancel()
 				continue
 			}
 
 			stats[i] = filesystemStat{
-				device:     s.device,
-				mountpoint: s.mountpoint,
-				fstype:     s.fstype,
-				options:    s.options,
+				device:     stat.device,
+				mountpoint: stat.mountpoint,
+				fstype:     stat.fstype,
+				options:    stat.options,
 				size:       response.size,
 				free:       response.free,
 				avail:      response.avail,
@@ -137,20 +141,26 @@ func parseFilesystemStats(r io.Reader, filter *regexp.Regexp) ([]filesystemStat,
 			}
 		case <-ctx.Done():
 			log.Warnf("filesystem %s doesn't respond: %s; skip", s.mountpoint, ctx.Err())
+			cancel()
 			continue
 		}
 
 		cancel()
 	}
 
+	wg.Wait()
+	close(statCh)
 	return stats, nil
 }
 
 // readMountpointStat requests stats from kernel and sends stats to channel.
-func readMountpointStat(mountpoint string, ch chan filesystemStat) {
+func readMountpointStat(mountpoint string, ch chan filesystemStat, wg *sync.WaitGroup) {
+	defer wg.Done()
+
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(mountpoint, &stat); err != nil {
 		ch <- filesystemStat{err: err}
+		return
 	}
 
 	// Syscall successful - send stat to the channel.

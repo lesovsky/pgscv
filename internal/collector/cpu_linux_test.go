@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -66,8 +65,6 @@ func Test_parseCPUStat(t *testing.T) {
 	// assume that sys_ticks is 100
 	for _, tc := range testcases {
 		got, err := parseCPUStat(tc.line, 100)
-		log.Infoln("lessqq: ", got)
-		log.Infoln("lessqq: ", err)
 		if tc.valid {
 			assert.NoError(t, err)
 			assert.Equal(t, tc.want, got)

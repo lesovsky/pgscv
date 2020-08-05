@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sync"
 	"testing"
 	"time"
 )
@@ -20,6 +21,31 @@ func TestFilesystemCollector_Update(t *testing.T) {
 	}
 
 	pipeline(t, input)
+}
+
+func Test_parseFilesystemStats(t *testing.T) {
+	file, err := os.Open(filepath.Clean("testdata/proc/mounts.golden"))
+	assert.NoError(t, err)
+
+	stats, err := parseFilesystemStats(file, regexp.MustCompile(`^tmpfs`))
+	assert.NoError(t, err)
+	assert.Greater(t, len(stats), 1)
+	assert.Greater(t, stats[0].size, float64(0))
+	assert.Greater(t, stats[0].free, float64(0))
+	assert.Greater(t, stats[0].avail, float64(0))
+	assert.Greater(t, stats[0].files, float64(0))
+	assert.Greater(t, stats[0].filesfree, float64(0))
+
+	_ = file.Close()
+
+	// test with wrong format file
+	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
+	assert.NoError(t, err)
+
+	stats, err = parseFilesystemStats(file, nil)
+	assert.Error(t, err)
+	assert.Nil(t, stats)
+	_ = file.Close()
 }
 
 func Test_parseProcMounts(t *testing.T) {
@@ -51,37 +77,15 @@ func Test_parseProcMounts(t *testing.T) {
 	assert.Nil(t, stats)
 }
 
-func Test_parseFilesystemStats(t *testing.T) {
-	file, err := os.Open(filepath.Clean("/proc/mounts"))
-	assert.NoError(t, err)
-
-	stats, err := parseFilesystemStats(file, regexp.MustCompile(`^tmpfs`))
-	assert.NoError(t, err)
-	assert.Greater(t, len(stats), 1)
-	assert.Greater(t, stats[0].size, float64(0))
-	assert.Greater(t, stats[0].free, float64(0))
-	assert.Greater(t, stats[0].avail, float64(0))
-	assert.Greater(t, stats[0].files, float64(0))
-	assert.Greater(t, stats[0].filesfree, float64(0))
-
-	_ = file.Close()
-
-	// test with wrong format file
-	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
-	assert.NoError(t, err)
-
-	stats, err = parseProcMounts(file, nil)
-	assert.Error(t, err)
-	assert.Nil(t, stats)
-	_ = file.Close()
-}
-
 func Test_readMountpointStat(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
+	wg := sync.WaitGroup{}
 	ch := make(chan filesystemStat)
-	go readMountpointStat("/", ch)
+
+	wg.Add(1)
+	go readMountpointStat("/", ch, &wg)
 
 	select {
 	case response := <-ch:
@@ -94,4 +98,6 @@ func Test_readMountpointStat(t *testing.T) {
 		assert.Fail(t, "context cancelled: ", ctx.Err())
 	}
 
+	wg.Wait()
+	close(ch)
 }
