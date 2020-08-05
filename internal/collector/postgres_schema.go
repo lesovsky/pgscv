@@ -172,14 +172,13 @@ func collectSchemaNonPKTables(conn *store.DB, ch chan<- prometheus.Metric, desc 
 	}
 }
 
-// getSchemaNonPKTables searches non-pk-tables in the database and return its names if such tables have been found.
+// getSchemaNonPKTables searches tables with no PRIMARY or UNIQUE keys in the database and return its names.
 func getSchemaNonPKTables(conn *store.DB) []string {
-	var query = `SELECT t.nspname AS schemaname, t.relname AS relname
-FROM (SELECT c.oid, c.relname, n.nspname
-      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
-      WHERE c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema')
-      ) AS t
-LEFT OUTER JOIN pg_constraint c ON c.contype in ('p', 'u') AND c.conrelid = t.oid WHERE c.conname IS NULL`
+	var query = `SELECT n.nspname AS schemaname, c.relname AS relname
+FROM pg_class c
+JOIN pg_namespace n ON c.relnamespace = n.oid
+WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE c.oid = i.indrelid AND (i.indisprimary OR i.indisunique))
+AND c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')`
 
 	rows, err := conn.Conn().Query(context.Background(), query)
 	if err != nil {
