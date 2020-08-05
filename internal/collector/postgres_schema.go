@@ -270,11 +270,10 @@ func getSchemaNonIndexedFK(conn *store.DB) map[string]postgresGenericStat {
     c.connamespace::regnamespace::text AS schemaname, s.relname AS relname,
     string_agg(a.attname, ',' ORDER BY x.n) AS colnames, c.conname AS constraint,
     c.confrelid::regclass::text AS referenced
-FROM pg_catalog.pg_constraint c CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS x(attnum, n)
-JOIN pg_catalog.pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid
+FROM pg_constraint c CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS x(attnum, n)
+JOIN pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid
 JOIN pg_class s ON c.conrelid = s.oid
-WHERE
-  NOT EXISTS (SELECT 1 FROM pg_catalog.pg_index i WHERE i.indrelid = c.conrelid AND (i.indkey::smallint[])[0:cardinality(c.conkey)-1] @> c.conkey)
+WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND (i.indkey::integer[])[0:cardinality(c.conkey)-1] @> c.conkey::integer[])
   AND c.contype = 'f'
 GROUP BY c.connamespace,s.relname,c.conname,c.confrelid`
 
