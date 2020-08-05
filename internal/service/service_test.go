@@ -32,12 +32,32 @@ func TestRepository_getService(t *testing.T) {
 	assert.Equal(t, s.ConnSettings, got.ConnSettings)
 }
 
-func TestRepository_removeServiceByServiceID(t *testing.T) {
+func TestRepository_markServiceFailed(t *testing.T) {
+	r := NewRepository()
+	s := TestSystemService()
+	r.addService(s.ServiceID, s)
+
+	// mark service as failed
+	r.markServiceFailed(s.ServiceID)
+
+	// get its status - should be equal 1
+	got := r.getServiceStatus(s.ServiceID)
+	assert.Equal(t, 1, got)
+
+	// mark healthy
+	r.markServiceHealthy(s.ServiceID)
+
+	// get its status - should be equal 0
+	got = r.getServiceStatus(s.ServiceID)
+	assert.Equal(t, 0, got)
+}
+
+func TestRepository_removeService(t *testing.T) {
 	r := NewRepository()
 	s := TestSystemService()
 	r.addService(s.ServiceID, s)
 	assert.Equal(t, 1, r.totalServices())
-	r.removeServiceByServiceID(s.ServiceID)
+	r.removeService(s.ServiceID)
 	assert.Equal(t, 0, r.totalServices())
 }
 
@@ -95,6 +115,24 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 	}
 }
 
+func TestRepository_startBackgroundDiscovery(t *testing.T) {
+	r := NewRepository()
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+	r.startBackgroundDiscovery(ctx, Config{})
+	assert.NotEqual(t, 0, r.totalServices())
+}
+
+func TestRepository_lookupServices(t *testing.T) {
+	if uid := os.Geteuid(); uid != 0 {
+		t.Skipf("root privileges required, skip")
+	}
+
+	r := NewRepository()
+	assert.NoError(t, r.lookupServices(Config{}))
+	assert.NotEqual(t, 0, r.totalServices())
+}
+
 func TestRepository_setupServices(t *testing.T) {
 	testCases := []struct {
 		name     string
@@ -128,28 +166,27 @@ func TestRepository_setupServices(t *testing.T) {
 		assert.Equal(t, tc.expected, r.totalServices())
 
 		assert.NoError(t, r.setupServices(tc.config))
-		// TODO: should be enabled after implementing postgres/pgbouncer services
-		//s := r.GetService("postgres:127.0.0.1:5432")
-		//assert.NotNil(t, s.Collector)
+		s := r.GetService("postgres:127.0.0.1:5432")
+		assert.NotNil(t, s.Collector)
 	}
 }
 
-func TestRepository_startBackgroundDiscovery(t *testing.T) {
+func Test_healthcheckServices(t *testing.T) {
 	r := NewRepository()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	r.startBackgroundDiscovery(ctx, Config{})
-	assert.NotEqual(t, 0, r.totalServices())
-}
+	s1 := TestSystemService()
+	r.addService(s1.ServiceID, s1)
 
-func TestRepository_lookupServices(t *testing.T) {
-	if uid := os.Geteuid(); uid != 0 {
-		t.Skipf("root privileges required, skip")
+	s2 := TestPostgresService()
+	s2.ConnSettings.Conninfo = "host=invalid dbname=invalid user=invalid"
+	r.addService(s2.ServiceID, s2)
+
+	assert.Equal(t, 2, r.totalServices())
+
+	for i := 0; i < 10; i++ {
+		r.healthcheckServices()
 	}
 
-	r := NewRepository()
-	assert.NoError(t, r.lookupServices(Config{}))
-	assert.NotEqual(t, 0, r.totalServices())
+	assert.Equal(t, 1, r.totalServices())
 }
 
 func Test_parsePostgresProcessCmdline(t *testing.T) {

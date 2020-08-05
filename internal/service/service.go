@@ -50,6 +50,9 @@ type Service struct {
 	// Prometheus-based metrics collector associated with the service. Each 'service' has its own dedicated collector instance
 	// which implements a service-specific set of metric collectors.
 	Collector Collector
+	// TotalErrors represents total number of times where service's health checks failed. When errors limit is reached service
+	// removed from the repo.
+	TotalErrors int
 }
 
 // Config defines service's configuration.
@@ -150,13 +153,37 @@ func (repo *Repository) getService(id string) Service {
 	return s
 }
 
-// removeService removes service from the repo.
-func (repo *Repository) removeServiceByServiceID(id string) {
+// markServiceFailed increments total number of health check errors.
+func (repo *Repository) markServiceFailed(id string) {
 	repo.Lock()
-	for k, v := range repo.Services {
-		if v.ServiceID == id {
-			delete(repo.Services, k)
-		}
+	s := repo.Services[id]
+	s.TotalErrors++
+	repo.Services[id] = s
+	repo.Unlock()
+}
+
+// getServiceStatus returns total number of errors (failed health checks).
+func (repo *Repository) getServiceStatus(id string) int {
+	repo.RLock()
+	n := repo.Services[id].TotalErrors
+	repo.RUnlock()
+	return n
+}
+
+// markServiceHealthy resets health check errors counter to zero.
+func (repo *Repository) markServiceHealthy(id string) {
+	repo.Lock()
+	s := repo.Services[id]
+	s.TotalErrors = 0
+	repo.Services[id] = s
+	repo.Unlock()
+}
+
+// removeService removes service from the repo.
+func (repo *Repository) removeService(id string) {
+	repo.Lock()
+	if _, ok := repo.Services[id]; ok {
+		delete(repo.Services, id)
 	}
 	repo.Unlock()
 }
@@ -228,61 +255,6 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 	}
 }
 
-// setupServices attaches metrics exporters to the services in the repo.
-func (repo *Repository) setupServices(config Config) error {
-	log.Debug("config: setting up services")
-
-	var servicesIDs = repo.getServiceIDs()
-
-	for _, id := range servicesIDs {
-		var service = repo.getService(id)
-		if service.Collector == nil {
-			service.ProjectID = config.ProjectID
-
-			factories := collector.Factories{}
-			collectorConfig := collector.Config{
-				AllowTrackSensitive: config.AllowTrackSensitive,
-				ServiceType:         service.ConnSettings.ServiceType,
-				ConnString:          service.ConnSettings.Conninfo,
-			}
-
-			switch service.ConnSettings.ServiceType {
-			case model.ServiceTypeSystem:
-				factories.RegisterSystemCollectors()
-			case model.ServiceTypePostgresql:
-				factories.RegisterPostgresCollectors()
-				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
-				if err != nil {
-					log.Errorf("service [%s] setup failed: %s; skip", service.ServiceID, err)
-					continue
-				}
-				collectorConfig.PostgresServiceConfig = cfg
-			case model.ServiceTypePgbouncer:
-				factories.RegisterPgbouncerCollectors()
-			default:
-				continue
-			}
-
-			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories, collectorConfig)
-			if err != nil {
-				return err
-			}
-			service.Collector = mc
-
-			// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
-			if config.RuntimeMode == model.RuntimePullMode {
-				prometheus.MustRegister(service.Collector)
-			}
-
-			// put updated service copy into repo
-			repo.addService(id, service)
-			log.Debugf("service configured [%s]", id)
-		}
-	}
-
-	return nil
-}
-
 // startBackgroundDiscovery looking for services and add them to the repo.
 func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Config) {
 	log.Debug("starting background auto-discovery loop")
@@ -301,7 +273,11 @@ func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Con
 			continue
 		}
 
-		// sleep until timeout or exit
+		// Perform health check for services with remote endpoints (e.g. Postgres or Pgbouncer). Services which continuously
+		// don't respond are removed from the repo (but if they appear later they will be discovered again).
+		repo.healthcheckServices()
+
+		// Sleep until timeout or exit if context canceled.
 		select {
 		case <-time.After(60 * time.Second):
 			continue
@@ -374,6 +350,96 @@ func (repo *Repository) lookupServices(config Config) error {
 		}
 	}
 	return nil
+}
+
+// setupServices attaches metrics exporters to the services in the repo.
+func (repo *Repository) setupServices(config Config) error {
+	log.Debug("config: setting up services")
+
+	for _, id := range repo.getServiceIDs() {
+		var service = repo.getService(id)
+		if service.Collector == nil {
+			service.ProjectID = config.ProjectID
+
+			factories := collector.Factories{}
+			collectorConfig := collector.Config{
+				AllowTrackSensitive: config.AllowTrackSensitive,
+				ServiceType:         service.ConnSettings.ServiceType,
+				ConnString:          service.ConnSettings.Conninfo,
+			}
+
+			switch service.ConnSettings.ServiceType {
+			case model.ServiceTypeSystem:
+				factories.RegisterSystemCollectors()
+			case model.ServiceTypePostgresql:
+				factories.RegisterPostgresCollectors()
+				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
+				if err != nil {
+					log.Errorf("service [%s] setup failed: %s; skip", service.ServiceID, err)
+					continue
+				}
+				collectorConfig.PostgresServiceConfig = cfg
+			case model.ServiceTypePgbouncer:
+				factories.RegisterPgbouncerCollectors()
+			default:
+				continue
+			}
+
+			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories, collectorConfig)
+			if err != nil {
+				return err
+			}
+			service.Collector = mc
+
+			// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
+			if config.RuntimeMode == model.RuntimePullMode {
+				prometheus.MustRegister(service.Collector)
+			}
+
+			// put updated service copy into repo
+			repo.addService(id, service)
+			log.Debugf("service configured [%s]", id)
+		}
+	}
+
+	return nil
+}
+
+// healthcheckServices performs services health checks and remove those who don't respond too long
+func (repo *Repository) healthcheckServices() {
+	log.Debug("services healthcheck started")
+
+	// Remove service after 10 failed health checks.
+	var errorThreshold = 10
+
+	for _, id := range repo.getServiceIDs() {
+		var service = repo.getService(id)
+
+		switch service.ConnSettings.ServiceType {
+		case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
+			totalErrors := repo.getServiceStatus(id)
+			err := attemptConnect(service.ConnSettings.Conninfo)
+			if err != nil {
+				totalErrors++
+				if totalErrors < errorThreshold {
+					repo.markServiceFailed(id)
+					log.Warnf("service [%s] failed: tries remain %d/%d", id, totalErrors, errorThreshold)
+				} else {
+					// unregister service is necessary in PULL mode (but it's also safe in PUSH mode)
+					if repo.Services[id].Collector != nil {
+						prometheus.Unregister(repo.Services[id].Collector)
+					}
+
+					repo.removeService(id)
+					log.Errorf("service [%s] removed: too many failures %d/%d", id, totalErrors, errorThreshold)
+				}
+			}
+		default:
+			continue
+		}
+	}
+
+	log.Debug("services healthcheck finished")
 }
 
 // discoverPostgres reads "datadir" argument from Postmaster's cmdline string and reads postmaster.pid stored in data

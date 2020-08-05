@@ -57,6 +57,8 @@ type Collector interface {
 type PgscvCollector struct {
 	Config     Config
 	Collectors map[string]Collector
+	// anchorDesc is a metric descriptor used for distinguishing collectors when unregister is required.
+	anchorDesc typedDesc
 }
 
 // NewPgscvCollector accepts Factories and creates per-service instance of Collector.
@@ -72,11 +74,23 @@ func NewPgscvCollector(projectID string, serviceID string, factories Factories, 
 		collectors[key] = collector
 	}
 
-	return &PgscvCollector{Config: config, Collectors: collectors}, nil
+	// anchorDesc is a metric descriptor used for distinguish collectors. Creating many collectors with uniq anchorDesc makes
+	// possible to unregister collectors if they or their associated services become unnecessary or unavailable.
+	desc := typedDesc{
+		desc: prometheus.NewDesc(
+			prometheus.BuildFQName("pgscv", "service", serviceID),
+			"Service metric.",
+			nil, constLabels,
+		), valueType: prometheus.GaugeValue,
+	}
+
+	return &PgscvCollector{Config: config, Collectors: collectors, anchorDesc: desc}, nil
 }
 
 // Describe implements the prometheus.Collector interface.
-func (n PgscvCollector) Describe(_ chan<- *prometheus.Desc) {}
+func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
+	ch <- n.anchorDesc.desc
+}
 
 // Collect implements the prometheus.Collector interface.
 func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
