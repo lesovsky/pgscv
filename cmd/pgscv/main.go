@@ -32,12 +32,12 @@ func main() {
 
 	config, err := pgscv.NewConfig(*configFile)
 	if err != nil {
-		log.Errorf("Cannot start %s, unable to create config: %s", appName, err)
+		log.Errorln("parse config failed: ", err)
 		os.Exit(1)
 	}
 
 	if err := config.Validate(); err != nil {
-		log.Errorf("Cannot start %s, unable to validate config: %s", appName, err)
+		log.Errorln("validate config failed: ", err)
 		os.Exit(1)
 	}
 

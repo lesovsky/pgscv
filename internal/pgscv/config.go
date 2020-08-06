@@ -3,15 +3,11 @@ package pgscv
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
 	"io/ioutil"
 	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -30,14 +26,13 @@ type Config struct {
 	BinaryVersion        string                // version of the program, required for auto-update procedure
 	RuntimeMode          int                   // application runtime mode
 	AllowTrackSensitive  bool                  `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
-	ScheduleEnabled      bool                  // use schedule-based metrics collecting
-	ListenAddress        string                `json:"listen_address"`      // Network address and port where the application should listen on
-	MetricsServiceURL    string                `json:"metrics_service_url"` // URL of Weaponry service metric gateway
+	ListenAddress        string                `json:"listen_address"`        // Network address and port where the application should listen on
+	MetricsServiceURL    string                `json:"metrics_service_url"`   // URL of Weaponry service metric gateway
 	MetricsSendInterval  time.Duration         // Metric send interval
-	APIKey               string                `json:"api_key"` // API key for accessing to Weaponry
-	ProjectID            string                // ProjectID value obtained from API key
-	ServicesConnSettings []service.ConnSetting `json:"services"` // Slice of connection settings for exact services
-	Defaults             map[string]string     `json:"defaults"` // Defaults
+	APIKey               string                `json:"api_key"`    // API key for accessing to Weaponry
+	ProjectID            int                   `json:"project_id"` // ProjectID specifies project_id label value
+	ServicesConnSettings []service.ConnSetting `json:"services"`   // Slice of connection settings for exact services
+	Defaults             map[string]string     `json:"defaults"`   // Defaults
 }
 
 // NewConfig creates new config based on config file.
@@ -58,12 +53,8 @@ func NewConfig(configFilePath string) (*Config, error) {
 
 // Validate checks configuration for stupid values and set defaults
 func (c *Config) Validate() error {
-	if c.APIKey != "" {
-		projectID, err := newProjectID(c.APIKey)
-		if err != nil {
-			return err
-		}
-		c.ProjectID = projectID
+	if (c.APIKey != "" && c.ProjectID == 0) || (c.APIKey == "" && c.ProjectID != 0) {
+		return fmt.Errorf("API key and Project ID should be specified both")
 	}
 
 	if c.MetricsServiceURL == "" {
@@ -71,7 +62,6 @@ func (c *Config) Validate() error {
 	} else {
 		c.RuntimeMode = model.RuntimePushMode
 		c.MetricsSendInterval = defaultMetricsSendInterval
-		c.ScheduleEnabled = true
 	}
 
 	// API key is necessary when Metric Service is specified
@@ -107,92 +97,19 @@ func (c *Config) Validate() error {
 	// User might specify its own set of services which he would like to monitor. This services should be validated and
 	// invalid should be rejected. Validation is performed using pgx.ParseConfig method which does all dirty work.
 	if c.ServicesConnSettings != nil {
-		var foundInvalid bool
 		if len(c.ServicesConnSettings) != 0 {
-			for i, s := range c.ServicesConnSettings {
+			for _, s := range c.ServicesConnSettings {
 				if s.ServiceType == "" {
-					log.Errorf("service_type is not specified for %s; ignore", s.Conninfo)
-					c.ServicesConnSettings[i].Conninfo = "__invalid__"
-					foundInvalid = true
+					return fmt.Errorf("service_type is not specified for %s", s.Conninfo)
 				}
 
 				_, err := pgx.ParseConfig(s.Conninfo)
 				if err != nil {
-					log.Errorf("%s: %s; ignore", err, s.Conninfo)
-					c.ServicesConnSettings[i].Conninfo = "__invalid__"
-					foundInvalid = true
+					return fmt.Errorf("invalid conninfo: %s", err)
 				}
-			}
-		}
-
-		// If services with invalid Conninfo have been found, just build a new slice without invalid services.
-		if foundInvalid {
-			cc := make([]service.ConnSetting, 0, len(c.ServicesConnSettings))
-			for _, s := range c.ServicesConnSettings {
-				if s.Conninfo != "__invalid__" {
-					cc = append(cc, s)
-				}
-			}
-
-			// But it may happen that all the passed settings are wrong, in this case don't allocate slice.
-			if len(cc) != 0 {
-				c.ServicesConnSettings = cc
-			} else {
-				c.ServicesConnSettings = nil
 			}
 		}
 	}
 
 	return nil
-}
-
-// newProjectID reads provided API key and produces ProjectID string
-func newProjectID(s string) (string, error) {
-	// sanity check, but normally should not be here
-	if s == "" {
-		return "", fmt.Errorf("api key not found")
-	}
-
-	log.Debug("processing api key")
-
-	// api key should consists of four parts
-	parts := strings.Split(s, "-")
-	if len(parts) != 4 {
-		return "", fmt.Errorf("api key bad format")
-	}
-
-	// lengths of these parts should be 12-4-4-8 (yes, this is not UUID)
-	for i, v := range []int{12, 4, 4, 8} {
-		if len(parts[i]) != v {
-			return "", fmt.Errorf("api key bad format")
-		}
-	}
-
-	re, err := regexp.Compile("^[A-Z0-9]+$")
-	if err != nil {
-		return "", err
-	}
-
-	// each part should satisfy the regexp
-	for _, v := range parts {
-		if !re.MatchString(v) {
-			return "", fmt.Errorf("api key bad format")
-		}
-	}
-
-	re, err = regexp.Compile("[A-Z]+")
-	if err != nil {
-		return "", err
-	}
-
-	// extract project_id from last part
-	id := re.ReplaceAllString(parts[3], "")
-
-	// check extracted value is able to be converted to int64
-	_, err = strconv.ParseInt(id, 10, 64)
-	if err != nil {
-		return "", err
-	}
-
-	return id, nil
 }

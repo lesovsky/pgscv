@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,7 +25,7 @@ func Start(ctx context.Context, config *Config) error {
 	serviceConfig := service.Config{
 		RuntimeMode:         config.RuntimeMode,
 		AllowTrackSensitive: config.AllowTrackSensitive,
-		ProjectID:           config.ProjectID,
+		ProjectID:           strconv.Itoa(config.ProjectID),
 		ConnDefaults:        config.Defaults,
 		ConnSettings:        config.ServicesConnSettings,
 	}

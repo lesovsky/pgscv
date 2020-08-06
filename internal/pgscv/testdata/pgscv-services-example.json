@@ -1,0 +1,13 @@
+{
+  "listen_address": "127.0.0.1:8080",
+  "services": [
+    {
+      "service_type": "postgres",
+      "conninfo": "host=127.0.0.1 port=5432 dbname=test user=test"
+    },
+    {
+      "service_type": "pgbouncer",
+      "conninfo": "host=127.0.0.1 port=6432 dbname=test user=test"
+    }
+  ]
+}
