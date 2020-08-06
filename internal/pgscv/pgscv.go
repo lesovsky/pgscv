@@ -55,7 +55,7 @@ func Start(ctx context.Context, config *Config) error {
 
 	switch config.RuntimeMode {
 	case model.RuntimePullMode:
-		return runPullMode(config)
+		return runPullMode(ctx, config)
 	case model.RuntimePushMode:
 		return runPushMode(ctx, config, serviceRepo)
 	default:
@@ -64,10 +64,9 @@ func Start(ctx context.Context, config *Config) error {
 	}
 }
 
-func runPullMode(config *Config) error {
+func runPullMode(ctx context.Context, config *Config) error {
 	log.Infof("use PULL mode, accepting requests on http://%s/metrics", config.ListenAddress)
 
-	//http.Handle("/metrics", newHandler())
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
@@ -81,7 +80,25 @@ func runPullMode(config *Config) error {
 			log.Warnln("response write failed: ", err)
 		}
 	})
-	return http.ListenAndServe(config.ListenAddress, nil)
+
+	var errCh = make(chan error)
+	defer close(errCh)
+
+	// Run listener.
+	go func() {
+		errCh <- http.ListenAndServe(config.ListenAddress, nil)
+	}()
+
+	// Waiting for errors or context cancelling.
+	for {
+		select {
+		case err := <-errCh:
+			return err
+		case <-ctx.Done():
+			log.Info("exit signaled, stop listening")
+			return nil
+		}
+	}
 }
 
 // runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service

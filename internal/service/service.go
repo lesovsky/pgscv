@@ -211,14 +211,15 @@ func (repo *Repository) getServiceIDs() []string {
 func (repo *Repository) addServicesFromConfig(config Config) {
 	log.Debug("config: add services from config file")
 
+	// Always add system service.
+	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
+	log.Info("registered new service [system:0]")
+
 	// Sanity check, but basically should be always passed.
 	if config.ConnSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
 		return
 	}
-
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
-	log.Info("registered new service [system:0]")
 
 	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
 	// in the repo.

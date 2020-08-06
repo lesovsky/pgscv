@@ -94,7 +94,7 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 		{
 			name:     "empty conn settings",
 			config:   Config{},
-			expected: 0,
+			expected: 1,
 		},
 		{
 			name:     "invalid service",
