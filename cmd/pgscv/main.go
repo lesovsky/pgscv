@@ -39,15 +39,14 @@ func main() {
 	}
 
 	if *doUninstall {
-		uc := &packaging.UninstallConfig{BinaryName: appName}
-		os.Exit(packaging.RunUninstall(uc))
+		os.Exit(packaging.RunUninstall())
 	}
 
 	if *doBootstrap {
 		bc := &packaging.BootstrapConfig{
-			AgentBinaryName:          appName,
 			RunAsUser:                os.Getenv("PGSCV_RUN_AS_USER"),
 			MetricServiceBaseURL:     os.Getenv("PGSCV_METRICS_SERVICE_BASE_URL"),
+			AutoUpdateURL:            os.Getenv("PGSCV_AUTOUPDATE_URL"),
 			APIKey:                   os.Getenv("PGSCV_API_KEY"),
 			ProjectID:                os.Getenv("PGSCV_PROJECT_ID"),
 			DefaultPostgresPassword:  os.Getenv("PGSCV_PG_PASSWORD"),

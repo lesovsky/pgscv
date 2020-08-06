@@ -6,6 +6,11 @@ import (
 	"os"
 )
 
+const (
+	executableName     = "pgscv"
+	systemdServiceName = "pgscv.service"
+)
+
 // run pre-bootstrap checks
 func preCheck() error {
 	log.Info("run pre-flight checks")

@@ -24,6 +24,7 @@ const (
 // Config defines application's configuration.
 type Config struct {
 	BinaryVersion        string                // version of the program, required for auto-update procedure
+	AutoUpdateURL        string                `json:"autoupdate_url"` // URL used for auto-update
 	RuntimeMode          int                   // application runtime mode
 	AllowTrackSensitive  bool                  `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
 	ListenAddress        string                `json:"listen_address"`        // Network address and port where the application should listen on

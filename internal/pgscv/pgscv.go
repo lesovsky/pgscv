@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
+	"github.com/barcodepro/pgscv/internal/packaging"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/prometheus/client_golang/prometheus/push"
@@ -46,12 +47,16 @@ func Start(ctx context.Context, config *Config) error {
 		}
 	}
 
-	//go func() {
-	//	ac := &packaging.AutoupdateConfig{
-	//		BinaryVersion: config.BinaryVersion,
-	//	}
-	//	packaging.StartBackgroundAutoUpdate(ctx, ac)
-	//}()
+	// Start auto-update loop if source URL is specified.
+	if config.AutoUpdateURL != "" {
+		go func() {
+			ac := &packaging.AutoupdateConfig{
+				BinaryVersion: config.BinaryVersion,
+				DistBaseURL:   config.AutoUpdateURL,
+			}
+			packaging.StartBackgroundAutoUpdate(ctx, ac)
+		}()
+	}
 
 	switch config.RuntimeMode {
 	case model.RuntimePullMode:

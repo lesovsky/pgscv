@@ -7,11 +7,13 @@ import (
 	"os"
 	"os/exec"
 	"os/user"
+	"path/filepath"
 	"strconv"
 	"text/template"
 )
 
 const confFileTemplate = `{
+  "autoupdate_url": "{{ .AutoUpdateURL}}",
   "api_key": "{{ .APIKey }}",
   "project_id": "{{ .ProjectID }}",
   "metrics_service_url": "{{ .MetricServiceBaseURL }}",
@@ -36,7 +38,7 @@ User={{ .RunAsUser }}
 Group={{ .RunAsUser }}
 
 # Start the agent process
-ExecStart=/usr/bin/{{ .AgentBinaryName }} --config-file=/etc/pgscv.json
+ExecStart=/usr/bin/{{ .ExecutableName }} --config-file=/etc/{{ .ExecutableName }}.json
 
 # Only kill the agent process
 KillMode=process
@@ -55,10 +57,11 @@ WantedBy=multi-user.target
 `
 
 type BootstrapConfig struct {
-	AgentBinaryName          string
+	ExecutableName           string
 	AutoStart                bool
 	RunAsUser                string
 	MetricServiceBaseURL     string
+	AutoUpdateURL            string
 	APIKey                   string
 	ProjectID                string
 	DefaultPostgresPassword  string
@@ -80,12 +83,17 @@ func (c *BootstrapConfig) Validate() error {
 	if c.MetricServiceBaseURL == "" {
 		return fmt.Errorf("PGSCV_METRICS_SERVICE_BASE_URL is not defined")
 	}
+	if c.AutoUpdateURL == "" {
+		return fmt.Errorf("PGSCV_AUTOUPDATE_URL is not defined")
+	}
 	if c.APIKey == "" {
 		return fmt.Errorf("PGSCV_API_KEY is not defined")
 	}
 	if c.ProjectID == "" {
 		return fmt.Errorf("PGSCV_PROJECT_ID is not defined")
 	}
+
+	c.ExecutableName = executableName
 
 	return nil
 }
@@ -101,7 +109,7 @@ func RunBootstrap(config *BootstrapConfig) int {
 		return bootstrapFailed(err)
 	}
 
-	if err := installBin(config); err != nil {
+	if err := installBin(); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -118,16 +126,16 @@ func RunBootstrap(config *BootstrapConfig) int {
 	}
 
 	if config.AutoStart {
-		if err := enableAutostart(config); err != nil {
+		if err := enableAutostart(); err != nil {
 			return bootstrapFailed(err)
 		}
 	}
 
-	if err := runAgent(config); err != nil {
+	if err := runAgent(); err != nil {
 		return bootstrapFailed(err)
 	}
 
-	if err := deleteSelf(config); err != nil {
+	if err := deleteSelf(); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -135,10 +143,10 @@ func RunBootstrap(config *BootstrapConfig) int {
 }
 
 // installs agent binary
-func installBin(config *BootstrapConfig) error {
+func installBin() error {
 	log.Info("Install agent")
-	fromFilename := fmt.Sprintf("./%s", config.AgentBinaryName)
-	toFilename := fmt.Sprintf("/usr/bin/%s", config.AgentBinaryName)
+	fromFilename := fmt.Sprintf("./%s", executableName)
+	toFilename := fmt.Sprintf("/usr/bin/%s", executableName)
 
 	from, err := os.Open(fromFilename)
 	if err != nil {
@@ -172,7 +180,7 @@ func createConfigFile(config *BootstrapConfig) error {
 	}
 
 	// create config-file with proper permissions
-	conffile := fmt.Sprintf("/etc/%s.json", config.AgentBinaryName)
+	conffile := fmt.Sprintf("/etc/%s.json", executableName)
 	f, err := os.Create(conffile)
 	if err != nil {
 		return fmt.Errorf("create config file failed: %s", err)
@@ -211,7 +219,7 @@ func createSystemdUnit(config *BootstrapConfig) error {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	unitfile := fmt.Sprintf("/etc/systemd/system/%s.service", config.AgentBinaryName)
+	unitfile := fmt.Sprintf("/etc/systemd/system/%s", systemdServiceName)
 	f, err := os.Create(unitfile)
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
@@ -246,11 +254,10 @@ func reloadSystemd() error {
 }
 
 // enables agent autostart
-func enableAutostart(config *BootstrapConfig) error {
+func enableAutostart() error {
 	log.Info("Enable autostart")
 
-	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
-	cmd := exec.Command("systemctl", "enable", servicename)
+	cmd := exec.Command("systemctl", "enable", systemdServiceName)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("enable agent service failed: %s ", err)
@@ -265,11 +272,10 @@ func enableAutostart(config *BootstrapConfig) error {
 }
 
 // run agent systemd unit
-func runAgent(config *BootstrapConfig) error {
+func runAgent() error {
 	log.Info("Run agent")
 
-	servicename := fmt.Sprintf("%s.service", config.AgentBinaryName)
-	cmd := exec.Command("systemctl", "start", servicename)
+	cmd := exec.Command("systemctl", "start", systemdServiceName)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("start agent service failed: %s ", err)
@@ -285,10 +291,9 @@ func runAgent(config *BootstrapConfig) error {
 }
 
 // delete self executable
-func deleteSelf(config *BootstrapConfig) error {
+func deleteSelf() error {
 	log.Info("Cleanup")
-	filename := fmt.Sprintf("./%s", config.AgentBinaryName)
-	return os.Remove(filename)
+	return os.Remove(filepath.Clean(fmt.Sprintf("./%s", executableName)))
 }
 
 // bootstrapFailed signales bootstrap failed with error

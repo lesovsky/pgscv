@@ -5,32 +5,29 @@ import (
 	"github.com/barcodepro/pgscv/internal/log"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
-type UninstallConfig struct {
-	BinaryName string
-}
-
 // RunUninstall is the main uninstall entry point
-func RunUninstall(config *UninstallConfig) int {
+func RunUninstall() int {
 	log.Info("Run uninstall")
 	if err := preCheck(); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := stopAgent(config); err != nil {
+	if err := stopAgent(); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeServiceUnit(config); err != nil {
+	if err := removeServiceUnit(); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeConfig(config); err != nil {
+	if err := removeConfig(); err != nil {
 		return uninstallFailed(err)
 	}
 
-	if err := removeBinary(config); err != nil {
+	if err := removeBinary(); err != nil {
 		return uninstallFailed(err)
 	}
 
@@ -38,11 +35,10 @@ func RunUninstall(config *UninstallConfig) int {
 }
 
 // stopAgent stops agent' systemd service
-func stopAgent(c *UninstallConfig) error {
+func stopAgent() error {
 	log.Info("Stop agent")
 
-	servicename := fmt.Sprintf("%s.service", c.BinaryName)
-	cmd := exec.Command("systemctl", "stop", servicename)
+	cmd := exec.Command("systemctl", "stop", systemdServiceName)
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("stop agent service failed: %s ", err)
@@ -58,24 +54,22 @@ func stopAgent(c *UninstallConfig) error {
 }
 
 // removeServiceUnit removes systemd unit file
-func removeServiceUnit(c *UninstallConfig) error {
+func removeServiceUnit() error {
 	log.Info("Remove systemd unit")
-	filename := fmt.Sprintf("/etc/systemd/system/%s.service", c.BinaryName)
+	filename := fmt.Sprintf("/etc/systemd/system/%s", systemdServiceName)
 	return os.Remove(filename)
 }
 
 // removeConfig removes configuration file
-func removeConfig(c *UninstallConfig) error {
+func removeConfig() error {
 	log.Info("Remove config file")
-	filename := fmt.Sprintf("/etc/%s.json", c.BinaryName)
-	return os.Remove(filename)
+	return os.Remove(filepath.Clean(fmt.Sprintf("/etc/%s.json", executableName)))
 }
 
 // removeBinary removes binary
-func removeBinary(c *UninstallConfig) error {
+func removeBinary() error {
 	log.Info("Remove agent")
-	filename := fmt.Sprintf("/usr/bin/%s", c.BinaryName)
-	return os.Remove(filename)
+	return os.Remove(filepath.Clean(fmt.Sprintf("/usr/bin/%s", executableName)))
 }
 
 // uninstallFailed signales uninstall failed with error
