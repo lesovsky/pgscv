@@ -89,6 +89,7 @@ func Test_parseProcStat(t *testing.T) {
 
 	// open invalid file
 	file, err = os.Open(filepath.Clean("testdata/proc/stat.invalid.golden"))
+	assert.NoError(t, err)
 	_, err = parseProcStat(file)
 	assert.Error(t, err)
 

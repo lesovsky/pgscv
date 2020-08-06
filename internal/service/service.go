@@ -182,9 +182,7 @@ func (repo *Repository) markServiceHealthy(id string) {
 // removeService removes service from the repo.
 func (repo *Repository) removeService(id string) {
 	repo.Lock()
-	if _, ok := repo.Services[id]; ok {
-		delete(repo.Services, id)
-	}
+	delete(repo.Services, id)
 	repo.Unlock()
 }
 

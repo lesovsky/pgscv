@@ -186,7 +186,7 @@ func countCPUCores(path string) (float64, float64, error) {
 
 		file := d + "/online"
 		if re.MatchString(d) {
-			content, err := ioutil.ReadFile(file)
+			content, err := ioutil.ReadFile(filepath.Clean(file))
 			if err != nil {
 				return 0, 0, err
 			}
@@ -198,9 +198,9 @@ func countCPUCores(path string) (float64, float64, error) {
 
 			switch string(line) {
 			case "0":
-				offlineCnt += 1
+				offlineCnt++
 			case "1":
-				onlineCnt += 1
+				onlineCnt++
 			default:
 				log.Warnf("count cpu cores failed, bad value in %s: %s; skip", file, line)
 			}
@@ -238,7 +238,7 @@ func countScalingGovernors(path string) (map[string]float64, error) {
 		}
 
 		file := d + "/cpufreq" + "/scaling_governor"
-		content, err := ioutil.ReadFile(file)
+		content, err := ioutil.ReadFile(filepath.Clean(file))
 		if err != nil {
 			return nil, err
 		}

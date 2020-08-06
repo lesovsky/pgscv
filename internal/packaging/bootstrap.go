@@ -153,12 +153,12 @@ func installBin() error {
 	fromFilename := fmt.Sprintf("./%s", defaultExecutableName)
 	toFilename := fmt.Sprintf("/usr/bin/%s", defaultExecutableName)
 
-	from, err := os.Open(fromFilename)
+	from, err := os.Open(filepath.Clean(fromFilename))
 	if err != nil {
 		return fmt.Errorf("open file failed: %s", err)
 
 	}
-	to, err := os.OpenFile(toFilename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	to, err := os.OpenFile(filepath.Clean(toFilename), os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("open destination file failed: %s", err)
 	}
@@ -171,6 +171,10 @@ func installBin() error {
 	}
 	if err = to.Close(); err != nil {
 		log.Warnln("close destination file failed, ignore it; ", err)
+	}
+	err = os.Chmod(toFilename, 0755) // #nosec G302
+	if err != nil {
+		return fmt.Errorf("chmod 0755 failed: %s", err)
 	}
 	return nil
 }

@@ -247,7 +247,7 @@ func getStorageProperties(path string, ignore *regexp.Regexp) ([]storageDevicePr
 func getDeviceRotational(devpath string) (string, error) {
 	rotationalFile := devpath + "/queue/rotational"
 
-	content, err := ioutil.ReadFile(rotationalFile)
+	content, err := ioutil.ReadFile(filepath.Clean(rotationalFile))
 	if err != nil {
 		return "", err
 	}
@@ -274,7 +274,7 @@ func getDeviceScheduler(devpath string) (sched string, err error) {
 
 	schedulerFile := devpath + "/queue/scheduler"
 
-	content, err := ioutil.ReadFile(schedulerFile)
+	content, err := ioutil.ReadFile(filepath.Clean(schedulerFile))
 	if err != nil {
 		return "", err
 	}

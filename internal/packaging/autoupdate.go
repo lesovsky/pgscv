@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -211,7 +212,7 @@ func extractDistribution() error {
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.Mkdir(header.Name, 0755); err != nil {
+			if err := os.Mkdir(header.Name, 0750); err != nil {
 				return err
 			}
 		case tar.TypeReg:
@@ -219,7 +220,9 @@ func extractDistribution() error {
 			if err != nil {
 				return err
 			}
-			if _, err := io.Copy(outFile, tarReader); err != nil {
+			// TODO: warning excluded because it's not clear how to fix it.
+			_, err = io.Copy(outFile, tarReader) // #nosec G110
+			if err != nil {
 				return err
 			}
 			err = outFile.Close()
@@ -253,7 +256,7 @@ func updateBinary() error {
 		return fmt.Errorf("open file failed: %s", err)
 
 	}
-	to, err := os.OpenFile(toFilename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0755)
+	to, err := os.OpenFile(toFilename, os.O_CREATE|os.O_RDWR|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("open destination file failed: %s", err)
 	}
@@ -266,6 +269,10 @@ func updateBinary() error {
 	}
 	if err = to.Close(); err != nil {
 		log.Warnln("close destination file failed, ignore it; ", err)
+	}
+	err = os.Chmod(toFilename, 0755) // #nosec G302
+	if err != nil {
+		return fmt.Errorf("chmod 0755 failed: %s", err)
 	}
 
 	// run service restart
@@ -335,7 +342,7 @@ func downloadFile(url, file string) error {
 // hashSha256 calculates sha256 for specified file
 func hashSha256(filename string) (string, error) {
 	log.Debugf("calculating sha256 checksum for %s", filename)
-	f, err := os.Open(filename)
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return "", err
 	}

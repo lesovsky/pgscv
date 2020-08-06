@@ -31,7 +31,7 @@ func Test_parseDiskstats(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	re := regexp.MustCompile("^(ram|loop|fd|dm-|(h|s|v|xv)d[a-z]|nvme\\d+n\\d+p)\\d+$")
+	re := regexp.MustCompile(`^(ram|loop|fd|dm-|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)
 	stats, err := parseDiskstats(file, re)
 	assert.NoError(t, err)
 
