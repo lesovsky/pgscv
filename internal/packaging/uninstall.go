@@ -56,20 +56,20 @@ func stopAgent() error {
 // removeServiceUnit removes systemd unit file
 func removeServiceUnit() error {
 	log.Info("Remove systemd unit")
-	filename := fmt.Sprintf("/etc/systemd/system/%s", systemdServiceName)
+	filename := fmt.Sprintf("%s/%s", defaultSystemdPathPrefix, systemdServiceName)
 	return os.Remove(filename)
 }
 
 // removeConfig removes configuration file
 func removeConfig() error {
 	log.Info("Remove config file")
-	return os.Remove(filepath.Clean(fmt.Sprintf("/etc/%s.json", executableName)))
+	return os.Remove(filepath.Clean(fmt.Sprintf("%s/%s.json", defaultConfigPathPrefix, defaultExecutableName)))
 }
 
 // removeBinary removes binary
 func removeBinary() error {
 	log.Info("Remove agent")
-	return os.Remove(filepath.Clean(fmt.Sprintf("/usr/bin/%s", executableName)))
+	return os.Remove(filepath.Clean(fmt.Sprintf("/usr/bin/%s", defaultExecutableName)))
 }
 
 // uninstallFailed signales uninstall failed with error

@@ -15,7 +15,7 @@ import (
 const confFileTemplate = `{
   "autoupdate_url": "{{ .AutoUpdateURL}}",
   "api_key": "{{ .APIKey }}",
-  "project_id": "{{ .ProjectID }}",
+  "project_id": {{ .ProjectID }},
   "metrics_service_url": "{{ .MetricServiceBaseURL }}",
   "defaults": {
     "postgres_username": "pgscv",
@@ -66,6 +66,9 @@ type BootstrapConfig struct {
 	ProjectID                string
 	DefaultPostgresPassword  string
 	DefaultPgbouncerPassword string
+	//
+	configPathPrefix  string // path prefix for configuration file
+	systemdPathPrefix string // path prefix for systemd units
 }
 
 func (c *BootstrapConfig) Validate() error {
@@ -93,7 +96,9 @@ func (c *BootstrapConfig) Validate() error {
 		return fmt.Errorf("PGSCV_PROJECT_ID is not defined")
 	}
 
-	c.ExecutableName = executableName
+	c.ExecutableName = defaultExecutableName
+	c.configPathPrefix = defaultConfigPathPrefix
+	c.systemdPathPrefix = defaultSystemdPathPrefix
 
 	return nil
 }
@@ -145,8 +150,8 @@ func RunBootstrap(config *BootstrapConfig) int {
 // installs agent binary
 func installBin() error {
 	log.Info("Install agent")
-	fromFilename := fmt.Sprintf("./%s", executableName)
-	toFilename := fmt.Sprintf("/usr/bin/%s", executableName)
+	fromFilename := fmt.Sprintf("./%s", defaultExecutableName)
+	toFilename := fmt.Sprintf("/usr/bin/%s", defaultExecutableName)
 
 	from, err := os.Open(fromFilename)
 	if err != nil {
@@ -180,7 +185,7 @@ func createConfigFile(config *BootstrapConfig) error {
 	}
 
 	// create config-file with proper permissions
-	conffile := fmt.Sprintf("/etc/%s.json", executableName)
+	conffile := fmt.Sprintf("%s/%s.json", config.configPathPrefix, config.ExecutableName)
 	f, err := os.Create(conffile)
 	if err != nil {
 		return fmt.Errorf("create config file failed: %s", err)
@@ -219,7 +224,7 @@ func createSystemdUnit(config *BootstrapConfig) error {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	unitfile := fmt.Sprintf("/etc/systemd/system/%s", systemdServiceName)
+	unitfile := fmt.Sprintf("%s/%s", config.systemdPathPrefix, systemdServiceName)
 	f, err := os.Create(unitfile)
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
@@ -293,7 +298,7 @@ func runAgent() error {
 // delete self executable
 func deleteSelf() error {
 	log.Info("Cleanup")
-	return os.Remove(filepath.Clean(fmt.Sprintf("./%s", executableName)))
+	return os.Remove(filepath.Clean(fmt.Sprintf("./%s", defaultExecutableName)))
 }
 
 // bootstrapFailed signales bootstrap failed with error

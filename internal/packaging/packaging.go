@@ -7,8 +7,11 @@ import (
 )
 
 const (
-	executableName     = "pgscv"
-	systemdServiceName = "pgscv.service"
+	defaultExecutableName = "pgscv"
+	systemdServiceName    = "pgscv.service"
+
+	defaultConfigPathPrefix  = "/etc"
+	defaultSystemdPathPrefix = "/etc/systemd/system"
 )
 
 // run pre-bootstrap checks
