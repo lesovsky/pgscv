@@ -59,8 +59,7 @@ func Start(ctx context.Context, config *Config) error {
 	case model.RuntimePushMode:
 		return runPushMode(ctx, config, serviceRepo)
 	default:
-		log.Errorf("unknown mode selected: %d, quit", config.RuntimeMode)
-		return nil
+		return fmt.Errorf("unknown mode selected: %d, quit", config.RuntimeMode)
 	}
 }
 

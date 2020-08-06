@@ -15,6 +15,46 @@ import (
 	"time"
 )
 
+func TestStart(t *testing.T) {
+	t.Run("pull mode", func(t *testing.T) {
+		pullModeConfig := &Config{RuntimeMode: model.RuntimePullMode, ListenAddress: "127.0.0.1:5002"}
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+
+		assert.NoError(t, Start(ctx, pullModeConfig))
+		cancel()
+
+		http.DefaultServeMux = new(http.ServeMux) // clean http environment (which may be dirtied by other concurrently running tests)
+	})
+
+	t.Run("push mode", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Regexp(t, regexp.MustCompile(`/metrics/job/db_system_[a-f0-9]{32}_system%3A0`), r.URL.String())
+			body, err := ioutil.ReadAll(r.Body)
+			assert.NoError(t, err)
+			assert.Greater(t, len(body), 0)
+
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		defer server.Close()
+		pushModeConfig := &Config{
+			RuntimeMode: model.RuntimePushMode,
+			APIKey:      "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+			MetricsServiceURL: server.URL, MetricsSendInterval: 2 * time.Second,
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		defer cancel()
+
+		assert.NoError(t, Start(ctx, pushModeConfig))
+	})
+
+	t.Run("unknown mode", func(t *testing.T) {
+		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+		assert.Error(t, Start(ctx, &Config{RuntimeMode: -1}))
+		cancel()
+	})
+}
+
 func Test_runPullMode(t *testing.T) {
 	config := &Config{RuntimeMode: model.RuntimePullMode, ListenAddress: "127.0.0.1:5001"}
 	wg := sync.WaitGroup{}
@@ -56,6 +96,8 @@ func Test_runPullMode(t *testing.T) {
 
 	// Waiting for listener goroutine.
 	wg.Wait()
+
+	http.DefaultServeMux = new(http.ServeMux) // clean http environment (which may be dirtied by other concurrently running tests)
 }
 
 func Test_runPushMode(t *testing.T) {
@@ -72,7 +114,11 @@ func Test_runPushMode(t *testing.T) {
 	defer server.Close()
 
 	// Prepare stuff, create repo with default 'system' service.
-	config := &Config{APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1, MetricsServiceURL: server.URL, MetricsSendInterval: 600 * time.Millisecond}
+	config := &Config{
+		RuntimeMode: model.RuntimePushMode,
+		APIKey:      "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+		MetricsServiceURL: server.URL, MetricsSendInterval: 600 * time.Millisecond,
+	}
 	repo := service.NewRepository()
 	serviceConfig := service.Config{
 		RuntimeMode:  model.RuntimePushMode,
