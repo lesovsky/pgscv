@@ -1,6 +1,7 @@
 package pgscv
 
 import (
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/stretchr/testify/assert"
@@ -56,6 +57,19 @@ func TestNewConfig(t *testing.T) {
 				ServicesConnSettings: []service.ConnSetting{
 					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 dbname=test user=test"},
 					{ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=test user=test"},
+				},
+			},
+		},
+		{
+			name:  "valid: with filters",
+			valid: true,
+			file:  "testdata/pgscv-filters-example.json",
+			want: &Config{
+				ListenAddress: "127.0.0.1:8080",
+				Defaults:      map[string]string{},
+				Filters: map[string]filter.Filter{
+					"diskstats/device": {Exclude: "^(test|example)$"},
+					"netdev/device":    {Include: "^(test|example)$"},
 				},
 			},
 		},
@@ -135,6 +149,11 @@ func TestConfig_Validate(t *testing.T) {
 				{ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid"},
 			}},
 		},
+		{
+			name:  "invalid config: invalid filter",
+			valid: false,
+			in:    &Config{ListenAddress: "127.0.0.1:8080", Filters: map[string]filter.Filter{"test": {Include: "["}}},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -142,6 +161,7 @@ func TestConfig_Validate(t *testing.T) {
 			err := tc.in.Validate()
 			if tc.valid {
 				assert.NoError(t, err)
+				assert.NotNil(t, tc.in.Filters)
 			} else {
 				assert.Error(t, err)
 			}

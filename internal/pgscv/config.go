@@ -3,6 +3,7 @@ package pgscv
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
@@ -23,17 +24,18 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryVersion        string                // version of the program, required for auto-update procedure
-	AutoUpdateURL        string                `json:"autoupdate_url"` // URL used for auto-update
-	RuntimeMode          int                   // application runtime mode
-	AllowTrackSensitive  bool                  `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                `json:"listen_address"`        // Network address and port where the application should listen on
-	MetricsServiceURL    string                `json:"metrics_service_url"`   // URL of Weaponry service metric gateway
-	MetricsSendInterval  time.Duration         // Metric send interval
-	APIKey               string                `json:"api_key"`    // API key for accessing to Weaponry
-	ProjectID            int                   `json:"project_id"` // ProjectID specifies project_id label value
-	ServicesConnSettings []service.ConnSetting `json:"services"`   // Slice of connection settings for exact services
-	Defaults             map[string]string     `json:"defaults"`   // Defaults
+	BinaryVersion        string                   // version of the program, required for auto-update procedure
+	AutoUpdateURL        string                   `json:"autoupdate_url"` // URL used for auto-update
+	RuntimeMode          int                      // application runtime mode
+	AllowTrackSensitive  bool                     `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
+	ListenAddress        string                   `json:"listen_address"`        // Network address and port where the application should listen on
+	MetricsServiceURL    string                   `json:"metrics_service_url"`   // URL of Weaponry service metric gateway
+	MetricsSendInterval  time.Duration            // Metric send interval
+	APIKey               string                   `json:"api_key"`    // API key for accessing to Weaponry
+	ProjectID            int                      `json:"project_id"` // ProjectID specifies project_id label value
+	ServicesConnSettings []service.ConnSetting    `json:"services"`   // Slice of connection settings for exact services
+	Defaults             map[string]string        `json:"defaults"`   // Defaults
+	Filters              map[string]filter.Filter `json:"filters"`
 }
 
 // NewConfig creates new config based on config file.
@@ -110,6 +112,15 @@ func (c *Config) Validate() error {
 				}
 			}
 		}
+	}
+
+	// Add default filters and compile regexps.
+	if c.Filters == nil {
+		c.Filters = make(map[string]filter.Filter)
+	}
+	filter.DefaultFilters(c.Filters)
+	if err := filter.CompileFilters(c.Filters); err != nil {
+		return err
 	}
 
 	return nil

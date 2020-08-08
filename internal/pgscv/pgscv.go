@@ -29,6 +29,7 @@ func Start(ctx context.Context, config *Config) error {
 		ProjectID:           strconv.Itoa(config.ProjectID),
 		ConnDefaults:        config.Defaults,
 		ConnSettings:        config.ServicesConnSettings,
+		Filters:             config.Filters,
 	}
 
 	if config.ServicesConnSettings == nil {

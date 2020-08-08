@@ -4,36 +4,25 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
 
-const (
-	reFilterFilesystemPattern = `^(ext3|ext4|xfs|btrfs)$`
-)
-
 type filesystemCollector struct {
-	filterFilesystemPattern *regexp.Regexp
-	bytes                   typedDesc
-	files                   typedDesc
+	bytes typedDesc
+	files typedDesc
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
 func NewFilesystemCollector(labels prometheus.Labels) (Collector, error) {
-	re, err := regexp.Compile(reFilterFilesystemPattern)
-	if err != nil {
-		return nil, err
-	}
-
 	return &filesystemCollector{
-		filterFilesystemPattern: re,
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "filesystem", "bytes"),
@@ -52,8 +41,8 @@ func NewFilesystemCollector(labels prometheus.Labels) (Collector, error) {
 }
 
 // Update method collects filesystem usage statistics.
-func (c *filesystemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
-	stats, err := getFilesystemStats(c.filterFilesystemPattern)
+func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+	stats, err := getFilesystemStats(config.Filters)
 	if err != nil {
 		return fmt.Errorf("get filesystem stats failed: %s", err)
 	}
@@ -88,19 +77,19 @@ type filesystemStat struct {
 }
 
 // getFilesystemStats opens stats file and execute stats parser.
-func getFilesystemStats(filter *regexp.Regexp) ([]filesystemStat, error) {
+func getFilesystemStats(filters map[string]filter.Filter) ([]filesystemStat, error) {
 	file, err := os.Open("/proc/mounts")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseFilesystemStats(file, filter)
+	return parseFilesystemStats(file, filters)
 }
 
 // parseFilesystemStats parses stats file and return stats.
-func parseFilesystemStats(r io.Reader, filter *regexp.Regexp) ([]filesystemStat, error) {
-	stats, err := parseProcMounts(r, filter)
+func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]filesystemStat, error) {
+	stats, err := parseProcMounts(r, filters)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +164,7 @@ func readMountpointStat(mountpoint string, ch chan filesystemStat, wg *sync.Wait
 }
 
 // parseProcMounts parses /proc/mounts and returns slice of stats with filled filesystems properties (but without stats values).
-func parseProcMounts(r io.Reader, filter *regexp.Regexp) ([]filesystemStat, error) {
+func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]filesystemStat, error) {
 	var (
 		scanner = bufio.NewScanner(r)
 		stats   []filesystemStat
@@ -190,9 +179,11 @@ func parseProcMounts(r io.Reader, filter *regexp.Regexp) ([]filesystemStat, erro
 		}
 
 		fstype := parts[2]
-		if filter != nil && !filter.MatchString(fstype) {
-			log.Debugln("ignore filesystem ", fstype)
-			continue
+		if f, ok := filters["filesystem/fstype"]; ok {
+			if !f.Pass(fstype) {
+				log.Debugln("ignore filesystem ", fstype)
+				continue
+			}
 		}
 
 		s := filesystemStat{

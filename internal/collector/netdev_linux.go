@@ -3,30 +3,24 @@ package collector
 import (
 	"bufio"
 	"fmt"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
 	"os"
-	"regexp"
 	"strconv"
 	"strings"
 )
 
-const (
-	netdevIgnoredDevicePattern = `docker|virbr`
-)
-
 type netdevCollector struct {
-	ignoredDevicePattern *regexp.Regexp
-	bytes                typedDesc
-	packets              typedDesc
-	events               typedDesc
+	bytes   typedDesc
+	packets typedDesc
+	events  typedDesc
 }
 
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
 func NewNetdevCollector(labels prometheus.Labels) (Collector, error) {
 	return &netdevCollector{
-		ignoredDevicePattern: regexp.MustCompile(netdevIgnoredDevicePattern),
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "network", "bytes_total"),
@@ -52,8 +46,8 @@ func NewNetdevCollector(labels prometheus.Labels) (Collector, error) {
 }
 
 // Update method collects network interfaces statistics
-func (c *netdevCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
-	stats, err := getNetdevStats(c.ignoredDevicePattern)
+func (c *netdevCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+	stats, err := getNetdevStats(config.Filters["netdev/device"])
 	if err != nil {
 		return fmt.Errorf("get /proc/net/dev stats failed: %s", err)
 	}
@@ -89,18 +83,18 @@ func (c *netdevCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 }
 
 // getNetdevStats is the intermediate function which opens stats file and run stats parser for extracting stats.
-func getNetdevStats(ignore *regexp.Regexp) (map[string][]float64, error) {
+func getNetdevStats(filter filter.Filter) (map[string][]float64, error) {
 	file, err := os.Open("/proc/net/dev")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseNetdevStats(file, ignore)
+	return parseNetdevStats(file, filter)
 }
 
 // parseNetdevStats accepts file descriptor, reads file content and produces stats.
-func parseNetdevStats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64, error) {
+func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
 	scanner := bufio.NewScanner(r)
 
 	// Stats file /proc/net/dev has header consisting of two lines. Read the header and check content to make sure this is proper file.
@@ -118,7 +112,7 @@ func parseNetdevStats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64,
 		values := strings.Fields(scanner.Text())
 
 		device := strings.TrimRight(values[0], ":")
-		if ignore != nil && ignore.MatchString(device) {
+		if !filter.Pass(device) {
 			log.Debugln("ignore device ", device)
 			continue
 		}

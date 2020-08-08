@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
@@ -20,8 +21,11 @@ type Config struct {
 	AllowTrackSensitive bool
 	// PostgresServiceConfig defines collector's options specific for Postgres service
 	PostgresServiceConfig
+	// Filters are user-defined regular expressions allow to include/exclude collecting various stats.
+	Filters map[string]filter.Filter
 }
 
+// PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
 type PostgresServiceConfig struct {
 	// ServerVersionNum defines version of Postgres in XXYYZZ format.
 	ServerVersionNum int

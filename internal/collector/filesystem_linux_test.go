@@ -2,6 +2,7 @@ package collector
 
 import (
 	"context"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -27,7 +28,11 @@ func Test_parseFilesystemStats(t *testing.T) {
 	file, err := os.Open(filepath.Clean("testdata/proc/mounts.golden"))
 	assert.NoError(t, err)
 
-	stats, err := parseFilesystemStats(file, regexp.MustCompile(`^tmpfs`))
+	ff := map[string]filter.Filter{
+		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^tmpfs`)},
+	}
+
+	stats, err := parseFilesystemStats(file, ff)
 	assert.NoError(t, err)
 	assert.Greater(t, len(stats), 1)
 	assert.Greater(t, stats[0].size, float64(0))
@@ -53,9 +58,11 @@ func Test_parseProcMounts(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	filter := regexp.MustCompile(`^(ext3|ext4|xfs|btrfs)$`)
+	ff := map[string]filter.Filter{
+		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^(ext3|ext4|xfs|btrfs)$`)},
+	}
 
-	stats, err := parseProcMounts(file, filter)
+	stats, err := parseProcMounts(file, ff)
 	assert.NoError(t, err)
 
 	want := []filesystemStat{

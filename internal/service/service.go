@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/collector"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
@@ -62,6 +63,7 @@ type Config struct {
 	ProjectID           string
 	ConnDefaults        map[string]string `json:"defaults"` // Defaults
 	ConnSettings        []ConnSetting
+	Filters             map[string]filter.Filter
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -365,6 +367,7 @@ func (repo *Repository) setupServices(config Config) error {
 				AllowTrackSensitive: config.AllowTrackSensitive,
 				ServiceType:         service.ConnSettings.ServiceType,
 				ConnString:          service.ConnSettings.Conninfo,
+				Filters:             config.Filters,
 			}
 
 			switch service.ConnSettings.ServiceType {

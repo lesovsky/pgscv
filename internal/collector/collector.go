@@ -12,9 +12,9 @@ type Factories map[string]func(prometheus.Labels) (Collector, error)
 // RegisterSystemCollectors unions all system-related collectors and registers them in single place.
 func (f Factories) RegisterSystemCollectors() {
 	f.register("cpu", NewCPUCollector)
-	f.register("disk", NewDiskstatsCollector)
+	f.register("diskstats", NewDiskstatsCollector)
 	f.register("filesystem", NewFilesystemCollector)
-	f.register("network", NewNetdevCollector)
+	f.register("netdev", NewNetdevCollector)
 	f.register("memory", NewMeminfoCollector)
 	f.register("system", NewSystemCollector)
 }

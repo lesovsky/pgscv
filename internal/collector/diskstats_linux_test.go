@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -31,8 +32,8 @@ func Test_parseDiskstats(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	re := regexp.MustCompile(`^(ram|loop|fd|dm-|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)
-	stats, err := parseDiskstats(file, re)
+	f := filter.Filter{ExcludeRE: regexp.MustCompile(`^(ram|loop|fd|dm-|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)}
+	stats, err := parseDiskstats(file, f)
 	assert.NoError(t, err)
 
 	want := map[string][]float64{
@@ -44,14 +45,14 @@ func Test_parseDiskstats(t *testing.T) {
 }
 
 func Test_getStorageProperties(t *testing.T) {
-	re := regexp.MustCompile(ignoredDevicesPattern)
+	f := filter.Filter{ExcludeRE: regexp.MustCompile(`^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)}
 
 	want := []storageDeviceProperties{
 		{device: "sda", rotational: "0", scheduler: "mq-deadline"},
 		{device: "sdb", rotational: "1", scheduler: "deadline"},
 	}
 
-	storages, err := getStorageProperties("testdata/sys/block/*", re)
+	storages, err := getStorageProperties("testdata/sys/block/*", f)
 	assert.NoError(t, err)
 	assert.Equal(t, want, storages)
 }

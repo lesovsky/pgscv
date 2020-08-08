@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
@@ -16,20 +17,18 @@ import (
 )
 
 const (
-	diskSectorSize        = 512
-	ignoredDevicesPattern = "^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\\d+n\\d+p)\\d+$"
+	diskSectorSize = 512
 )
 
 type diskstatsCollector struct {
-	ignoredDevicesPattern *regexp.Regexp
-	completed             typedDesc
-	merged                typedDesc
-	bytes                 typedDesc
-	times                 typedDesc
-	ionow                 typedDesc
-	iotime                typedDesc
-	iotimeweighted        typedDesc
-	storages              typedDesc
+	completed      typedDesc
+	merged         typedDesc
+	bytes          typedDesc
+	times          typedDesc
+	ionow          typedDesc
+	iotime         typedDesc
+	iotimeweighted typedDesc
+	storages       typedDesc
 }
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
@@ -38,7 +37,6 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 	var diskLabelNames = []string{"device", "type"}
 
 	return &diskstatsCollector{
-		ignoredDevicesPattern: regexp.MustCompile(ignoredDevicesPattern),
 		completed: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "disk", "completed_total"),
@@ -98,8 +96,8 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 	}, nil
 }
 
-func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
-	stats, err := getDiskstats(c.ignoredDevicesPattern)
+func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+	stats, err := getDiskstats(config.Filters["diskstats/device"])
 	if err != nil {
 		return fmt.Errorf("get diskstats failed: %s", err)
 	}
@@ -135,7 +133,7 @@ func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error
 	}
 
 	// Collect storages properties.
-	storages, err := getStorageProperties("/sys/block/*", c.ignoredDevicesPattern)
+	storages, err := getStorageProperties("/sys/block/*", config.Filters["diskstats/device"])
 	if err != nil {
 		log.Warnf("get storage devices properties failed: %s; skip", err)
 	} else {
@@ -148,18 +146,18 @@ func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error
 }
 
 // getDiskstats opens stats file and executes stats parser.
-func getDiskstats(ignore *regexp.Regexp) (map[string][]float64, error) {
+func getDiskstats(filter filter.Filter) (map[string][]float64, error) {
 	file, err := os.Open("/proc/diskstats")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseDiskstats(file, ignore)
+	return parseDiskstats(file, filter)
 }
 
 // parseDiskstat reads stats file and returns stats structs.
-func parseDiskstats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64, error) {
+func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
 	var scanner = bufio.NewScanner(r)
 	var stats = map[string][]float64{}
 
@@ -173,7 +171,7 @@ func parseDiskstats(r io.Reader, ignore *regexp.Regexp) (map[string][]float64, e
 		}
 
 		var device = values[2]
-		if ignore != nil && ignore.MatchString(device) {
+		if !filter.Pass(device) {
 			log.Debugln("ignore device ", device)
 			continue
 		}
@@ -203,7 +201,7 @@ type storageDeviceProperties struct {
 }
 
 // getStorageProperties reads storages properties.
-func getStorageProperties(path string, ignore *regexp.Regexp) ([]storageDeviceProperties, error) {
+func getStorageProperties(path string, filter filter.Filter) ([]storageDeviceProperties, error) {
 	dirs, err := filepath.Glob(path)
 	if err != nil {
 		return nil, err
@@ -215,7 +213,7 @@ func getStorageProperties(path string, ignore *regexp.Regexp) ([]storageDevicePr
 		parts := strings.Split(devpath, "/")
 		device := parts[len(parts)-1]
 
-		if ignore != nil && ignore.MatchString(device) {
+		if !filter.Pass(device) {
 			log.Debugln("skip device ", device)
 			continue
 		}

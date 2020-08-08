@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -26,8 +27,8 @@ func Test_parseNetdevStats(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	re := regexp.MustCompile(`docker|br-ed|virbr`)
-	stats, err := parseNetdevStats(file, re)
+	f := filter.Filter{ExcludeRE: regexp.MustCompile(`docker|br-ed|virbr`)}
+	stats, err := parseNetdevStats(file, f)
 	assert.NoError(t, err)
 
 	want := map[string][]float64{
