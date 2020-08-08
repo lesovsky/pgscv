@@ -20,7 +20,7 @@ func TestPostgresService() Service {
 		ProjectID: "1",
 		ConnSettings: ConnSetting{
 			ServiceType: model.ServiceTypePostgresql,
-			Conninfo:    "host=127.0.0.1 port=5432 user=pgscv dbname=postgres",
+			Conninfo:    "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures",
 		},
 	}
 }

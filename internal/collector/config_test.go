@@ -11,7 +11,7 @@ func TestNewPostgresServiceConfig(t *testing.T) {
 		connStr string
 		valid   bool
 	}{
-		{name: "valid config", connStr: "host=postgres dbname=postgres user=postgres", valid: true},
+		{name: "valid config", connStr: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv", valid: true},
 		{name: "invalid config", connStr: "invalid", valid: false},
 	}
 

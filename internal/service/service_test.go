@@ -87,7 +87,7 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 		{
 			name: "valid",
 			config: Config{ConnSettings: []ConnSetting{
-				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
 			}},
 			expected: 2,
 		},
@@ -143,7 +143,7 @@ func TestRepository_setupServices(t *testing.T) {
 			name: "valid",
 			config: Config{
 				ConnSettings: []ConnSetting{
-					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
 				},
 			},
 			expected: 2,
@@ -153,7 +153,7 @@ func TestRepository_setupServices(t *testing.T) {
 			config: Config{
 				RuntimeMode: model.RuntimePullMode,
 				ConnSettings: []ConnSetting{
-					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=postgres"},
+					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
 				},
 			},
 			expected: 2,

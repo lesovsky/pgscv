@@ -15,8 +15,8 @@ func TestNew(t *testing.T) {
 		valid bool
 	}{
 		{dsn: testPostgresConnStr, valid: true},
-		{dsn: "host=127.0.0.1 dbname=postgres user=postgres sslmode=require", valid: true},
-		{dsn: "host=127.0.0.1 dbname=invalid user=postgres sslmode=disable", valid: false},
+		{dsn: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv sslmode=require", valid: true},
+		{dsn: "host=127.0.0.1 dbname=invalid user=pgscv sslmode=disable", valid: false},
 		{dsn: "invalid_string", valid: false},
 	}
 

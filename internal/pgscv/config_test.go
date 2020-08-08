@@ -55,8 +55,8 @@ func TestNewConfig(t *testing.T) {
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
 				ServicesConnSettings: []service.ConnSetting{
-					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 dbname=test user=test"},
-					{ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=test user=test"},
+					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 dbname=pgscv_fixtures user=pgscv"},
+					{ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=pgbouncer user=pgscv"},
 				},
 			},
 		},
@@ -131,15 +131,15 @@ func TestConfig_Validate(t *testing.T) {
 			name:  "valid config with specified services",
 			valid: true,
 			in: &Config{ListenAddress: "127.0.0.1:8080", ServicesConnSettings: []service.ConnSetting{
-				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 dbname=postgres user=postgres"},
-				{ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=pgbouncer user=pgbouncer"},
+				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv"},
+				{ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=pgbouncer user=pgscv"},
 			}},
 		},
 		{
 			name:  "invalid config with specified services: empty service type",
 			valid: false,
 			in: &Config{ListenAddress: "127.0.0.1:8080", ServicesConnSettings: []service.ConnSetting{
-				{ServiceType: "", Conninfo: "host=127.0.0.1 dbname=postgres user=postgres"},
+				{ServiceType: "", Conninfo: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv"},
 			}},
 		},
 		{

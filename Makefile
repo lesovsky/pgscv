@@ -28,7 +28,6 @@ lint: ## Lint the source files
 	golangci-lint run --timeout 5m -E golint -e '(struct field|type|method|func) [a-zA-Z`]+ should be [a-zA-Z`]+'
 	gosec -quiet ./...
 
-# -parallel 1 is used because the almost all test are parallel unsafe, use TRUNCATE for cleanup and break neighbour tests
 test: dep ## Run tests
 	go test -race -timeout 300s -coverprofile=.test_coverage.txt ./... && \
     	go tool cover -func=.test_coverage.txt | tail -n1 | awk '{print "Total test coverage: " $$3}'
@@ -37,19 +36,13 @@ test: dep ## Run tests
 race: dep ## Run data race detector
 	go test -race -short -timeout 300s -p 1 ./...
 
-#coverage: ## Generate global code coverage report
-#  ./tools/coverage.sh;
-#
-#coverhtml: ## Generate global code coverage report in HTML
-#  ./tools/coverage.sh html;
-
 build: dep ## Build
 	mkdir -p ./bin
 	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${APPNAME} ./cmd/pgscv
-#	cd bin; \
-#		tar czf ${APPNAME}.tar.gz ${APPNAME} && \
-#		sha256sum ${APPNAME}.tar.gz > ${APPNAME}.sha256 && \
-#		echo ${COMMIT}-${BRANCH} > ${APPNAME}.version
+	cd bin; \
+		tar czf ${APPNAME}.tar.gz ${APPNAME} && \
+		sha256sum ${APPNAME}.tar.gz > ${APPNAME}.sha256 && \
+		echo ${COMMIT}-${BRANCH} > ${APPNAME}.version
 
 docker-build: ## Build docker image
 	mkdir -p ./bin
