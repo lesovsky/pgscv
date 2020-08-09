@@ -34,7 +34,7 @@ PGSCV_PROJECT_ID=\$1 \
 PGSCV_API_KEY=\$2
 
 # download and extract agent
-curl -s ${PGSCV_AUTOUPDATE_URL}/pgscv.tar.gz -o - | tar xzf -
+curl -s https://dist.${BASE_DOMAIN}/pgscv.tar.gz -o - | tar xzf -
 
 # run agent bootstrap using passed key
 ./pgscv --bootstrap
