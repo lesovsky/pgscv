@@ -12,11 +12,13 @@ func TestSystemCollector_Update(t *testing.T) {
 		required: []string{
 			"node_system_sysctl",
 			"node_system_cpu_cores_total",
-			"node_system_scaling_governors_total",
 			"node_system_numa_nodes_total",
 			"node_context_switches_total",
 			"node_forks_total",
 			"node_boot_time_seconds",
+		},
+		optional: []string{
+			"node_system_scaling_governors_total",
 		},
 		collector: NewSystemCollector,
 	}
