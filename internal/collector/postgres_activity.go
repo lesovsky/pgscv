@@ -23,8 +23,8 @@ FROM pg_stat_activity`
     coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
     coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
     left(query, 32) as query
-FROM pg_stat_activity
-`
+FROM pg_stat_activity`
+
 	postgresPreparedXactQuery = `SELECT count(*) AS total FROM pg_prepared_xacts`
 
 	// Backend states accordingly to pg_stat_activity.state
@@ -128,13 +128,15 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	ch <- c.prepared.mustNewConstMetric(stats.prepared)
 
 	// activity max times
+	ch <- c.activity.mustNewConstMetric(stats.maxIdleUser, "idle_xact", "user")
+	ch <- c.activity.mustNewConstMetric(stats.maxIdleMaint, "idle_xact", "maintenance")
 	ch <- c.activity.mustNewConstMetric(stats.maxRunUser, "running", "user")
 	ch <- c.activity.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
 	ch <- c.activity.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
 	ch <- c.activity.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
-	ch <- c.inflight.mustNewConstMetric(stats.querySelect, "select")
 
 	// in flight queries
+	ch <- c.inflight.mustNewConstMetric(stats.querySelect, "select")
 	ch <- c.inflight.mustNewConstMetric(stats.queryMod, "mod")
 	ch <- c.inflight.mustNewConstMetric(stats.queryDdl, "ddl")
 	ch <- c.inflight.mustNewConstMetric(stats.queryMaint, "maintenance")
@@ -161,6 +163,8 @@ type postgresActivityStat struct {
 	other        float64 // state IN ('fastpath function call','disabled')
 	waiting      float64 // wait_event_type = 'Lock' (or waiting = 't')
 	prepared     float64 // FROM pg_prepared_xacts
+	maxIdleUser  float64 // longest duration among idle transactions opened by user
+	maxIdleMaint float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
 	maxRunUser   float64 // longest duration among client queries
 	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
 	maxWaitUser  float64 // longest duration being in waiting state (all activity)
@@ -224,7 +228,11 @@ func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
 					state := row[stateIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
-					stats.updateMaxRuntimeDuration(value, state, event, query)
+					if state == stIdleXact || state == stIdleXactAborted {
+						stats.updateMaxIdletimeDuration(value, state, query)
+					} else {
+						stats.updateMaxRuntimeDuration(value, state, event, query)
+					}
 				}
 			case "since_change_seconds":
 				eventIdx := colindexes[waitColumnName]
@@ -272,6 +280,44 @@ func (s *postgresActivityStat) updateState(state string) {
 	}
 }
 
+// updateMaxIdletimeDuration updates max duration of idle transactions activity.
+func (s *postgresActivityStat) updateMaxIdletimeDuration(value string, state string, query string) {
+	// necessary values should not be empty (except wait_event_type)
+	if value == "" || state == "" || query == "" {
+		return
+	}
+
+	// don't account time for any activity except idle xacts.
+	if state != stIdleXact && state != stIdleXactAborted {
+		return
+	}
+
+	v, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		log.Errorf("skip collecting max idle time duration metric: %s", err)
+		return
+	}
+
+	// all validations ok, update stats
+
+	// inspect query - is ia a user activity like queries, or maintenance tasks like automatic or regular vacuum/analyze.
+	re, err := regexp.Compile(regexpMaintenanceActivity)
+	if err != nil {
+		log.Errorf("skip collecting max idle time duration metric: %s", err)
+		return
+	}
+
+	if re.MatchString(query) {
+		if v > s.maxIdleMaint {
+			s.maxIdleMaint = v
+		}
+	} else {
+		if v > s.maxIdleUser {
+			s.maxIdleUser = v
+		}
+	}
+}
+
 // updateMaxRuntimeDuration updates max duration o frunning activity.
 func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state string, etype string, query string) {
 	// necessary values should not be empty (except wait_event_type)
@@ -286,7 +332,7 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state stri
 
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		log.Errorf("skip collecting max duration metric: %s", err)
+		log.Errorf("skip collecting max run time duration metric: %s", err)
 		return
 	}
 
@@ -300,7 +346,6 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state stri
 	}
 
 	if re.MatchString(query) {
-
 		if v > s.maxRunMaint {
 			s.maxRunMaint = v
 		}

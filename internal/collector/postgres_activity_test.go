@@ -51,6 +51,10 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 						{String: "20", Valid: true}, {String: "20", Valid: true}, {String: "SELECT idle in transaction", Valid: true},
 					},
 					{
+						{String: "idle in transaction", Valid: true}, {String: "Client", Valid: true}, {String: "ClientRead", Valid: true},
+						{String: "28", Valid: true}, {String: "18", Valid: true}, {String: "ANALYZE example", Valid: true},
+					},
+					{
 						{String: "idle in transaction (aborted)", Valid: true}, {String: "Client", Valid: true}, {String: "ClientRead", Valid: true},
 						{String: "15", Valid: true}, {String: "15", Valid: true}, {String: "SELECT idle in transaction", Valid: true},
 					},
@@ -68,8 +72,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				},
 			},
 			want: postgresActivityStat{
-				active: 6, idle: 1, idlexact: 2, other: 1, waiting: 2,
-				maxRunUser: 20, maxRunMaint: 9, maxWaitUser: 13, maxWaitMaint: 12,
+				active: 6, idle: 1, idlexact: 3, other: 1, waiting: 2,
+				maxIdleUser: 20, maxIdleMaint: 28, maxRunUser: 10, maxRunMaint: 9, maxWaitUser: 13, maxWaitMaint: 12,
 				querySelect: 1, queryMod: 1, queryMaint: 4,
 			},
 		},
