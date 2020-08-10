@@ -27,14 +27,14 @@ func NewFilesystemCollector(labels prometheus.Labels) (Collector, error) {
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "filesystem", "bytes"),
 				"Total number of bytes of filesystem by each type.",
-				[]string{"device", "mountpoint", "fstype", "type"}, labels,
+				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
 		files: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "filesystem", "files"),
 				"Total number of files (inodes) of filesystem by each type.",
-				[]string{"device", "mountpoint", "fstype", "type"}, labels,
+				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
