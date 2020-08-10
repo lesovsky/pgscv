@@ -1,0 +1,4 @@
+/dev/mapper/ssd-root / ext4 rw,relatime,discard,errors=remount-ro 0 0
+/dev/sda1 /boot ext3 rw,relatime 0 0
+/dev/mapper/ssd-data /data ext4 rw,relatime,discard 0 0
+/dev/sdc1 /archive xfs rw,relatime 0 0

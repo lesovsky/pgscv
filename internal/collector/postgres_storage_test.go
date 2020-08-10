@@ -5,10 +5,16 @@ import (
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestPostgresStorageCollector_Update(t *testing.T) {
+	if uid := os.Geteuid(); uid != 0 {
+		t.Skipf("root privileges required, skip")
+	}
+
 	var input = pipelineInput{
 		required: []string{"postgres_directory_size_bytes_total"},
 		// temp files related metrics might not be generated on idle systems.
@@ -56,4 +62,48 @@ func Test_parsePostgresTempFileInflght(t *testing.T) {
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
+}
+
+func Test_getDirectorySize(t *testing.T) {
+	size, err := getDirectorySize("testdata")
+	assert.NoError(t, err)
+	assert.Greater(t, size, int64(0))
+
+	size, err = getDirectorySize("unknown")
+	assert.NoError(t, err)
+	assert.Equal(t, size, int64(0))
+}
+
+func Test_findMountpoint(t *testing.T) {
+	got, err := findMountpoint([]string{"/"}, "/bin")
+	assert.NoError(t, err)
+	assert.Equal(t, "/", got)
+}
+
+func Test_getAllMountpoints(t *testing.T) {
+	res, err := getAllMountpoints()
+	assert.NoError(t, err)
+	assert.Greater(t, len(res), 0)
+}
+
+func Test_parseAllMounpoints(t *testing.T) {
+	file, err := os.Open(filepath.Clean("testdata/proc/mounts-short.golden"))
+	assert.NoError(t, err)
+	defer func() { _ = file.Close() }()
+
+	stats, err := parseAllMounpoints(file)
+	assert.NoError(t, err)
+
+	want := []string{"/", "/boot", "/data", "/archive"}
+
+	assert.Equal(t, want, stats)
+
+	// test with wrong format file
+	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
+	assert.NoError(t, err)
+	defer func() { _ = file.Close() }()
+
+	stats, err = parseAllMounpoints(file)
+	assert.Error(t, err)
+	assert.Nil(t, stats)
 }

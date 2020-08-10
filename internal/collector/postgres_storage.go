@@ -1,14 +1,18 @@
 package collector
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
+	"io"
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 const (
@@ -55,7 +59,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "directory_size", "bytes_total"),
 				"The size of Postgres server directories of each type, in bytes.",
-				[]string{"path", "type"}, constLabels,
+				[]string{"path", "mountpoint", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -88,12 +92,15 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 		ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
 	}
 
-	dirstats := newPostgresDirStat(conn, config.DataDirectory)
+	dirstats, err := newPostgresDirStat(conn, config.DataDirectory)
+	if err != nil {
+		return err
+	}
 
-	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirPath, "data")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirPath, "wal")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirPath, "log")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirPath, dirstats.datadirMountpoint, "data")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirPath, dirstats.waldirMountpoint, "wal")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirPath, dirstats.logdirMountpoint, "log")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp")
 
 	return nil
 }
@@ -176,16 +183,19 @@ func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfile
 // postgresDirStat represents stats about Postgres system directories
 type postgresDirStat struct {
 	datadirPath       string
+	datadirMountpoint string
 	datadirSizeBytes  float64
 	waldirPath        string
+	waldirMountpoint  string
 	waldirSizeBytes   float64
 	logdirPath        string
+	logdirMountpoint  string
 	logdirSizeBytes   float64
 	tmpfilesSizeBytes float64
 }
 
 // newPostgresDirStat returns sizes of Postgres server directories.
-func newPostgresDirStat(conn *store.DB, datadir string) postgresDirStat {
+func newPostgresDirStat(conn *store.DB, datadir string) (*postgresDirStat, error) {
 	var (
 		logdirSizeBytes, waldirSizeBytes, tmpfilesSizeBytes int64
 		logdirPath, waldirPath                              string
@@ -193,46 +203,71 @@ func newPostgresDirStat(conn *store.DB, datadir string) postgresDirStat {
 
 	datadirSizeBytes, err := getDirectorySize(datadir)
 	if err != nil {
-		log.Errorf("get data_directory size failed: %s; skip", err)
+		return nil, fmt.Errorf("get data_directory size failed: %s", err)
 	}
 
 	err = conn.Conn().
 		QueryRow(context.Background(), "SELECT current_setting('log_directory') AS path, sum(size) AS bytes FROM pg_ls_logdir() WHERE current_setting('logging_collector') = 'on'").
 		Scan(&logdirPath, &logdirSizeBytes)
 	if err != nil {
-		log.Errorf("get log directory size failed: %s; skip", err)
+		return nil, fmt.Errorf("get log directory size failed: %s", err)
 	}
 
 	err = conn.Conn().
 		QueryRow(context.Background(), "SELECT current_setting('data_directory')||'/pg_wal' AS path, sum(size) AS bytes FROM pg_ls_waldir()").
 		Scan(&waldirPath, &waldirSizeBytes)
 	if err != nil {
-		log.Errorf("get WAL directory size failed: %s; skip", err)
+		return nil, fmt.Errorf("get WAL directory size failed: %s", err)
 	}
 
 	err = conn.Conn().
 		QueryRow(context.Background(), "SELECT coalesce(sum(size), 0) AS total_bytes FROM (SELECT (pg_ls_tmpdir(oid)).size FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces").
 		Scan(&tmpfilesSizeBytes)
 	if err != nil {
-		log.Errorf("get total size of temp files failed: %s; skip", err)
+		return nil, fmt.Errorf("get total size of temp files failed: %s", err)
 	}
 
-	return postgresDirStat{
+	// Get directories mounpoints.
+	mounts, err := getAllMountpoints()
+	if err != nil {
+		return nil, fmt.Errorf("get mountpoints failed: %s", err)
+	}
+	datadirMountpoint, err := findMountpoint(mounts, datadir)
+	if err != nil {
+		return nil, fmt.Errorf("get mountpoints failed: %s", err)
+	}
+	waladirMountpoint, err := findMountpoint(mounts, waldirPath)
+	if err != nil {
+		return nil, fmt.Errorf("get mountpoints failed: %s", err)
+	}
+	logdirMountpoint, err := findMountpoint(mounts, logdirPath)
+	if err != nil {
+		return nil, fmt.Errorf("get mountpoints failed: %s", err)
+	}
+
+	return &postgresDirStat{
 		datadirPath:       datadir,
+		datadirMountpoint: datadirMountpoint,
 		datadirSizeBytes:  float64(datadirSizeBytes),
 		waldirPath:        waldirPath,
+		waldirMountpoint:  waladirMountpoint,
 		waldirSizeBytes:   float64(waldirSizeBytes),
 		logdirPath:        logdirPath,
+		logdirMountpoint:  logdirMountpoint,
 		logdirSizeBytes:   float64(logdirSizeBytes),
 		tmpfilesSizeBytes: float64(tmpfilesSizeBytes),
-	}
+	}, nil
 }
 
 // getDirectorySize walk through directory tree, calculate sizes and return total size of the directory.
 func getDirectorySize(path string) (int64, error) {
 	var size int64
 	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+		// ignore ENOENT errors, they don't affect overall result.
 		if err != nil {
+			if strings.HasSuffix(err.Error(), "no such file or directory") {
+				return nil
+			}
 			return err
 		}
 		if !info.IsDir() {
@@ -241,4 +276,72 @@ func getDirectorySize(path string) (int64, error) {
 		return err
 	})
 	return size, err
+}
+
+// findMountpoint checks path in the list of passed mountpoints.
+func findMountpoint(mounts []string, path string) (string, error) {
+	if path == "/" {
+		return "/", nil
+	}
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		return "", err
+	}
+
+	// If it is a symlink dereference it and try to find mountpoint again.
+	if fi.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Readlink(path)
+		if err != nil {
+			return "", err
+		}
+		return findMountpoint(mounts, resolved)
+	}
+
+	// Check path in a list of all mounts.
+	if stringsContains(mounts, path) {
+		log.Debugf("mountpoint found: %s\n", path)
+		return path, nil
+	}
+
+	// If path is not in mounts list, truncate path by one directory and try again.
+	parts := strings.Split(path, "/")
+	path = strings.Join(parts[0:len(parts)-1], "/")
+	if path == "" {
+		path = "/"
+	}
+
+	return findMountpoint(mounts, path)
+}
+
+// getAllMountpoints opens /proc/mounts file and run parser.
+func getAllMountpoints() ([]string, error) {
+	file, err := os.Open("/proc/mounts")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+
+	return parseAllMounpoints(file)
+}
+
+// parseAllMountpoints parses passed reader and returns slice with all mountpoints presented.
+func parseAllMounpoints(r io.Reader) ([]string, error) {
+	var (
+		scanner     = bufio.NewScanner(r)
+		mountpoints []string
+	)
+
+	// Parse line by line, split line to param and value, parse the value to float and save to store.
+	for scanner.Scan() {
+		parts := strings.Fields(scanner.Text())
+
+		if len(parts) != 6 {
+			return nil, fmt.Errorf("/proc/mounts invalid line: %s; skip", scanner.Text())
+		}
+
+		mountpoints = append(mountpoints, parts[1])
+	}
+
+	return mountpoints, scanner.Err()
 }

@@ -205,7 +205,7 @@ func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
 				continue
 			}
 
-			// Run column-specific logic
+			// Run column-specific logic. All empty (NULL) or not Valid values are silently ignored.
 			switch string(colname.Name) {
 			case "state":
 				// Count activity only if query is not NULL (if query is NULL it means this is a background server process
@@ -215,10 +215,12 @@ func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
 					stats.updateState(row[i].String)
 				}
 			case waitColumnName:
+				// Count waitings only if waiting = 't' or wait_event_type = 'Lock'.
 				if row[i].String == weLock || row[i].String == "t" {
 					stats.updateState("waiting")
 				}
 			case "since_start_seconds":
+				// Consider type of activity depending on 'state' column.
 				stateIdx := colindexes["state"]
 				eventIdx := colindexes[waitColumnName]
 				queryIdx := colindexes["query"]
