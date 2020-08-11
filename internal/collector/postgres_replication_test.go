@@ -34,10 +34,9 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 			name: "normal output",
 			res: &model.PGResult{
 				Nrows: 1,
-				Ncols: 15,
+				Ncols: 13,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("pid")}, {Name: []byte("client_addr")}, {Name: []byte("usename")}, {Name: []byte("application_name")}, {Name: []byte("state")},
-					{Name: []byte("wal_bytes")},
 					{Name: []byte("pending_lag_bytes")}, {Name: []byte("write_lag_bytes")}, {Name: []byte("flush_lag_bytes")},
 					{Name: []byte("replay_lag_bytes")}, {Name: []byte("total_lag_bytes")}, {Name: []byte("write_lag_seconds")},
 					{Name: []byte("flush_lag_seconds")}, {Name: []byte("replay_lag_seconds")},
@@ -45,17 +44,33 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 				Rows: [][]sql.NullString{
 					{
 						{String: "123456", Valid: true}, {String: "127.0.0.1", Valid: true}, {String: "testuser", Valid: true}, {String: "testapp", Valid: true},
-						{String: "teststate", Valid: true}, {String: "999999", Valid: true},
+						{String: "teststate", Valid: true},
 						{String: "100", Valid: true}, {String: "200", Valid: true}, {String: "300", Valid: true}, {String: "400", Valid: true},
 						{String: "500", Valid: true}, {String: "600", Valid: true}, {String: "700", Valid: true}, {String: "800", Valid: true},
+					},
+					{
+						// pg_receivewals and pg_basebackups don't have replay lag.
+						{String: "101010", Valid: true}, {String: "127.0.0.1", Valid: true}, {String: "testuser", Valid: true}, {String: "pg_receivewal", Valid: true},
+						{String: "teststate", Valid: true},
+						{String: "4257", Valid: true}, {String: "8452", Valid: true}, {String: "5785", Valid: true}, {String: "", Valid: false},
+						{String: "", Valid: false}, {String: "2458", Valid: true}, {String: "7871", Valid: true}, {String: "6896", Valid: true},
 					},
 				},
 			},
 			want: map[string]postgresReplicationStat{
 				"123456": {
 					pid: "123456", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "testapp", state: "teststate",
-					walBytes: 999999, pendingLagBytes: 100, writeLagBytes: 200, flushLagBytes: 300, replayLagBytes: 400,
-					totalLagBytes: 500, writeLagSeconds: 600, flushLagSeconds: 700, replayLagSeconds: 800,
+					values: map[string]float64{
+						"pending_lag_bytes": 100, "write_lag_bytes": 200, "flush_lag_bytes": 300, "replay_lag_bytes": 400, "total_lag_bytes": 500,
+						"write_lag_seconds": 600, "flush_lag_seconds": 700, "replay_lag_seconds": 800,
+					},
+				},
+				"101010": {
+					pid: "101010", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "pg_receivewal", state: "teststate",
+					values: map[string]float64{
+						"pending_lag_bytes": 4257, "write_lag_bytes": 8452, "flush_lag_bytes": 5785,
+						"write_lag_seconds": 2458, "flush_lag_seconds": 7871, "replay_lag_seconds": 6896,
+					},
 				},
 			},
 		},
@@ -83,6 +98,24 @@ func Test_selectReplicationQuery(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run("", func(t *testing.T) {
 			assert.Equal(t, tc.want, selectReplicationQuery(tc.version))
+		})
+	}
+}
+
+func Test_selectWalQuery(t *testing.T) {
+	var testcases = []struct {
+		version int
+		want    string
+	}{
+		{version: 90600, want: postgresWalQuery96},
+		{version: 90605, want: postgresWalQuery96},
+		{version: 100000, want: postgresWalQuertLatest},
+		{version: 100005, want: postgresWalQuertLatest},
+	}
+
+	for _, tc := range testcases {
+		t.Run("", func(t *testing.T) {
+			assert.Equal(t, tc.want, selectWalQuery(tc.version))
 		})
 	}
 }

@@ -10,10 +10,17 @@ import (
 )
 
 const (
+	postgresWalQuery96 = `SELECT
+    pg_is_in_recovery()::int AS recovery,
+    (case pg_is_in_recovery() when 't' then pg_last_wal_receive_xlog() else pg_current_xlog_location() end) - '0/00000000' AS wal_bytes`
+
+	postgresWalQuertLatest = `SELECT
+    pg_is_in_recovery()::int AS recovery,
+    (case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() else pg_current_wal_lsn() end) - '0/00000000' AS wal_bytes`
+
 	// Query for Postgres version 9.6 and older.
 	postgresReplicationQuery96 = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
-		(case pg_is_in_recovery() when 't' then null else pg_current_xlog_location() - '0/00000000' end) AS wal_bytes,
 		pg_current_xlog_location() - sent_lsn AS pending_lag_bytes,
 		sent_location - write_location AS write_lag_bytes,
 		write_location - flush_location AS flush_lag_bytes,
@@ -27,7 +34,6 @@ FROM pg_stat_replication`
 	// Query for Postgres versions from 10 and newer.
 	postgresReplicationQueryLatest = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
-		(case pg_is_in_recovery() when 't' then null else pg_current_wal_lsn() - '0/00000000' end) AS wal_bytes,
 		pg_current_wal_lsn() - sent_lsn AS pending_lag_bytes,
 		sent_lsn - write_lsn AS write_lag_bytes,
 		write_lsn - flush_lsn AS flush_lag_bytes,
@@ -50,7 +56,7 @@ type postgresReplicationCollector struct {
 // NewPostgresReplicationCollector returns a new Collector exposing postgres replication stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-REPLICATION-VIEW
 func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, error) {
-	var labelNames = []string{"client_addr", "usename", "application_name", "state", "type"}
+	var labelNames = []string{"client_addr", "usename", "application_name", "state", "lag"}
 
 	return &postgresReplicationCollector{
 		labelNames: labelNames,
@@ -64,7 +70,7 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, 
 		wal: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "wal", "bytes_total"),
-				"Total amount of WAL generated, in bytes.",
+				"Total amount of WAL generated or received, in bytes.",
 				[]string{}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
@@ -95,11 +101,13 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 
 	// Get recovery state.
 	var recovery int
-	err = conn.Conn().QueryRow(context.TODO(), "SELECT pg_is_in_recovery()::int").Scan(&recovery)
+	var walBytes int64
+	err = conn.Conn().QueryRow(context.TODO(), selectWalQuery(config.ServerVersionNum)).Scan(&recovery, &walBytes)
 	if err != nil {
 		log.Warnf("get recovery state failed: %s; skip", err)
 	} else {
 		ch <- c.recovery.mustNewConstMetric(float64(recovery))
+		ch <- c.wal.mustNewConstMetric(float64(walBytes))
 	}
 
 	// Get replication stats.
@@ -112,15 +120,30 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	stats := parsePostgresReplicationStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		ch <- c.wal.mustNewConstMetric(stat.walBytes)
-		ch <- c.lagbytes.mustNewConstMetric(stat.pendingLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
-		ch <- c.lagbytes.mustNewConstMetric(stat.writeLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
-		ch <- c.lagbytes.mustNewConstMetric(stat.flushLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
-		ch <- c.lagbytes.mustNewConstMetric(stat.replayLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
-		ch <- c.lagbytes.mustNewConstMetric(stat.totalLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "total")
-		ch <- c.lagseconds.mustNewConstMetric(stat.writeLagSeconds, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
-		ch <- c.lagseconds.mustNewConstMetric(stat.flushLagSeconds, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
-		ch <- c.lagseconds.mustNewConstMetric(stat.replayLagSeconds, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+		if value, ok := stat.values["pending_lag_bytes"]; ok {
+			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
+		}
+		if value, ok := stat.values["write_lag_bytes"]; ok {
+			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
+		}
+		if value, ok := stat.values["flush_lag_bytes"]; ok {
+			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
+		}
+		if value, ok := stat.values["replay_lag_bytes"]; ok {
+			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+		}
+		if value, ok := stat.values["total_lag_bytes"]; ok {
+			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "total")
+		}
+		if value, ok := stat.values["write_lag_seconds"]; ok {
+			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
+		}
+		if value, ok := stat.values["flush_lag_seconds"]; ok {
+			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
+		}
+		if value, ok := stat.values["replay_lag_seconds"]; ok {
+			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+		}
 	}
 
 	return nil
@@ -128,20 +151,12 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 
 // postgresReplicationStat represents per-replica stats based on pg_stat_replication.
 type postgresReplicationStat struct {
-	pid              string
-	clientaddr       string
-	usename          string
-	applicationName  string
-	state            string
-	walBytes         float64
-	pendingLagBytes  float64
-	writeLagBytes    float64
-	flushLagBytes    float64
-	replayLagBytes   float64
-	totalLagBytes    float64
-	writeLagSeconds  float64
-	flushLagSeconds  float64
-	replayLagSeconds float64
+	pid             string
+	clientaddr      string
+	usename         string
+	applicationName string
+	state           string
+	values          map[string]float64
 }
 
 // parsePostgresReplicationStats parses PGResult and returns struct with stats values.
@@ -149,7 +164,7 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 	var stats = make(map[string]postgresReplicationStat)
 
 	for _, row := range r.Rows {
-		stat := postgresReplicationStat{}
+		stat := postgresReplicationStat{values: map[string]float64{}}
 
 		// collect label values
 		for i, colname := range r.Colnames {
@@ -196,41 +211,37 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 
 			// Run column-specific logic
 			switch string(colname.Name) {
-			case "wal_bytes":
-				s := stats[pid]
-				s.walBytes = v
-				stats[pid] = s
 			case "pending_lag_bytes":
 				s := stats[pid]
-				s.pendingLagBytes = v
+				s.values["pending_lag_bytes"] = v
 				stats[pid] = s
 			case "write_lag_bytes":
 				s := stats[pid]
-				s.writeLagBytes = v
+				s.values["write_lag_bytes"] = v
 				stats[pid] = s
 			case "flush_lag_bytes":
 				s := stats[pid]
-				s.flushLagBytes = v
+				s.values["flush_lag_bytes"] = v
 				stats[pid] = s
 			case "replay_lag_bytes":
 				s := stats[pid]
-				s.replayLagBytes = v
+				s.values["replay_lag_bytes"] = v
 				stats[pid] = s
 			case "total_lag_bytes":
 				s := stats[pid]
-				s.totalLagBytes = v
+				s.values["total_lag_bytes"] = v
 				stats[pid] = s
 			case "write_lag_seconds":
 				s := stats[pid]
-				s.writeLagSeconds = v
+				s.values["write_lag_seconds"] = v
 				stats[pid] = s
 			case "flush_lag_seconds":
 				s := stats[pid]
-				s.flushLagSeconds = v
+				s.values["flush_lag_seconds"] = v
 				stats[pid] = s
 			case "replay_lag_seconds":
 				s := stats[pid]
-				s.replayLagSeconds = v
+				s.values["replay_lag_seconds"] = v
 				stats[pid] = s
 			default:
 				log.Debugf("unsupported pg_stat_replication stat column: %s, skip", string(colname.Name))
@@ -249,5 +260,15 @@ func selectReplicationQuery(version int) string {
 		return postgresReplicationQuery96
 	default:
 		return postgresReplicationQueryLatest
+	}
+}
+
+// selectWalQuery returns suitable wal state query depending on passed version.
+func selectWalQuery(version int) string {
+	switch {
+	case version < PostgresV10:
+		return postgresWalQuery96
+	default:
+		return postgresWalQuertLatest
 	}
 }
