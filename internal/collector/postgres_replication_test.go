@@ -37,7 +37,7 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 				Ncols: 15,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("pid")}, {Name: []byte("client_addr")}, {Name: []byte("usename")}, {Name: []byte("application_name")}, {Name: []byte("state")},
-					{Name: []byte("recovery")}, {Name: []byte("wal_bytes")},
+					{Name: []byte("wal_bytes")},
 					{Name: []byte("pending_lag_bytes")}, {Name: []byte("write_lag_bytes")}, {Name: []byte("flush_lag_bytes")},
 					{Name: []byte("replay_lag_bytes")}, {Name: []byte("total_lag_bytes")}, {Name: []byte("write_lag_seconds")},
 					{Name: []byte("flush_lag_seconds")}, {Name: []byte("replay_lag_seconds")},
@@ -45,7 +45,7 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 				Rows: [][]sql.NullString{
 					{
 						{String: "123456", Valid: true}, {String: "127.0.0.1", Valid: true}, {String: "testuser", Valid: true}, {String: "testapp", Valid: true},
-						{String: "teststate", Valid: true}, {String: "0", Valid: true}, {String: "999999", Valid: true},
+						{String: "teststate", Valid: true}, {String: "999999", Valid: true},
 						{String: "100", Valid: true}, {String: "200", Valid: true}, {String: "300", Valid: true}, {String: "400", Valid: true},
 						{String: "500", Valid: true}, {String: "600", Valid: true}, {String: "700", Valid: true}, {String: "800", Valid: true},
 					},
@@ -54,7 +54,7 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 			want: map[string]postgresReplicationStat{
 				"123456": {
 					pid: "123456", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "testapp", state: "teststate",
-					recovery: 0, walBytes: 999999, pendingLagBytes: 100, writeLagBytes: 200, flushLagBytes: 300, replayLagBytes: 400,
+					walBytes: 999999, pendingLagBytes: 100, writeLagBytes: 200, flushLagBytes: 300, replayLagBytes: 400,
 					totalLagBytes: 500, writeLagSeconds: 600, flushLagSeconds: 700, replayLagSeconds: 800,
 				},
 			},

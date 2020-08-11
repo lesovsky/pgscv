@@ -62,7 +62,7 @@ func NewSystemCollector(labels prometheus.Labels) (Collector, error) {
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "system", "scaling_governors_total"),
 				"Total number of CPU scaling governors used of each type.",
-				[]string{"type"}, labels,
+				[]string{"governor"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
 		numanodes: typedDesc{

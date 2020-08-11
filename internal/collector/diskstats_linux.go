@@ -82,7 +82,7 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 		iotimeweighted: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "disk", "io_time_weighted_seconds_total"),
-				"The weighted # of seconds spent doing I/Os.",
+				"The weighted number of seconds spent doing I/Os.",
 				[]string{"device"}, labels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},

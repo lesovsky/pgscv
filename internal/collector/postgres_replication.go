@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"context"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
@@ -12,7 +13,6 @@ const (
 	// Query for Postgres version 9.6 and older.
 	postgresReplicationQuery96 = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
-    pg_is_in_recovery()::int AS recovery,
 		(case pg_is_in_recovery() when 't' then null else pg_current_xlog_location() - '0/00000000' end) AS wal_bytes,
 		pg_current_xlog_location() - sent_lsn AS pending_lag_bytes,
 		sent_location - write_location AS write_lag_bytes,
@@ -27,7 +27,6 @@ FROM pg_stat_replication`
 	// Query for Postgres versions from 10 and newer.
 	postgresReplicationQueryLatest = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
-    pg_is_in_recovery()::int AS recovery,
 		(case pg_is_in_recovery() when 't' then null else pg_current_wal_lsn() - '0/00000000' end) AS wal_bytes,
 		pg_current_wal_lsn() - sent_lsn AS pending_lag_bytes,
 		sent_lsn - write_lsn AS write_lag_bytes,
@@ -94,16 +93,25 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	}
 	defer conn.Close()
 
+	// Get recovery state.
+	var recovery int
+	err = conn.Conn().QueryRow(context.TODO(), "SELECT pg_is_in_recovery()::int").Scan(&recovery)
+	if err != nil {
+		log.Warnf("get recovery state failed: %s; skip", err)
+	} else {
+		ch <- c.recovery.mustNewConstMetric(float64(recovery))
+	}
+
+	// Get replication stats.
 	res, err := conn.Query(selectReplicationQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
 
-	// parse pg_stat_statements stats
+	// Parse pg_stat_replication stats.
 	stats := parsePostgresReplicationStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		ch <- c.recovery.mustNewConstMetric(stat.recovery)
 		ch <- c.wal.mustNewConstMetric(stat.walBytes)
 		ch <- c.lagbytes.mustNewConstMetric(stat.pendingLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
 		ch <- c.lagbytes.mustNewConstMetric(stat.writeLagBytes, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
@@ -125,7 +133,6 @@ type postgresReplicationStat struct {
 	usename          string
 	applicationName  string
 	state            string
-	recovery         float64
 	walBytes         float64
 	pendingLagBytes  float64
 	writeLagBytes    float64
@@ -189,10 +196,6 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 
 			// Run column-specific logic
 			switch string(colname.Name) {
-			case "recovery":
-				s := stats[pid]
-				s.recovery = v
-				stats[pid] = s
 			case "wal_bytes":
 				s := stats[pid]
 				s.walBytes = v
