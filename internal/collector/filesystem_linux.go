@@ -48,15 +48,22 @@ func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric)
 	}
 
 	for _, s := range stats {
+		// Truncate device paths to device names, e.g /dev/sda -> sda
+		device, err := truncateDeviceName(s.device)
+		if err != nil {
+			log.Warnf("truncate device path %s failed: %s; skip", device, err)
+			continue
+		}
+
 		// bytes
-		ch <- c.bytes.mustNewConstMetric(s.size, s.device, s.mountpoint, s.fstype, "total")
-		ch <- c.bytes.mustNewConstMetric(s.free, s.device, s.mountpoint, s.fstype, "free")
-		ch <- c.bytes.mustNewConstMetric(s.avail, s.device, s.mountpoint, s.fstype, "avail")
-		ch <- c.bytes.mustNewConstMetric(s.size-s.free, s.device, s.mountpoint, s.fstype, "used")
+		ch <- c.bytes.mustNewConstMetric(s.size, device, s.mountpoint, s.fstype, "total")
+		ch <- c.bytes.mustNewConstMetric(s.free, device, s.mountpoint, s.fstype, "free")
+		ch <- c.bytes.mustNewConstMetric(s.avail, device, s.mountpoint, s.fstype, "avail")
+		ch <- c.bytes.mustNewConstMetric(s.size-s.free, device, s.mountpoint, s.fstype, "used")
 		// files (inodes)
-		ch <- c.files.mustNewConstMetric(s.files, s.device, s.mountpoint, s.fstype, "total")
-		ch <- c.files.mustNewConstMetric(s.filesfree, s.device, s.mountpoint, s.fstype, "free")
-		ch <- c.files.mustNewConstMetric(s.files-s.filesfree, s.device, s.mountpoint, s.fstype, "used")
+		ch <- c.files.mustNewConstMetric(s.files, device, s.mountpoint, s.fstype, "total")
+		ch <- c.files.mustNewConstMetric(s.filesfree, device, s.mountpoint, s.fstype, "free")
+		ch <- c.files.mustNewConstMetric(s.files-s.filesfree, device, s.mountpoint, s.fstype, "used")
 	}
 
 	return nil
@@ -197,4 +204,24 @@ func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]filesyste
 	}
 
 	return stats, scanner.Err()
+}
+
+// truncateDeviceName truncates passed full path to device to short device name.
+func truncateDeviceName(path string) (string, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+
+	if fi.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Readlink(path)
+		if err != nil {
+			return "", err
+		}
+		path = resolved
+	}
+
+	parts := strings.Split(path, "/")
+
+	return parts[len(parts)-1], nil
 }

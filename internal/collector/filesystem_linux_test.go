@@ -108,3 +108,27 @@ func Test_readMountpointStat(t *testing.T) {
 	wg.Wait()
 	close(ch)
 }
+
+func Test_truncateDeviceName(t *testing.T) {
+	var testcases = []struct {
+		name  string
+		valid bool
+		path  string
+		want  string
+	}{
+		{name: "valid 1", valid: true, path: "testdata/dev/sda", want: "sda"},
+		{name: "valid 2", valid: true, path: "testdata/dev/sdb2", want: "sdb2"},
+		{name: "valid 3", valid: true, path: "testdata/dev/mapper/ssd-root", want: "dm-1"},
+		{name: "unknown", valid: false, path: "testdata/dev/unknown"},
+	}
+
+	for _, tc := range testcases {
+		got, err := truncateDeviceName(tc.path)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		} else {
+			assert.Error(t, err)
+		}
+	}
+}
