@@ -6,7 +6,6 @@ import (
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
@@ -75,35 +74,14 @@ func Test_getDirectorySize(t *testing.T) {
 }
 
 func Test_findMountpoint(t *testing.T) {
-	got, err := findMountpoint([]string{"/"}, "/bin")
+	mount, device, err := findMountpoint([]mount{{mountpoint: "/", device: "sda"}}, "/bin")
 	assert.NoError(t, err)
-	assert.Equal(t, "/", got)
+	assert.Equal(t, "/", mount)
+	assert.Equal(t, "sda", device)
 }
 
 func Test_getAllMountpoints(t *testing.T) {
-	res, err := getAllMountpoints()
+	res, err := getMountpoints()
 	assert.NoError(t, err)
 	assert.Greater(t, len(res), 0)
-}
-
-func Test_parseAllMounpoints(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/proc/mounts-short.golden"))
-	assert.NoError(t, err)
-	defer func() { _ = file.Close() }()
-
-	stats, err := parseAllMounpoints(file)
-	assert.NoError(t, err)
-
-	want := []string{"/", "/boot", "/data", "/archive"}
-
-	assert.Equal(t, want, stats)
-
-	// test with wrong format file
-	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
-	assert.NoError(t, err)
-	defer func() { _ = file.Close() }()
-
-	stats, err = parseAllMounpoints(file)
-	assert.Error(t, err)
-	assert.Nil(t, stats)
 }

@@ -1,14 +1,12 @@
 package collector
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
-	"io"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -59,7 +57,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "directory_size", "bytes_total"),
 				"The size of Postgres server directories of each type, in bytes.",
-				[]string{"path", "mountpoint", "type"}, constLabels,
+				[]string{"device", "mountpoint", "path", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -97,10 +95,10 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 		return err
 	}
 
-	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirPath, dirstats.datadirMountpoint, "data")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirPath, dirstats.waldirMountpoint, "wal")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirPath, dirstats.logdirMountpoint, "log")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath, "data")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath, "wal")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath, "log")
+	ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp", "temp")
 
 	return nil
 }
@@ -184,12 +182,15 @@ func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfile
 type postgresDirStat struct {
 	datadirPath       string
 	datadirMountpoint string
+	datadirDevice     string
 	datadirSizeBytes  float64
 	waldirPath        string
 	waldirMountpoint  string
+	waldirDevice      string
 	waldirSizeBytes   float64
 	logdirPath        string
 	logdirMountpoint  string
+	logdirDevice      string
 	logdirSizeBytes   float64
 	tmpfilesSizeBytes float64
 }
@@ -227,33 +228,55 @@ func newPostgresDirStat(conn *store.DB, datadir string) (*postgresDirStat, error
 		return nil, fmt.Errorf("get total size of temp files failed: %s", err)
 	}
 
-	// Get directories mounpoints.
-	mounts, err := getAllMountpoints()
-	if err != nil {
-		return nil, fmt.Errorf("get mountpoints failed: %s", err)
-	}
-	datadirMountpoint, err := findMountpoint(mounts, datadir)
-	if err != nil {
-		return nil, fmt.Errorf("get mountpoints failed: %s", err)
-	}
-	waladirMountpoint, err := findMountpoint(mounts, waldirPath)
-	if err != nil {
-		return nil, fmt.Errorf("get mountpoints failed: %s", err)
-	}
-	logdirMountpoint, err := findMountpoint(mounts, logdirPath)
+	// Get directories mountpoints.
+	mounts, err := getMountpoints()
 	if err != nil {
 		return nil, fmt.Errorf("get mountpoints failed: %s", err)
 	}
 
+	// Find mountpoint and device for DATA directory.
+	datadirMountpoint, device, err := findMountpoint(mounts, datadir)
+	if err != nil {
+		return nil, fmt.Errorf("find data directory mountpoint failed: %s", err)
+	}
+	datadirDevice, err := truncateDeviceName(device)
+	if err != nil {
+		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
+	}
+
+	// Find mountpoint and device for WAL directory.
+	waldirMountpoint, device, err := findMountpoint(mounts, waldirPath)
+	if err != nil {
+		return nil, fmt.Errorf("find WAL directory mountpoint failed: %s", err)
+	}
+	waldirDevice, err := truncateDeviceName(device)
+	if err != nil {
+		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
+	}
+
+	// Find mountpoint and device for LOG directory.
+	logdirMountpoint, device, err := findMountpoint(mounts, logdirPath)
+	if err != nil {
+		return nil, fmt.Errorf("find log directory mountpoint failed: %s", err)
+	}
+	logdirDevice, err := truncateDeviceName(device)
+	if err != nil {
+		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
+	}
+
+	// Return stats and directories properties.
 	return &postgresDirStat{
 		datadirPath:       datadir,
 		datadirMountpoint: datadirMountpoint,
+		datadirDevice:     datadirDevice,
 		datadirSizeBytes:  float64(datadirSizeBytes),
 		waldirPath:        waldirPath,
-		waldirMountpoint:  waladirMountpoint,
+		waldirMountpoint:  waldirMountpoint,
+		waldirDevice:      waldirDevice,
 		waldirSizeBytes:   float64(waldirSizeBytes),
 		logdirPath:        logdirPath,
 		logdirMountpoint:  logdirMountpoint,
+		logdirDevice:      logdirDevice,
 		logdirSizeBytes:   float64(logdirSizeBytes),
 		tmpfilesSizeBytes: float64(tmpfilesSizeBytes),
 	}, nil
@@ -279,33 +302,35 @@ func getDirectorySize(path string) (int64, error) {
 }
 
 // findMountpoint checks path in the list of passed mountpoints.
-func findMountpoint(mounts []string, path string) (string, error) {
-	if path == "/" {
-		return "/", nil
-	}
-
+func findMountpoint(mounts []mount, path string) (string, string, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 
 	// If it is a symlink dereference it and try to find mountpoint again.
 	if fi.Mode()&os.ModeSymlink != 0 {
 		resolved, err := os.Readlink(path)
 		if err != nil {
-			return "", err
+			return "", "", err
 		}
 		return findMountpoint(mounts, resolved)
 	}
 
 	// Check path in a list of all mounts.
-	if stringsContains(mounts, path) {
-		log.Debugf("mountpoint found: %s\n", path)
-		return path, nil
+	for _, m := range mounts {
+		if m.mountpoint == path {
+			log.Debugf("mountpoint found: %s\n", path)
+			return path, m.device, nil
+		}
 	}
 
 	// If path is not in mounts list, truncate path by one directory and try again.
 	parts := strings.Split(path, "/")
+	if len(parts) == 0 {
+		return "", "", fmt.Errorf("mountpoint not found")
+	}
+
 	path = strings.Join(parts[0:len(parts)-1], "/")
 	if path == "" {
 		path = "/"
@@ -314,34 +339,13 @@ func findMountpoint(mounts []string, path string) (string, error) {
 	return findMountpoint(mounts, path)
 }
 
-// getAllMountpoints opens /proc/mounts file and run parser.
-func getAllMountpoints() ([]string, error) {
+// getMountpoints opens /proc/mounts file and run parser.
+func getMountpoints() ([]mount, error) {
 	file, err := os.Open("/proc/mounts")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseAllMounpoints(file)
-}
-
-// parseAllMountpoints parses passed reader and returns slice with all mountpoints presented.
-func parseAllMounpoints(r io.Reader) ([]string, error) {
-	var (
-		scanner     = bufio.NewScanner(r)
-		mountpoints []string
-	)
-
-	// Parse line by line, split line to param and value, parse the value to float and save to store.
-	for scanner.Scan() {
-		parts := strings.Fields(scanner.Text())
-
-		if len(parts) != 6 {
-			return nil, fmt.Errorf("/proc/mounts invalid line: %s; skip", scanner.Text())
-		}
-
-		mountpoints = append(mountpoints, parts[1])
-	}
-
-	return mountpoints, scanner.Err()
+	return parseProcMounts(file, nil)
 }
