@@ -11,10 +11,8 @@ import (
 func TestPostgresBgwriterCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_bgwriter_ckpt_timed_total",
-			"postgres_bgwriter_ckpt_req_total",
-			"postgres_bgwriter_ckpt_write_time_seconds_total",
-			"postgres_bgwriter_ckpt_sync_time_seconds_total",
+			"postgres_bgwriter_ckpt_total",
+			"postgres_bgwriter_ckpt_time_seconds_total",
 			"postgres_bgwriter_buffers_written_total",
 			"postgres_bgwriter_bgwr_maxwritten_clean_total",
 			"postgres_bgwriter_backend_fsync_total",

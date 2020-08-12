@@ -29,32 +29,18 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
-			"checkpoints_timed": {
+			"checkpoints": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_timed_total"),
-					"Total number of scheduled checkpoints that have been performed.",
-					nil, constLabels,
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_total"),
+					"Total number of checkpoints that have been performed of each type.",
+					[]string{"ckpt"}, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
-			"checkpoints_req": {
+			"checkpoint_time": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_req_total"),
-					"Total number of requested checkpoints that have been performed.",
-					nil, constLabels,
-				), valueType: prometheus.CounterValue,
-			},
-			"checkpoint_write_time": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_write_time_seconds_total"),
-					"Total amount of time that has been spent in the portion of checkpoint processing where files are written to disk, in seconds.",
-					nil, constLabels,
-				), valueType: prometheus.CounterValue, factor: .001,
-			},
-			"checkpoint_sync_time": {
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_sync_time_seconds_total"),
-					"Total amount of time that has been spent in the portion of checkpoint processing where files are synchronized to disk, in seconds.",
-					nil, constLabels,
+					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_time_seconds_total"),
+					"Total amount of time that has been spent writing or syncing data during checkpoint, in seconds.",
+					[]string{"op"}, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"buffers_written": {
@@ -113,14 +99,12 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 
 	for name, desc := range c.descs {
 		switch name {
-		case "checkpoints_timed":
-			ch <- desc.mustNewConstMetric(stats.ckptTimed)
-		case "checkpoints_req":
-			ch <- desc.mustNewConstMetric(stats.ckptReq)
-		case "checkpoint_write_time":
-			ch <- desc.mustNewConstMetric(stats.ckptWriteTime)
-		case "checkpoint_sync_time":
-			ch <- desc.mustNewConstMetric(stats.ckptSyncTime)
+		case "checkpoints":
+			ch <- desc.mustNewConstMetric(stats.ckptTimed, "timed")
+			ch <- desc.mustNewConstMetric(stats.ckptReq, "req")
+		case "checkpoint_time":
+			ch <- desc.mustNewConstMetric(stats.ckptWriteTime, "write")
+			ch <- desc.mustNewConstMetric(stats.ckptSyncTime, "sync")
 		case "maxwritten_clean":
 			ch <- desc.mustNewConstMetric(stats.bgwrMaxWritten)
 		case "buffers_written":
