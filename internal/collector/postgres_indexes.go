@@ -96,9 +96,10 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 		stats := parsePostgresIndexStats(res, c.labelNames)
 
 		for _, stat := range stats {
-			if stat.idxscan > 0 {
-				ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname)
-			}
+			// always send idx scan metrics
+			ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname)
+
+			// avoid metrics spamming and send metrics only if they greater than zero.
 			if stat.idxtupread > 0 {
 				ch <- c.tuples.mustNewConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
 			}
