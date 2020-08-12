@@ -122,6 +122,9 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, stat.query, "total")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
+		if stat.blkReadTime > 0 || stat.blkWriteTime > 0 {
+			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.datname, stat.usename, stat.queryid, stat.query, "executing")
+		}
 		if stat.blkReadTime > 0 {
 			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, stat.query, "ioread")
 		}
