@@ -239,30 +239,21 @@ func newPostgresDirStat(conn *store.DB, datadir string) (*postgresDirStat, error
 	if err != nil {
 		return nil, fmt.Errorf("find data directory mountpoint failed: %s", err)
 	}
-	datadirDevice, err := truncateDeviceName(device)
-	if err != nil {
-		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
-	}
+	datadirDevice := truncateDeviceName(device)
 
 	// Find mountpoint and device for WAL directory.
 	waldirMountpoint, device, err := findMountpoint(mounts, waldirPath)
 	if err != nil {
 		return nil, fmt.Errorf("find WAL directory mountpoint failed: %s", err)
 	}
-	waldirDevice, err := truncateDeviceName(device)
-	if err != nil {
-		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
-	}
+	waldirDevice := truncateDeviceName(device)
 
 	// Find mountpoint and device for LOG directory.
 	logdirMountpoint, device, err := findMountpoint(mounts, logdirPath)
 	if err != nil {
 		return nil, fmt.Errorf("find log directory mountpoint failed: %s", err)
 	}
-	logdirDevice, err := truncateDeviceName(device)
-	if err != nil {
-		return nil, fmt.Errorf("truncate device path %s to name failed: %s", device, err)
-	}
+	logdirDevice := truncateDeviceName(device)
 
 	// Return stats and directories properties.
 	return &postgresDirStat{

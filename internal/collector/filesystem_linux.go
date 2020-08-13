@@ -47,11 +47,7 @@ func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric)
 
 	for _, s := range stats {
 		// Truncate device paths to device names, e.g /dev/sda -> sda
-		device, err := truncateDeviceName(s.mount.device)
-		if err != nil {
-			log.Warnf("truncate device path %s failed: %s; skip", device, err)
-			continue
-		}
+		device := truncateDeviceName(s.mount.device)
 
 		// bytes
 		ch <- c.bytes.mustNewConstMetric(s.size, device, s.mount.mountpoint, s.mount.fstype, "total")
@@ -98,10 +94,10 @@ func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]file
 
 	wg := sync.WaitGroup{}
 	statCh := make(chan filesystemStat)
-	stats := make([]filesystemStat, len(mounts))
+	stats := []filesystemStat{}
 
 	wg.Add(len(mounts))
-	for i, m := range mounts {
+	for _, m := range mounts {
 		mount := m
 
 		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too. To avoid such situations wrap
@@ -120,7 +116,7 @@ func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]file
 				continue
 			}
 
-			stats[i] = filesystemStat{
+			stat := filesystemStat{
 				mount:     mount,
 				size:      response.size,
 				free:      response.free,
@@ -128,6 +124,7 @@ func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]file
 				files:     response.files,
 				filesfree: response.filesfree,
 			}
+			stats = append(stats, stat)
 		case <-ctx.Done():
 			log.Warnf("filesystem %s doesn't respond: %s; skip", mount.mountpoint, ctx.Err())
 			cancel()

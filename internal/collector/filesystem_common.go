@@ -55,21 +55,34 @@ func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, er
 }
 
 // truncateDeviceName truncates passed full path to device to short device name.
-func truncateDeviceName(path string) (string, error) {
+func truncateDeviceName(path string) string {
+	if path == "" {
+		log.Warnf("empty path passed")
+		return ""
+	}
+	// Make name which will be returned in case of later errors occurred.
+	parts := strings.Split(path, "/")
+	name := parts[len(parts)-1]
+
+	// Check device path exists.
 	fi, err := os.Lstat(path)
 	if err != nil {
-		return "", err
+		log.Errorf("stat device path %s failed: %s, use defaults (%s)", path, err, name)
+		return name
 	}
 
+	// If path is symlink, try dereference it.
 	if fi.Mode()&os.ModeSymlink != 0 {
 		resolved, err := os.Readlink(path)
 		if err != nil {
-			return "", err
+			log.Errorf("dereference device path %s failed: %s, use name's last part (%s)", path, err, name)
+			return name
 		}
-		path = resolved
+		// Swap name to dereferenced origin.
+		parts := strings.Split(resolved, "/")
+		name = parts[len(parts)-1]
 	}
 
-	parts := strings.Split(path, "/")
-
-	return parts[len(parts)-1], nil
+	// Return default (or dereferenced) name.
+	return name
 }
