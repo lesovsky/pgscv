@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/filter"
+	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
@@ -75,6 +76,13 @@ func (c *Config) Validate() error {
 	if c.ListenAddress == "" {
 		c.ListenAddress = defaultListenAddress
 	}
+
+	if c.AllowTrackSensitive {
+		log.Infoln("sensitive data tracking: enabled. Enabled for: pg_stat_statements.query.")
+	} else {
+		log.Infoln("sensitive data tracking: disabled.")
+	}
+	log.Infoln("HINT: use 'allow_track_sensitive: <bool>' config option to manage.")
 
 	// setup defaults
 	if c.Defaults == nil {

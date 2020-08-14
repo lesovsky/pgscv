@@ -19,7 +19,7 @@ const (
 	// 2. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
 	postgresStatementsQueryTemplate = `SELECT
     d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    p.queryid, {{if .AllowTrackSensitive }}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{else}}''{{end}} AS query,
+    p.queryid, {{if .AllowTrackSensitive }}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{else}}'no-track'{{end}} AS query,
     p.calls, p.rows,
     p.total_time, p.blk_read_time, p.blk_write_time,
     nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
