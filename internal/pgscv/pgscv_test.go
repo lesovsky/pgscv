@@ -28,7 +28,7 @@ func TestStart(t *testing.T) {
 
 	t.Run("push mode", func(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Regexp(t, regexp.MustCompile(`/metrics/job/db_system_[a-f0-9]{32}_system%3A0`), r.URL.String())
+			assert.Regexp(t, regexp.MustCompile(`/metrics/job/db_system_[a-f0-9]{32}_(system|postgres|pgbouncer)%3A[0-9]+`), r.URL.String())
 			body, err := ioutil.ReadAll(r.Body)
 			assert.NoError(t, err)
 			assert.Greater(t, len(body), 0)
