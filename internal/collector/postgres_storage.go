@@ -67,7 +67,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	// Some directory listing functions (pg_ls_dir(), pg_ls_waldir(), pg_ls_tmpdir()) are available only since Postgres 10.
 	if config.ServerVersionNum < PostgresV10 {
-		log.Infoln("[postgres storage collector]: some server-side functions are not available, required Postgres 10 or newer")
+		log.Debugln("[postgres storage collector]: some server-side functions are not available, required Postgres 10 or newer")
 		return nil
 	}
 

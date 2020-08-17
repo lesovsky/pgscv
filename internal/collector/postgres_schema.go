@@ -118,6 +118,8 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 
 		// Functions below uses queries with casting to regnamespace data type, which is introduced in Postgres 9.5.
 		if config.ServerVersionNum >= PostgresV95 {
+			log.Debugln("[postgres schema collector]: some system data types are not available, required Postgres 9.5 or newer")
+
 			// 3. collect metrics related to invalid indexes.
 			collectSchemaInvalidIndexes(conn, ch, c.invalididx)
 
@@ -133,6 +135,8 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 
 		// Function below uses queries pg_sequences which is introduced in Postgres 10.
 		if config.ServerVersionNum >= PostgresV10 {
+			log.Debugln("[postgres schema collector]: some system views are not available, required Postgres 10 or newer")
+
 			// 7. collect metrics related to sequences (available since Postgres 10).
 			collectSchemaSequences(conn, ch, c.sequences)
 		}

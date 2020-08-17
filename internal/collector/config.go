@@ -67,6 +67,10 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		return config, err
 	}
 
+	if version < PostgresVMinNum {
+		log.Warnf("Postgres version is too old, some collectors functions won't work. Minimum required version is %s.", PostgresVMinStr)
+	}
+
 	config.ServerVersionNum = version
 
 	// Get Postgres data directory

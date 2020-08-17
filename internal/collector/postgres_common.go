@@ -14,6 +14,10 @@ const (
 	PostgresV95 = 90500
 	PostgresV96 = 90600
 	PostgresV10 = 100000
+
+	// Minimal required version is 9.5.
+	PostgresVMinNum = PostgresV95
+	PostgresVMinStr = "9.5"
 )
 
 // postgresGenericStat represent generic stat suitable for all kind of stats
