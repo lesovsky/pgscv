@@ -12,7 +12,7 @@ import (
 const (
 	postgresWalQuery96 = `SELECT
     pg_is_in_recovery()::int AS recovery,
-    (case pg_is_in_recovery() when 't' then pg_last_wal_receive_xlog() else pg_current_xlog_location() end) - '0/00000000' AS wal_bytes`
+    (case pg_is_in_recovery() when 't' then pg_last_xlog_receive_location() else pg_current_xlog_location() end) - '0/00000000' AS wal_bytes`
 
 	postgresWalQuertLatest = `SELECT
     pg_is_in_recovery()::int AS recovery,
@@ -21,7 +21,7 @@ const (
 	// Query for Postgres version 9.6 and older.
 	postgresReplicationQuery96 = `SELECT
     pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename, application_name, state,
-		pg_current_xlog_location() - sent_lsn AS pending_lag_bytes,
+		pg_current_xlog_location() - sent_location AS pending_lag_bytes,
 		sent_location - write_location AS write_lag_bytes,
 		write_location - flush_location AS flush_lag_bytes,
 		flush_location - replay_location AS replay_lag_bytes,

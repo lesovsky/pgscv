@@ -116,22 +116,26 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 		// 2. collect metrics related to tables with no primary/unique key constraints.
 		collectSchemaNonPKTables(conn, ch, c.nonpktables)
 
-		// 3. collect metrics related to invalid indexes.
-		collectSchemaInvalidIndexes(conn, ch, c.invalididx)
+		// Functions below uses queries with casting to regnamespace data type, which is introduced in Postgres 9.5.
+		if config.ServerVersionNum >= PostgresV95 {
+			// 3. collect metrics related to invalid indexes.
+			collectSchemaInvalidIndexes(conn, ch, c.invalididx)
 
-		// 4. collect metrics related to non indexed foreign key constraints.
-		collectSchemaNonIndexedFK(conn, ch, c.nonidxfkey)
+			// 4. collect metrics related to non indexed foreign key constraints.
+			collectSchemaNonIndexedFK(conn, ch, c.nonidxfkey)
 
-		// 5. collect metric related to redundant indexes.
-		collectSchemaRedundantIndexes(conn, ch, c.redundantidx)
+			// 5. collect metric related to redundant indexes.
+			collectSchemaRedundantIndexes(conn, ch, c.redundantidx)
 
-		// 6. collect metrics related to sequences (available since Postgres 10).
-		if config.ServerVersionNum >= PostgresV10 {
-			collectSchemaSequences(conn, ch, c.sequences)
+			// 6. collect metrics related to foreign key constraints with different data types.
+			collectSchemaFKDatatypeMismatch(conn, ch, c.difftypefkey)
 		}
 
-		// 7. collect metrics related to foreign key constraints with different data types.
-		collectSchemaFKDatatypeMismatch(conn, ch, c.difftypefkey)
+		// Function below uses queries pg_sequences which is introduced in Postgres 10.
+		if config.ServerVersionNum >= PostgresV10 {
+			// 7. collect metrics related to sequences (available since Postgres 10).
+			collectSchemaSequences(conn, ch, c.sequences)
+		}
 	}
 
 	return nil
