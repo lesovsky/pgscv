@@ -12,10 +12,11 @@ import (
 
 const (
 	userIndexesQuery = `SELECT
-    current_database() AS datname, schemaname, relname, indexrelname,
+    current_database() AS datname, schemaname, relname, indexrelname, (i.indisprimary OR i.indisunique) AS key,
     idx_scan, idx_tup_read, idx_tup_fetch, idx_blks_read, idx_blks_hit
 FROM pg_stat_user_indexes s1
-JOIN pg_statio_user_indexes s2 USING (schemaname, relname, indexrelname)`
+JOIN pg_statio_user_indexes s2 USING (schemaname, relname, indexrelname)
+JOIN pg_index i ON (s1.indexrelid = i.indexrelid)`
 )
 
 // postgresIndexesCollector defines metric descriptors and stats store.
@@ -31,7 +32,7 @@ type postgresIndexesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
 func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, error) {
-	var tablesLabelNames = []string{"datname", "schemaname", "relname", "indexrelname"}
+	var tablesLabelNames = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
 
 	return &postgresIndexesCollector{
 		labelNames: tablesLabelNames,
@@ -97,7 +98,7 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 
 		for _, stat := range stats {
 			// always send idx scan metrics
-			ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname)
+			ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname, stat.key)
 
 			// avoid metrics spamming and send metrics only if they greater than zero.
 			if stat.idxtupread > 0 {
@@ -124,6 +125,7 @@ type postgresIndexStat struct {
 	schemaname  string
 	relname     string
 	indexname   string
+	key         string
 	idxscan     float64
 	idxtupread  float64
 	idxtupfetch float64
@@ -149,6 +151,8 @@ func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]
 				index.relname = row[i].String
 			case "indexrelname":
 				index.indexname = row[i].String
+			case "key":
+				index.key = row[i].String
 			}
 		}
 
