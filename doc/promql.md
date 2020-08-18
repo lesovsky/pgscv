@@ -2,6 +2,7 @@
 
 #### Index
 - [Count usage over time](#count-usage-over-time) (Продолжительность длинного события).
+- [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
 
 ---
@@ -22,6 +23,16 @@
 Похожие примеры: продолжительность пользовательской сессии на сервере.
 
 Ссылки: [PrometheusCountUsageOverTime](https://utcc.utoronto.ca/~cks/space/blog/sysadmin/PrometheusCountUsageOverTime)
+
+##### Max connected standbys over period
+Определить максимальное количество одновременно подключенных standby узлов за период времени:
+```
+max_over_time(count(postgres_replication_lag_bytes{lag="write"})[1d:5m]) or vector(0)
+```
+- `count(postgres_replication_lag_bytes{lag="write"})` - считаем количество метрик с фильтром по lag="write"
+- `max_over_time(...[1d:5m])` - считаем за дневной период с интервалом 5 минут
+- `or vector(0)` - если нет метрик то показываем хотя бы 0
+
 
 ##### Sum by existential metrics
 Есть метрика `postgres_statements_time_total COUNTER` с меткой "mode", метка может принимать значения `total`, `executing`, `ioread`, `iowrite`. При это метрики с `mode=total` есть всегда, а с остальными значениями могут отсутствовать. Например если запросы не используют IO, то для них не будут генерироваться метрики с "mode=(ioread|iowrite)".
