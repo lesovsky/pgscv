@@ -4,7 +4,7 @@
 - [Count usage over time](#count-usage-over-time) (Продолжительность длинного события).
 - [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
-
+- [Get indexes size depending on their usage](#get-indexes-size-depending-on-their-usage) (Значения на основе значений другой метрики)
 ---
 
 ##### Count usage over time
@@ -44,3 +44,19 @@ sum by (datname,usename,queryid,query) (postgres_statements_time_total{mode=~"io
 ```
 - `postgres_statements_time_total{mode=~"io.*"}` - фильтруем метрики по рег.выражению - нужны только те который начинаются с "io".
 - `sum by (datname,usename,queryid,query) (...)` - суммируем с группировкой по набору полей. 
+
+##### Get indexes size depending on their usage
+Есть две метрики:
+- `postgres_index_size_bytes_total` - размер индекса в байтах
+- `postgres_index_scans_total` - количество сканирований по индексу
+
+Нужно найти размеры неиспользуемых (0 сканирований) индексов.
+
+```
+(postgres_index_size_bytes_total) + on(datname, schemaname, relname, indexrelname) group_right() (postgres_index_scans_total{key="false"} == 0)
+```
+- `postgres_index_size_bytes_total` - отталкиваемся от размеров
+- `postgres_index_scans_total{key="false"} == 0` - берем группу метрик со значение 0
+- `(...) + on(datname, schemaname, relname, indexrelname) group_right() (...)` - делаем **сумму значений** двух групп метрик на основе меток `datname`, `schemaname`, `relname`, `indexrelname`.
+- полученная группа будет содержать метрики присоединяемой группы, например `key="false"`
+- учитывая что в присоединяемой группе значения метрик равны 0 это не будет влиять на размеры (в противном случае нужно было бы метрики второй группы умножать на 0)
