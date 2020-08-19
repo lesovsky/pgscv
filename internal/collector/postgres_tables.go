@@ -20,9 +20,11 @@ const (
     extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds,
     extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds,
     vacuum_count, autovacuum_count, analyze_count, autoanalyze_count,
-    heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit
+    heap_blks_read, heap_blks_hit, idx_blks_read, idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit,
+    pg_relation_size(s1.relid) AS size_bytes
 FROM pg_stat_user_tables s1
-JOIN pg_statio_user_tables s2 USING (schemaname, relname)`
+JOIN pg_statio_user_tables s2 USING (schemaname, relname)
+WHERE NOT EXISTS (SELECT 1 FROM pg_locks WHERE relation = s1.relid AND mode = 'AccessExclusiveLock' AND granted)`
 )
 
 // postgresTablesCollector defines metric descriptors and stats store.
@@ -37,6 +39,7 @@ type postgresTablesCollector struct {
 	maintLastAnalyze typedDesc
 	maintenance      typedDesc
 	io               typedDesc
+	sizes            typedDesc
 	labelNames       []string
 }
 
@@ -126,6 +129,14 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 				prometheus.BuildFQName("postgres", "table_io", "blocks_total"),
 				"Total number of table's blocks processed.",
 				[]string{"datname", "schemaname", "relname", "type", "cache_hit"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		sizes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "size_bytes_total"),
+				"Total size of the table, in bytes.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -228,6 +239,8 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 			if stat.tidxhit > 0 {
 				ch <- c.io.mustNewConstMetric(stat.tidxhit, stat.datname, stat.schemaname, stat.relname, "tidx", "true")
 			}
+
+			ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname)
 		}
 	}
 
@@ -264,6 +277,7 @@ type postgresTableStat struct {
 	toasthit    float64
 	tidxread    float64
 	tidxhit     float64
+	sizebytes   float64
 }
 
 // parsePostgresTableStats parses PGResult and returns structs with stats values.
@@ -408,6 +422,10 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 				case "tidx_blks_hit":
 					s := stats[tablename]
 					s.tidxhit = v
+					stats[tablename] = s
+				case "size_bytes":
+					s := stats[tablename]
+					s.sizebytes = v
 					stats[tablename] = s
 				default:
 					log.Debugf("unsupported pg_stat_user_tables (or pg_statio_user_tables) stat column: %s, skip", string(colname.Name))

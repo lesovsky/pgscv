@@ -13,10 +13,11 @@ import (
 const (
 	userIndexesQuery = `SELECT
     current_database() AS datname, schemaname, relname, indexrelname, (i.indisprimary OR i.indisunique) AS key,
-    idx_scan, idx_tup_read, idx_tup_fetch, idx_blks_read, idx_blks_hit
+    idx_scan, idx_tup_read, idx_tup_fetch, idx_blks_read, idx_blks_hit,pg_relation_size(s1.indexrelid) AS size_bytes
 FROM pg_stat_user_indexes s1
 JOIN pg_statio_user_indexes s2 USING (schemaname, relname, indexrelname)
-JOIN pg_index i ON (s1.indexrelid = i.indexrelid)`
+JOIN pg_index i ON (s1.indexrelid = i.indexrelid)
+WHERE NOT EXISTS (SELECT 1 FROM pg_locks WHERE relation = s1.indexrelid AND mode = 'AccessExclusiveLock' AND granted)`
 )
 
 // postgresIndexesCollector defines metric descriptors and stats store.
@@ -24,6 +25,7 @@ type postgresIndexesCollector struct {
 	indexes    typedDesc
 	tuples     typedDesc
 	io         typedDesc
+	sizes      typedDesc
 	labelNames []string
 }
 
@@ -57,6 +59,14 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, erro
 				prometheus.BuildFQName("postgres", "index_io", "blocks_total"),
 				"Total number of index's blocks processed.",
 				[]string{"datname", "schemaname", "relname", "indexrelname", "cache_hit"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		sizes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "index", "size_bytes_total"),
+				"Total size of the index, in bytes.",
+				[]string{"datname", "schemaname", "relname", "indexrelname"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -97,8 +107,9 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 		stats := parsePostgresIndexStats(res, c.labelNames)
 
 		for _, stat := range stats {
-			// always send idx scan metrics
+			// always send idx scan metrics and indexes size
 			ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname, stat.key)
+			ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname, stat.indexname)
 
 			// avoid metrics spamming and send metrics only if they greater than zero.
 			if stat.idxtupread > 0 {
@@ -131,6 +142,7 @@ type postgresIndexStat struct {
 	idxtupfetch float64
 	idxread     float64
 	idxhit      float64
+	sizebytes   float64
 }
 
 // parsePostgresIndexStats parses PGResult and returns structs with stats values.
@@ -199,6 +211,10 @@ func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]
 				case "idx_blks_hit":
 					s := stats[indexname]
 					s.idxhit = v
+					stats[indexname] = s
+				case "size_bytes":
+					s := stats[indexname]
+					s.sizebytes = v
 					stats[indexname] = s
 				default:
 					log.Debugf("unsupported pg_stat_user_indexes (or pg_statio_user_indexes) stat column: %s, skip", string(colname.Name))
