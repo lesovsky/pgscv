@@ -18,8 +18,8 @@ const (
 	// 1. depending on user-requested AllowTrackSensitive, request or skip queries texts.
 	// 2. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
 	postgresStatementsQueryTemplate = `SELECT
-    d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    p.queryid, {{if .NoTrackMode }}'no-track'{{else}}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{end}} AS query,
+    d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid,
+    {{if .NoTrackMode }}'no-track'{{else}}left(regexp_replace(p.query,E'\\s+', ' ', 'g'),1024){{end}} AS query,
     p.calls, p.rows,
     p.total_time, p.blk_read_time, p.blk_write_time,
     nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
@@ -33,25 +33,21 @@ JOIN pg_database d ON d.oid=p.dbid`
 
 // postgresStatementsCollector ...
 type postgresStatementsCollector struct {
-	labelNames []string
-	calls      typedDesc
-	rows       typedDesc
-	times      typedDesc
-	blocks     typedDesc
+	calls  typedDesc
+	rows   typedDesc
+	times  typedDesc
+	blocks typedDesc
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
 // For details see https://www.postgresql.org/docs/current/pgstatstatements.html
 func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, error) {
-	var labelNames = []string{"usename", "datname", "queryid", "query"}
-
 	return &postgresStatementsCollector{
-		labelNames: labelNames,
 		calls: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "calls_total"),
 				"Total number of times query has been executed.",
-				labelNames, constLabels,
+				[]string{"usename", "datname", "queryid", "query"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -59,7 +55,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "rows_total"),
 				"Total number of rows retrieved or affected by the statement.",
-				labelNames, constLabels,
+				[]string{"usename", "datname", "queryid"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -67,14 +63,14 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "time_total"),
 				"Total time spent in the statement in each mode, in seconds.",
-				append(labelNames, "mode"), constLabels,
+				[]string{"usename", "datname", "queryid", "mode"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		blocks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "blocks_total"),
 				"Total number of block processed by the statement in each mode.",
-				append(labelNames, "type", "access"), constLabels,
+				[]string{"usename", "datname", "queryid", "type", "access"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -114,52 +110,52 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	conn.Close()
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresStatementsStats(res, c.labelNames)
+	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "queryid", "query"})
 
 	for _, stat := range stats {
 		ch <- c.calls.mustNewConstMetric(stat.calls, stat.datname, stat.usename, stat.queryid, stat.query)
-		ch <- c.rows.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.queryid, stat.query)
-		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, stat.query, "total")
+		ch <- c.rows.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.queryid)
+		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.queryid, "total")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
 		if stat.blkReadTime > 0 || stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.datname, stat.usename, stat.queryid, stat.query, "executing")
+			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.datname, stat.usename, stat.queryid, "executing")
 		}
 		if stat.blkReadTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, stat.query, "ioread")
+			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.queryid, "ioread")
 		}
 		if stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.queryid, stat.query, "iowrite")
+			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.queryid, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "hit")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.queryid, "shared", "hit")
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.queryid, "shared", "read")
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "dirtied")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.queryid, "shared", "dirtied")
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "shared", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.queryid, "shared", "written")
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.queryid, stat.query, "local", "hit")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.queryid, "local", "hit")
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "local", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.queryid, "local", "read")
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.queryid, stat.query, "local", "dirtied")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.queryid, "local", "dirtied")
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "local", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.queryid, "local", "written")
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.queryid, "temp", "read")
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.queryid, stat.query, "temp", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.queryid, "temp", "written")
 		}
 	}
 
