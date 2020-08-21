@@ -79,21 +79,24 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	}
 	defer conn.Close()
 
-	// Collecting in-flight temp files fails on Postgres versions before 12, so if collecting failed skip it ang go next.
-	res, err := conn.Query(postgresTempFilesInflightQuery)
-	if err == nil {
-		stats := parsePostgresTempFileInflght(res)
+	// Collecting in-flight temp only since Postgres 12.
+	if config.ServerVersionNum >= PostgresV12 {
+		res, err := conn.Query(postgresTempFilesInflightQuery)
+		if err == nil {
+			stats := parsePostgresTempFileInflght(res)
 
-		for _, stat := range stats {
-			ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
-			ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
-			ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
+			for _, stat := range stats {
+				ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
+				ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
+				ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
+			}
+		} else {
+			log.Infof("get in-flight temp files failed: %s; skip", err)
 		}
-	} else {
-		log.Infof("get in-flight temp files failed: %s; skip", err)
 	}
 
-	dirstats, err := newPostgresDirStat(conn, config.DataDirectory)
+	// Collecting other server-directories stats (DATADIR, WALDIR, LOGDIR, TEMPDIR).
+	dirstats, err := newPostgresDirStat(conn, config.DataDirectory, config.ServerVersionNum)
 	if err != nil {
 		return err
 	}
@@ -101,7 +104,10 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath, "data")
 	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath, "wal")
 	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath, "log")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp", "temp")
+
+	if config.ServerVersionNum >= PostgresV12 {
+		ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp", "temp")
+	}
 
 	return nil
 }
@@ -199,7 +205,7 @@ type postgresDirStat struct {
 }
 
 // newPostgresDirStat returns sizes of Postgres server directories.
-func newPostgresDirStat(conn *store.DB, datadir string) (*postgresDirStat, error) {
+func newPostgresDirStat(conn *store.DB, datadir string, version int) (*postgresDirStat, error) {
 	var (
 		logdirSizeBytes, waldirSizeBytes, tmpfilesSizeBytes int64
 		logdirPath, waldirPath                              string
@@ -224,11 +230,14 @@ func newPostgresDirStat(conn *store.DB, datadir string) (*postgresDirStat, error
 		return nil, fmt.Errorf("get WAL directory size failed: %s", err)
 	}
 
-	err = conn.Conn().
-		QueryRow(context.Background(), "SELECT coalesce(sum(size), 0) AS total_bytes FROM (SELECT (pg_ls_tmpdir(oid)).size FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces").
-		Scan(&tmpfilesSizeBytes)
-	if err != nil {
-		return nil, fmt.Errorf("get total size of temp files failed: %s", err)
+	// Collect temp files stats only if version is 12.
+	if version >= PostgresV12 {
+		err = conn.Conn().
+			QueryRow(context.Background(), "SELECT coalesce(sum(size), 0) AS total_bytes FROM (SELECT (pg_ls_tmpdir(oid)).size FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces").
+			Scan(&tmpfilesSizeBytes)
+		if err != nil {
+			return nil, fmt.Errorf("get total size of temp files failed: %s", err)
+		}
 	}
 
 	// Get directories mountpoints.
