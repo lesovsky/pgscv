@@ -65,7 +65,9 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	// Some directory listing functions (pg_ls_dir(), pg_ls_waldir(), pg_ls_tmpdir()) are available only since Postgres 10.
+	// Following directory listing functions are available since:
+	// - pg_ls_dir(), pg_ls_waldir() since Postgres 10
+	// - pg_ls_tmpdir() since Postgres 12
 	if config.ServerVersionNum < PostgresV10 {
 		log.Debugln("[postgres storage collector]: some server-side functions are not available, required Postgres 10 or newer")
 		return nil
@@ -77,17 +79,18 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	}
 	defer conn.Close()
 
+	// Collecting in-flight temp files fails on Postgres versions before 12, so if collecting failed skip it ang go next.
 	res, err := conn.Query(postgresTempFilesInflightQuery)
-	if err != nil {
-		return err
-	}
+	if err == nil {
+		stats := parsePostgresTempFileInflght(res)
 
-	stats := parsePostgresTempFileInflght(res)
-
-	for _, stat := range stats {
-		ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
-		ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
-		ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
+		for _, stat := range stats {
+			ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
+			ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
+			ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
+		}
+	} else {
+		log.Infof("get in-flight temp files failed: %s; skip", err)
 	}
 
 	dirstats, err := newPostgresDirStat(conn, config.DataDirectory)
