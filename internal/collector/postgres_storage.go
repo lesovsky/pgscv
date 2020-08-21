@@ -287,8 +287,23 @@ func newPostgresDirStat(conn *store.DB, datadir string, version int) (*postgresD
 
 // getDirectorySize walk through directory tree, calculate sizes and return total size of the directory.
 func getDirectorySize(path string) (int64, error) {
+	fi, err := os.Lstat(path)
+	if err != nil {
+		return 0, err
+	}
+
+	// If path is a symlink dereference it
+	if fi.Mode()&os.ModeSymlink != 0 {
+		resolved, err := os.Readlink(path)
+		if err != nil {
+			return 0, err
+		}
+		path = resolved
+	}
+
 	var size int64
-	err := filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
+
+	err = filepath.Walk(path, func(_ string, info os.FileInfo, err error) error {
 		// ignore ENOENT errors, they don't affect overall result.
 		if err != nil {
 			if strings.HasSuffix(err.Error(), "no such file or directory") {
@@ -306,7 +321,7 @@ func getDirectorySize(path string) (int64, error) {
 
 // findMountpoint checks path in the list of passed mountpoints.
 func findMountpoint(mounts []mount, path string) (string, string, error) {
-	fi, err := os.Stat(path)
+	fi, err := os.Lstat(path)
 	if err != nil {
 		return "", "", err
 	}
@@ -317,13 +332,21 @@ func findMountpoint(mounts []mount, path string) (string, string, error) {
 		if err != nil {
 			return "", "", err
 		}
+
+		// if resolved path is not an absolute path, join it to dir where symlink has been found.
+		if !strings.HasPrefix(resolved, "/") {
+			dirs := strings.Split(path, "/")
+			dirs[len(dirs)-1] = resolved
+			resolved = strings.Join(dirs, "/")
+		}
+
 		return findMountpoint(mounts, resolved)
 	}
 
 	// Check path in a list of all mounts.
 	for _, m := range mounts {
 		if m.mountpoint == path {
-			log.Debugf("mountpoint found: %s\n", path)
+			log.Debugf("mountpoint found: %s", path)
 			return path, m.device, nil
 		}
 	}

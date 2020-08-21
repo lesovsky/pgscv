@@ -69,7 +69,7 @@ func Test_getDirectorySize(t *testing.T) {
 	assert.Greater(t, size, int64(0))
 
 	size, err = getDirectorySize("unknown")
-	assert.NoError(t, err)
+	assert.Error(t, err)
 	assert.Equal(t, size, int64(0))
 }
 
