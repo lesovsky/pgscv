@@ -28,9 +28,9 @@ type Config struct {
 	BinaryVersion        string                   // version of the program, required for auto-update procedure
 	AutoUpdateURL        string                   `json:"autoupdate_url"` // URL used for auto-update
 	RuntimeMode          int                      // application runtime mode
-	AllowTrackSensitive  bool                     `json:"allow_track_sensitive"` // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                   `json:"listen_address"`        // Network address and port where the application should listen on
-	MetricsServiceURL    string                   `json:"metrics_service_url"`   // URL of Weaponry service metric gateway
+	NoTrackMode          bool                     `json:"no_track_mode"`       // controls tracking sensitive information (query texts, etc)
+	ListenAddress        string                   `json:"listen_address"`      // Network address and port where the application should listen on
+	MetricsServiceURL    string                   `json:"metrics_service_url"` // URL of Weaponry service metric gateway
 	MetricsSendInterval  time.Duration            // Metric send interval
 	APIKey               string                   `json:"api_key"`    // API key for accessing to Weaponry
 	ProjectID            int                      `json:"project_id"` // ProjectID specifies project_id label value
@@ -77,12 +77,12 @@ func (c *Config) Validate() error {
 		c.ListenAddress = defaultListenAddress
 	}
 
-	if c.AllowTrackSensitive {
-		log.Infoln("sensitive data tracking: enabled. Enabled for: pg_stat_statements.query.")
+	log.Infoln("*** IMPORTANT ***: pgSCV by default collects information about user queries. Tracking queries can be disabled with 'no_track_mode: true' in config file.")
+	if c.NoTrackMode {
+		log.Infoln("no-track mode enabled: tracking disabled for [pg_stat_statements.query].")
 	} else {
-		log.Infoln("sensitive data tracking: disabled.")
+		log.Infoln("no-track mode disabled")
 	}
-	log.Infoln("HINT: use 'allow_track_sensitive: <bool>' config option to manage.")
 
 	// setup defaults
 	if c.Defaults == nil {

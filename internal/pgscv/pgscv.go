@@ -24,12 +24,12 @@ func Start(ctx context.Context, config *Config) error {
 	serviceRepo := service.NewRepository()
 
 	serviceConfig := service.Config{
-		RuntimeMode:         config.RuntimeMode,
-		AllowTrackSensitive: config.AllowTrackSensitive,
-		ProjectID:           strconv.Itoa(config.ProjectID),
-		ConnDefaults:        config.Defaults,
-		ConnSettings:        config.ServicesConnSettings,
-		Filters:             config.Filters,
+		RuntimeMode:  config.RuntimeMode,
+		NoTrackMode:  config.NoTrackMode,
+		ProjectID:    strconv.Itoa(config.ProjectID),
+		ConnDefaults: config.Defaults,
+		ConnSettings: config.ServicesConnSettings,
+		Filters:      config.Filters,
 	}
 
 	if config.ServicesConnSettings == nil {
@@ -122,11 +122,11 @@ func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repo
 	// This is the one-time operation and here is using a naive approach with 'for loop + sleep' instead of channels/sync stuff.
 	log.Debugln("waiting for services appear in service repo...")
 	for {
+		time.Sleep(time.Second)
 		if n := instanceRepo.TotalServices(); n > 0 {
 			log.Debugln("done, services found: ", n)
 			break
 		}
-		time.Sleep(time.Second)
 	}
 
 	ticker := time.NewTicker(config.MetricsSendInterval)
@@ -156,7 +156,7 @@ func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repo
 	for _, id := range servicesIDs {
 		var svc = repo.GetService(id)
 		if svc.Collector == nil {
-			log.Infof("service [%s] exists, but collector is not initialized yet, skip", svc.ServiceID)
+			log.Infof("collector for service [%s] not initialized yet: try collecting metrics later", svc.ServiceID)
 			continue
 		}
 
