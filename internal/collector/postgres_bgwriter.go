@@ -31,50 +31,50 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 		descs: map[string]typedDesc{
 			"checkpoints": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_total"),
+					prometheus.BuildFQName("postgres", "ckpt", "checkpoints_total"),
 					"Total number of checkpoints that have been performed of each type.",
 					[]string{"ckpt"}, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"checkpoint_time": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "ckpt_time_seconds_total"),
-					"Total amount of time that has been spent writing or syncing data during checkpoint, in seconds.",
+					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_total"),
+					"Total amount of time that has been spent processing data during checkpoint, in seconds.",
 					[]string{"op"}, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
-			"buffers_written": {
+			"written_bytes": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "buffers_written_total"),
-					"Total number of buffers written.",
+					prometheus.BuildFQName("postgres", "written", "bytes_total"),
+					"Total number of bytes written by each subsystem, in bytes.",
 					labels, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"maxwritten_clean": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "bgwr_maxwritten_clean_total"),
+					prometheus.BuildFQName("postgres", "bgwriter", "maxwritten_clean_total"),
 					"Total number of times the background writer stopped a cleaning scan because it had written too many buffers.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"buffers_backend_fsync": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "backend_fsync_total"),
-					"Total number of times a backend had to execute its own fsync call.",
+					prometheus.BuildFQName("postgres", "backends", "fsync_total"),
+					"Total number of times a backends had to execute its own fsync() call.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
-			"buffers_alloc": {
+			"alloc_bytes": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "backend_buffers_allocated_total"),
-					"Total number of buffers allocated.",
+					prometheus.BuildFQName("postgres", "backends", "allocated_bytes_total"),
+					"Total number of bytes allocated by backend.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"stats_age_seconds": {
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "bgwriter", "stats_age_seconds"),
-					"The age of the activity statistics, in seconds.",
+					"The age of the background writer activity statistics, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
@@ -96,6 +96,7 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 	}
 
 	stats := parsePostgresBgwriterStats(res)
+	blockSize := float64(config.BlockSize)
 
 	for name, desc := range c.descs {
 		switch name {
@@ -108,14 +109,14 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 			ch <- desc.mustNewConstMetric(stats.ckptSyncTime, "sync")
 		case "maxwritten_clean":
 			ch <- desc.mustNewConstMetric(stats.bgwrMaxWritten)
-		case "buffers_written":
-			ch <- desc.mustNewConstMetric(stats.ckptBuffers, "checkpointer")
-			ch <- desc.mustNewConstMetric(stats.bgwrBuffers, "bgwriter")
-			ch <- desc.mustNewConstMetric(stats.backendBuffers, "backend")
+		case "written_bytes":
+			ch <- desc.mustNewConstMetric(stats.ckptBuffers*blockSize, "checkpointer")
+			ch <- desc.mustNewConstMetric(stats.bgwrBuffers*blockSize, "bgwriter")
+			ch <- desc.mustNewConstMetric(stats.backendBuffers*blockSize, "backend")
 		case "buffers_backend_fsync":
 			ch <- desc.mustNewConstMetric(stats.backendFsync)
-		case "buffers_alloc":
-			ch <- desc.mustNewConstMetric(stats.backendAllocated)
+		case "alloc_bytes":
+			ch <- desc.mustNewConstMetric(stats.backendAllocated * blockSize)
 		case "stats_age_seconds":
 			ch <- desc.mustNewConstMetric(stats.statsAgeSeconds)
 		default:

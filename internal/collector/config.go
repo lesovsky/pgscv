@@ -27,6 +27,8 @@ type Config struct {
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
 type PostgresServiceConfig struct {
+	// BlockSize defines size of data block Postgres operates.
+	BlockSize int
 	// ServerVersionNum defines version of Postgres in XXYYZZ format.
 	ServerVersionNum int
 	// DataDirectory defines filesystem path where Postgres' data files and directories resides.
@@ -56,6 +58,18 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	defer conn.Close()
 
 	var setting string
+
+	// Get Postgres block size.
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'block_size'").Scan(&setting)
+	if err != nil {
+		return config, err
+	}
+	bsize, err := strconv.Atoi(setting)
+	if err != nil {
+		return config, err
+	}
+
+	config.BlockSize = bsize
 
 	// Get Postgres server version
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
