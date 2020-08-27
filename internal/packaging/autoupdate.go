@@ -43,12 +43,14 @@ func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 
 	log.Info("start background auto-update loop")
 	for {
+		err := RunUpdate(c)
+		if err != nil {
+			log.Errorln("auto-update failed: ", err)
+		}
+
 		select {
 		case <-time.After(defaultAutoUpdateInterval):
-			err := RunUpdate(c)
-			if err != nil {
-				log.Errorln("auto-update failed: ", err)
-			}
+			continue
 		case <-ctx.Done():
 			log.Info("exit signaled, stop auto-update")
 			return
