@@ -103,6 +103,7 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 			ch <- desc.mustNewConstMetric(stats.ckptTimed, "timed")
 			ch <- desc.mustNewConstMetric(stats.ckptReq, "req")
 		case "checkpoint_time":
+			ch <- desc.mustNewConstMetric(stats.ckptWriteTime+stats.ckptSyncTime, "total")
 			ch <- desc.mustNewConstMetric(stats.ckptWriteTime, "write")
 			ch <- desc.mustNewConstMetric(stats.ckptSyncTime, "sync")
 		case "maxwritten_clean":
