@@ -16,6 +16,7 @@ func (f Factories) RegisterSystemCollectors() {
 	f.register("diskstats", NewDiskstatsCollector)
 	f.register("filesystem", NewFilesystemCollector)
 	f.register("netdev", NewNetdevCollector)
+	f.register("network", NewNetworkCollector)
 	f.register("memory", NewMeminfoCollector)
 	f.register("system", NewSystemCollector)
 }
