@@ -308,7 +308,7 @@ func (repo *Repository) lookupServices(config Config) error {
 
 		name, err := proc.Name()
 		if err != nil {
-			log.Warnf("auto-discovery: no process name for pid %d: %s; skip", pid, err)
+			log.Debugf("auto-discovery: no process name for pid %d: %s; skip", pid, err)
 			continue // skip processes with no names
 		}
 
