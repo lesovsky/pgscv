@@ -79,7 +79,7 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 		res, err := conn.Query(postgresFunctionsQuery)
 		conn.Close()
 		if err != nil {
-			log.Warnf("get functions stat for datname %s failed: %s", err, d)
+			log.Warnf("get functions stat of database %s failed: %s", d, err)
 			continue
 		}
 

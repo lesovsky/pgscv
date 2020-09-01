@@ -102,7 +102,7 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 		res, err := conn.Query(userIndexesQuery)
 		conn.Close()
 		if err != nil {
-			log.Warnf("get indexes stat for datname %s failed: %s", err, d)
+			log.Warnf("get indexes stat of database %s failed: %s", d, err)
 			continue
 		}
 
