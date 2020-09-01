@@ -28,56 +28,84 @@ func TestPostgresSchemaCollector_Update(t *testing.T) {
 
 func Test_getSystemCatalogSize(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.NotEqual(t, float64(0), getSystemCatalogSize(conn))
+	got, err := getSystemCatalogSize(conn)
+	assert.NoError(t, err)
+	assert.NotEqual(t, float64(0), got)
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, float64(0), getSystemCatalogSize(conn))
+	got, err = getSystemCatalogSize(conn)
+	assert.Error(t, err)
+	assert.Equal(t, float64(0), got)
 }
 
 func Test_getSchemaNonPKTables(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaNonPKTables(conn)))
+	got, err := getSchemaNonPKTables(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaNonPKTables(conn)))
+	got, err = getSchemaNonPKTables(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
 
 func Test_getSchemaInvalidIndexes(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaInvalidIndexes(conn)))
+	got, err := getSchemaInvalidIndexes(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaInvalidIndexes(conn)))
+	got, err = getSchemaInvalidIndexes(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
 
 func Test_getSchemaNonIndexedFK(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaNonIndexedFK(conn)))
+	got, err := getSchemaNonIndexedFK(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaNonIndexedFK(conn)))
+	got, err = getSchemaNonIndexedFK(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
 
 func Test_getSchemaRedundantIndexes(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaRedundantIndexes(conn)))
+	got, err := getSchemaRedundantIndexes(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaRedundantIndexes(conn)))
+	got, err = getSchemaRedundantIndexes(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
 
 func Test_getSchemaSequences(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaSequences(conn)))
+	got, err := getSchemaSequences(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaSequences(conn)))
+	got, err = getSchemaSequences(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
 
 func Test_getSchemaFKDatatypeMismatch(t *testing.T) {
 	conn := store.NewTest(t)
-	assert.Less(t, 0, len(getSchemaFKDatatypeMismatch(conn)))
+	got, err := getSchemaFKDatatypeMismatch(conn)
+	assert.NoError(t, err)
+	assert.Less(t, 0, len(got))
 
 	_ = conn.Conn().Close(context.Background())
-	assert.Equal(t, 0, len(getSchemaFKDatatypeMismatch(conn)))
+	got, err = getSchemaFKDatatypeMismatch(conn)
+	assert.Error(t, err)
+	assert.Equal(t, 0, len(got))
 }
