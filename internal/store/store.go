@@ -20,21 +20,18 @@ func New(connString string) (*DB, error) {
 		return nil, err
 	}
 
-	// enable compatibility with pgbouncer
-	config.PreferSimpleProtocol = true
-
-	conn, err := pgx.ConnectConfig(context.Background(), config)
-	if err != nil {
-		return nil, err
-	}
-
-	return &DB{conn: conn}, nil
+	return NewWithConfig(config)
 }
 
-// NewWithConfig creates new connection to Postgres/Pgbouncer using passed Config
+// NewWithConfig creates new connection to Postgres/Pgbouncer using passed Config.
 func NewWithConfig(config *pgx.ConnConfig) (*DB, error) {
-	// enable compatibility with pgbouncer
+	// Enable simple protocol for compatibility with Pgbouncer.
 	config.PreferSimpleProtocol = true
+
+	// Explicitly set standard_conforming_strings to 'on' which is required when using simple protocol.
+	config.RuntimeParams = map[string]string{
+		"standard_conforming_strings": "on",
+	}
 
 	conn, err := pgx.ConnectConfig(context.Background(), config)
 	if err != nil {
