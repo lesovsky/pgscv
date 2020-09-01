@@ -170,8 +170,10 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 		}
 
 		res, err := conn.Query(userTablesQuery)
+		conn.Close()
 		if err != nil {
-			return err
+			log.Warnf("get tables stat for datname %s failed: %s", err, d)
+			continue
 		}
 
 		stats := parsePostgresTableStats(res, c.labelNames)

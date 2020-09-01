@@ -140,6 +140,8 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 			// 7. collect metrics related to sequences (available since Postgres 10).
 			collectSchemaSequences(conn, ch, c.sequences)
 		}
+
+		conn.Close()
 	}
 
 	return nil
