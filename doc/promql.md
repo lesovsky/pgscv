@@ -1,11 +1,21 @@
 ### PromQL Examples
 
 #### Index
+- [Get IO latencies](#get-io-latencies) (средняя latency IO запросов).
 - [Count usage over time](#count-usage-over-time) (Продолжительность длинного события).
 - [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
 - [Get indexes size depending on their usage](#get-indexes-size-depending-on-their-usage) (Значения на основе значений другой метрики)
 ---
+
+##### Get IO latencies
+Чтобы получить latency IO запросов, нужно взять отношение времени выполнения всех запросов к количеству выполненных запросов - `latency = T / n`.
+Обе метрики являются типом COUNTER поэтому считаем через rate() функцию.
+Метрика времени выражена в секундах и удобнее перевести её в миллисекунды домножив результат на 1000.
+Пример ниже показывает как взять latency для read запросов:
+```
+rate(node_disk_time_seconds_total{type="reads",device="sdb"}[5m]) / rate(node_disk_completed_total{type="reads", device="sdb"}[5m]) * 1000
+```
 
 ##### Count usage over time
 Есть процедура резервного копирования: 1) запускается с периодичностью; 2) имеет время начала и конца.
