@@ -100,20 +100,53 @@ func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
 }
 
 // Collect implements the prometheus.Collector interface.
-func (n PgscvCollector) Collect(ch chan<- prometheus.Metric) {
-	wg := sync.WaitGroup{}
-	wg.Add(len(n.Collectors))
+func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
+	wgCollector := sync.WaitGroup{}
+	wgSender := sync.WaitGroup{}
+
+	// Create pipe channel used transmitting metrics from collectors to sender.
+	pipelineIn := make(chan prometheus.Metric)
+
+	// Run collectors.
+	wgCollector.Add(len(n.Collectors))
 	for name, c := range n.Collectors {
 		go func(name string, c Collector) {
-			execute(name, n.Config, c, ch)
-			wg.Done()
+			collect(name, n.Config, c, pipelineIn)
+			wgCollector.Done()
 		}(name, c)
 	}
-	wg.Wait()
+
+	// Run sender.
+	wgSender.Add(1)
+	go func() {
+		send(pipelineIn, out)
+		wgSender.Done()
+	}()
+
+	// Wait until all collectors have been finished. Close the channel and allow to sender to send metrics.
+	wgCollector.Wait()
+	close(pipelineIn)
+
+	// Wait until metrics have been sent.
+	wgSender.Wait()
 }
 
-// execute acts like a middleware - it runs metric collection function and wraps it into instrumenting logic.
-func execute(name string, config Config, c Collector, ch chan<- prometheus.Metric) {
+// send acts like a middleware between metric collector functions which produces metrics and Prometheus who accepts metrics.
+func send(in <-chan prometheus.Metric, out chan<- prometheus.Metric) {
+	var metrics []prometheus.Metric
+	for m := range in {
+		metrics = append(metrics, m)
+	}
+
+	// implement other middlewares here.
+
+	for _, m := range metrics {
+		out <- m
+	}
+}
+
+// collect runs metric collection function and wraps it into instrumenting logic.
+func collect(name string, config Config, c Collector, ch chan<- prometheus.Metric) {
 	err := c.Update(config, ch)
 	if err != nil {
 		log.Errorf("%s collector failed; %s", name, err)
