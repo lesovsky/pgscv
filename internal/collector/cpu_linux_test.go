@@ -72,5 +72,4 @@ func Test_parseCPUStat(t *testing.T) {
 			assert.Error(t, err)
 		}
 	}
-
 }

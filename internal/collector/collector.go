@@ -133,14 +133,10 @@ func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
 
 // send acts like a middleware between metric collector functions which produces metrics and Prometheus who accepts metrics.
 func send(in <-chan prometheus.Metric, out chan<- prometheus.Metric) {
-	var metrics []prometheus.Metric
 	for m := range in {
-		metrics = append(metrics, m)
-	}
 
-	// implement other middlewares here.
+		// implement other middlewares here.
 
-	for _, m := range metrics {
 		out <- m
 	}
 }
