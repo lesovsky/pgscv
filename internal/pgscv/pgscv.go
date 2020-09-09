@@ -52,6 +52,7 @@ func Start(ctx context.Context, config *Config) error {
 	if config.AutoUpdateURL != "" {
 		go func() {
 			ac := &packaging.AutoupdateConfig{
+				BinaryPath:    config.BinaryPath,
 				BinaryVersion: config.BinaryVersion,
 				DistBaseURL:   config.AutoUpdateURL,
 			}

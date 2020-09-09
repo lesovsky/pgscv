@@ -9,6 +9,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
+	"golang.org/x/sys/unix"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -20,6 +21,7 @@ import (
 )
 
 type AutoupdateConfig struct {
+	BinaryPath    string
 	BinaryVersion string
 	DistBaseURL   string
 }
@@ -36,8 +38,9 @@ const (
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
 func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
-	if err := preCheck(); err != nil {
-		log.Warnln("auto-update disabled: ", err)
+	// Check directory with program executable is writable.
+	if err := checkRunDirectory(c.BinaryPath); err != nil {
+		log.Errorf("auto-update cannot start: %s", err)
 		return
 	}
 
@@ -360,4 +363,15 @@ func hashSha256(filename string) (string, error) {
 	}
 
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
+}
+
+// checkRunDirectory checks directory of passed path is writable.
+func checkRunDirectory(path string) error {
+	fields := strings.Split(path, "/")
+	if len(fields) == 0 {
+		return fmt.Errorf("empty slice")
+	}
+
+	rundir := strings.Join(fields[0:len(fields)-1], "/")
+	return unix.Access(rundir, unix.W_OK)
 }

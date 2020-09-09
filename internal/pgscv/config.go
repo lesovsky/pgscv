@@ -25,6 +25,7 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
+	BinaryPath           string                   // full path of the program, required for auto-update procedure
 	BinaryVersion        string                   // version of the program, required for auto-update procedure
 	AutoUpdateURL        string                   `json:"autoupdate_url"` // URL used for auto-update
 	RuntimeMode          int                      // application runtime mode
