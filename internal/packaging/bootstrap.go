@@ -29,7 +29,8 @@ const confFileTemplate = `{
 const unitTemplate = `
 [Unit]
 Description=pgSCV is the Weaponry platform agent for PostgreSQL ecosystem
-After=network.target
+Requires=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
