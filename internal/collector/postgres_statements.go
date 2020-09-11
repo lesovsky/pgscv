@@ -115,49 +115,49 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "query"})
 
 	for _, stat := range stats {
-		ch <- c.calls.mustNewConstMetric(stat.calls, stat.datname, stat.usename, stat.md5hash, stat.query)
-		ch <- c.rows.mustNewConstMetric(stat.rows, stat.datname, stat.usename, stat.md5hash)
-		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.datname, stat.usename, stat.md5hash, "total")
+		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash, stat.query)
+		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
+		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.usename, stat.datname, stat.md5hash, "total")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
 		if stat.blkReadTime > 0 || stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.datname, stat.usename, stat.md5hash, "executing")
+			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
 		}
 		if stat.blkReadTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.datname, stat.usename, stat.md5hash, "ioread")
+			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.usename, stat.datname, stat.md5hash, "ioread")
 		}
 		if stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.datname, stat.usename, stat.md5hash, "iowrite")
+			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.datname, stat.usename, stat.md5hash, "shared", "hit")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.usename, stat.datname, stat.md5hash, "shared", "hit")
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.datname, stat.usename, stat.md5hash, "shared", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.usename, stat.datname, stat.md5hash, "shared", "read")
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.datname, stat.usename, stat.md5hash, "shared", "dirtied")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.usename, stat.datname, stat.md5hash, "shared", "dirtied")
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.datname, stat.usename, stat.md5hash, "shared", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.usename, stat.datname, stat.md5hash, "shared", "written")
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.datname, stat.usename, stat.md5hash, "local", "hit")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.usename, stat.datname, stat.md5hash, "local", "hit")
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.datname, stat.usename, stat.md5hash, "local", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.usename, stat.datname, stat.md5hash, "local", "read")
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.datname, stat.usename, stat.md5hash, "local", "dirtied")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.usename, stat.datname, stat.md5hash, "local", "dirtied")
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.datname, stat.usename, stat.md5hash, "local", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.usename, stat.datname, stat.md5hash, "local", "written")
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.datname, stat.usename, stat.md5hash, "temp", "read")
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.usename, stat.datname, stat.md5hash, "temp", "read")
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.datname, stat.usename, stat.md5hash, "temp", "written")
+			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.usename, stat.datname, stat.md5hash, "temp", "written")
 		}
 	}
 
