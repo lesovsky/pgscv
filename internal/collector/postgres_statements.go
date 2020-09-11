@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"bytes"
 	"crypto/md5" // #nosec G501
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
@@ -12,16 +11,14 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"text/template"
 )
 
 const (
-	// postgresStatementsQueryTemplate defines template for querying statements metrics.
-	// 1. depending on user-requested AllowTrackSensitive, request or skip queries texts.
-	// 2. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
-	postgresStatementsQueryTemplate = `SELECT
+	// postgresStatementsQuery defines query for querying statements metrics.
+	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
+	postgresStatementsQuery = `SELECT
     d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    {{if .NoTrackMode }}'no-track'{{else}}regexp_replace(p.query,E'\\s+', ' ', 'g'){{end}} AS query,
+    p.queryid, regexp_replace(p.query,E'\\s+', ' ', 'g') AS query,
     p.calls, p.rows,
     p.total_time, p.blk_read_time, p.blk_write_time,
     nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
@@ -92,19 +89,8 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		return err
 	}
 
-	tmpl, err := template.New("query").Parse(postgresStatementsQueryTemplate)
-	if err != nil {
-		return err
-	}
-
-	params := struct{ NoTrackMode bool }{NoTrackMode: config.NoTrackMode}
-	var buf bytes.Buffer
-	if err = tmpl.Execute(&buf, params); err != nil {
-		return err
-	}
-
 	// get pg_stat_statements stats
-	res, err := conn.Query(buf.String())
+	res, err := conn.Query(postgresStatementsQuery)
 	if err != nil {
 		return err
 	}
@@ -112,10 +98,17 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	conn.Close()
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "query"})
+	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "queryid", "query"})
 
 	for _, stat := range stats {
-		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash, stat.query)
+		var query string
+		if config.NoTrackMode {
+			query = stat.queryid + " /* queryid only, no-track mode enabled */"
+		} else {
+			query = stat.query
+		}
+
+		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash, query)
 		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
 		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.usename, stat.datname, stat.md5hash, "total")
 
@@ -168,8 +161,9 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 type postgresStatementStat struct {
 	datname           string
 	usename           string
-	md5hash           string
+	queryid           string
 	query             string
+	md5hash           string
 	calls             float64
 	rows              float64
 	totalTime         float64
@@ -194,7 +188,7 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 	// process row by row - on every row construct 'statement' using datname/usename/queryHash trio. Next process other row's
 	// fields and collect stats for constructed 'statement'.
 	for _, row := range r.Rows {
-		var datname, usename, query, md5hash string
+		var datname, usename, queryid, query, md5hash string
 
 		// collect label values
 		for i, colname := range r.Colnames {
@@ -203,6 +197,8 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 				datname = row[i].String
 			case "usename":
 				usename = row[i].String
+			case "queryid":
+				queryid = row[i].String
 			case "query":
 				query = normalizeStatement(row[i].String)
 				md5hash = fmt.Sprintf("%x", md5.Sum([]byte(query))) // #nosec G401
@@ -214,7 +210,7 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		if _, ok := stats[statement]; !ok {
-			stats[statement] = postgresStatementStat{datname: datname, usename: usename, md5hash: md5hash, query: query}
+			stats[statement] = postgresStatementStat{datname: datname, usename: usename, queryid: queryid, query: query, md5hash: md5hash}
 		}
 
 		// fetch data values from columns
