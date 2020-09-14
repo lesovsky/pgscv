@@ -33,6 +33,8 @@ type PostgresServiceConfig struct {
 	ServerVersionNum int
 	// DataDirectory defines filesystem path where Postgres' data files and directories resides.
 	DataDirectory string
+	// LoggingCollector defines value of 'logging_collector' GUC.
+	LoggingCollector bool
 	// PgStatStatements defines is pg_stat_statements available in shared_preload_libraries and available for queries
 	PgStatStatements bool
 	// PgStatStatementsSource defines the database name where pg_stat_statements is available
@@ -41,10 +43,7 @@ type PostgresServiceConfig struct {
 
 // NewPostgresServiceConfig defines new config for Postgres-based collectors
 func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
-	var config = PostgresServiceConfig{
-		PgStatStatements:       false,
-		PgStatStatementsSource: "",
-	}
+	var config = PostgresServiceConfig{}
 
 	pgconfig, err := pgx.ParseConfig(connStr)
 	if err != nil {
@@ -95,17 +94,29 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 
 	config.DataDirectory = setting
 
+	// Get setting of 'logging_collector' GUC.
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'logging_collector'").Scan(&setting)
+	if err != nil {
+		return config, err
+	}
+
+	if setting == "on" {
+		config.LoggingCollector = true
+	}
+
 	// Get shared_preload_libraries (for inspecting enabled extensions).
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
 	if err != nil {
 		return config, err
 	}
-	if !strings.Contains(setting, "pg_stat_statements") {
+	if strings.Contains(setting, "pg_stat_statements") {
+		// Enable PgStatStatements, but leave empty PgStatStatementsSource, it will be filled at first execution of collector's Update method.
+		config.PgStatStatements = true
+		config.PgStatStatementsSource = ""
+	} else {
 		log.Info("pg_stat_statements is not found in shared_preload_libraries, disable pg_stat_statements metrics collection")
+		config.PgStatStatements = false
 	}
-
-	// Enable PgStatStatements, but leave empty PgStatStatementsSource, it will be filled at first execution of collector's Update method.
-	config.PgStatStatements = true
 
 	return config, nil
 }

@@ -342,7 +342,7 @@ func normalizeStatement(stmt string) string {
 	return strings.TrimSpace(stmt)
 }
 
-// NewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for qetting stats.
+// NewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for getting stats.
 // Executing this function supposes pg_stat_statements is already available in shared_preload_libraries (checked when
 // setting up service).
 func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
