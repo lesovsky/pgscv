@@ -217,7 +217,7 @@ func newPostgresDirStat(conn *store.DB, datadir string, version int) (*postgresD
 	}
 
 	err = conn.Conn().
-		QueryRow(context.Background(), "SELECT current_setting('log_directory') AS path, sum(size) AS bytes FROM pg_ls_logdir() WHERE current_setting('logging_collector') = 'on'").
+		QueryRow(context.Background(), "SELECT current_setting('log_directory') AS path, coalesce(sum(size), 0) AS bytes FROM pg_ls_logdir() WHERE current_setting('logging_collector') = 'on'").
 		Scan(&logdirPath, &logdirSizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("get log directory size failed: %s", err)
