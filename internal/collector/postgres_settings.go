@@ -6,6 +6,7 @@ import (
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ import (
 // postgresSettingsCollector defines metric descriptors and stats store.
 type postgresSettingsCollector struct {
 	settings typedDesc
+	files    typedDesc
 }
 
 // NewPostgresSettingsCollector returns a new Collector exposing postgres settings stats.
@@ -26,6 +28,14 @@ func NewPostgresSettingsCollector(constLabels prometheus.Labels) (Collector, err
 				prometheus.BuildFQName("postgres", "service", "settings"),
 				"Labeled information about Postgres configuration settings.",
 				[]string{"name", "setting", "unit", "vartype", "source"}, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
+		files: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "service", "files"),
+				"Labeled information about Postgres system files.",
+				[]string{"path", "mode"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -51,6 +61,18 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 
 	for _, s := range settings {
 		ch <- c.settings.mustNewConstMetric(s.value, s.name, s.setting, s.unit, s.vartype, "main")
+	}
+
+	query = `SELECT name, setting FROM pg_show_all_settings() WHERE name IN ('config_file','hba_file','ident_file','data_directory')`
+	res, err = conn.Query(query)
+	if err != nil {
+		return err
+	}
+
+	files := parsePostgresFiles(res)
+
+	for _, f := range files {
+		ch <- c.files.mustNewConstMetric(1, f.name, f.setting)
 	}
 
 	return nil
@@ -166,6 +188,37 @@ func newPostgresSetting(name, setting, unit, vartype string) (postgresSetting, e
 	default:
 		return postgresSetting{}, fmt.Errorf("unknown vartype: %s", vartype)
 	}
+}
+
+//
+func parsePostgresFiles(r *model.PGResult) []postgresSetting {
+	var settings []postgresSetting
+
+	for _, row := range r.Rows {
+		if len(row) != 2 {
+			log.Warnln("invalid number of columns, skip")
+			continue
+		}
+
+		// Important: order of items depends on order of columns in SELECT statement.
+		path := row[1].String
+		fi, err := os.Stat(path)
+		if err != nil {
+			log.Warnf("%s stat failed: %s; skip", path, err)
+		}
+
+		mode := fmt.Sprintf("%o", fi.Mode().Perm())
+
+		setting, err := newPostgresSetting(path, mode, "", "string")
+		if err != nil {
+			log.Warnf("failed create setting: %s (name=%s, setting=%s, unit=%s, vartype=%s); skip", err, path, mode, "", "string")
+		}
+
+		// Append setting to store.
+		settings = append(settings, setting)
+	}
+
+	return settings
 }
 
 // parseUnit parses pg_settings.unit value and normalize it to factor and base unit (bytes or seconds).

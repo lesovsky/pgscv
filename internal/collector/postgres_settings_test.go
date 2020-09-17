@@ -12,6 +12,7 @@ func TestPostgresSettingsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"postgres_service_settings",
+			"postgres_service_files",
 		},
 		collector: NewPostgresSettingsCollector,
 		service:   model.ServiceTypePostgresql,
@@ -49,6 +50,42 @@ func Test_parsePostgresSettings(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := parsePostgresSettings(tc.res)
+			assert.EqualValues(t, tc.want, got)
+		})
+	}
+}
+
+func Test_parsePostgresFiles(t *testing.T) {
+	var testCases = []struct {
+		name string
+		res  *model.PGResult
+		want []postgresSetting
+	}{
+		{
+			name: "normal output",
+			res: &model.PGResult{
+				Nrows:    4,
+				Ncols:    2,
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("name")}, {Name: []byte("setting")}},
+				Rows: [][]sql.NullString{
+					{{String: "config_file", Valid: true}, {String: "testdata/datadir/postgresql.conf.golden", Valid: true}},
+					{{String: "hba_file", Valid: true}, {String: "testdata/datadir/pg_hba.conf.golden", Valid: true}},
+					{{String: "ident_file", Valid: true}, {String: "testdata/datadir/pg_ident.conf.golden", Valid: true}},
+					{{String: "data_directory", Valid: true}, {String: "testdata/datadir", Valid: true}},
+				},
+			},
+			want: []postgresSetting{
+				{name: "testdata/datadir/postgresql.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
+				{name: "testdata/datadir/pg_hba.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
+				{name: "testdata/datadir/pg_ident.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
+				{name: "testdata/datadir", setting: "755", unit: "", vartype: "string", value: 0},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parsePostgresFiles(tc.res)
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
