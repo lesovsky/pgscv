@@ -5,6 +5,7 @@ import (
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
+	"os"
 	"testing"
 )
 
@@ -56,6 +57,12 @@ func Test_parsePostgresSettings(t *testing.T) {
 }
 
 func Test_parsePostgresFiles(t *testing.T) {
+	// set exact permissions because after CI's git clone permissions depend on used system umask.
+	assert.NoError(t, os.Chmod("testdata/datadir/postgresql.conf.golden", 0644))
+	assert.NoError(t, os.Chmod("testdata/datadir/pg_hba.conf.golden", 0644))
+	assert.NoError(t, os.Chmod("testdata/datadir/pg_ident.conf.golden", 0644))
+	assert.NoError(t, os.Chmod("testdata/datadir", 0755))
+
 	var testCases = []struct {
 		name string
 		res  *model.PGResult
