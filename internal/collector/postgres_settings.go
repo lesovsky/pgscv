@@ -35,7 +35,7 @@ func NewPostgresSettingsCollector(constLabels prometheus.Labels) (Collector, err
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "service", "files"),
 				"Labeled information about Postgres system files.",
-				[]string{"path", "mode"}, constLabels,
+				[]string{"guc", "mode", "path"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -72,7 +72,7 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 	files := parsePostgresFiles(res)
 
 	for _, f := range files {
-		ch <- c.files.mustNewConstMetric(1, f.name, f.setting)
+		ch <- c.files.mustNewConstMetric(1, f.guc, f.mode, f.path)
 	}
 
 	return nil
@@ -190,9 +190,16 @@ func newPostgresSetting(name, setting, unit, vartype string) (postgresSetting, e
 	}
 }
 
-//
-func parsePostgresFiles(r *model.PGResult) []postgresSetting {
-	var settings []postgresSetting
+// postgresFile describes various info about Postgres system files.
+type postgresFile struct {
+	path string
+	mode string
+	guc  string
+}
+
+// parsePostgresFiles parses query result and produces slice with info about Postgres system files.
+func parsePostgresFiles(r *model.PGResult) []postgresFile {
+	var files []postgresFile
 
 	for _, row := range r.Rows {
 		if len(row) != 2 {
@@ -201,24 +208,25 @@ func parsePostgresFiles(r *model.PGResult) []postgresSetting {
 		}
 
 		// Important: order of items depends on order of columns in SELECT statement.
-		path := row[1].String
+		guc, path := row[0].String, row[1].String
 		fi, err := os.Stat(path)
 		if err != nil {
 			log.Warnf("%s stat failed: %s; skip", path, err)
 		}
 
-		mode := fmt.Sprintf("%o", fi.Mode().Perm())
+		mode := fmt.Sprintf("%04o", fi.Mode().Perm())
 
-		setting, err := newPostgresSetting(path, mode, "", "string")
-		if err != nil {
-			log.Warnf("failed create setting: %s (name=%s, setting=%s, unit=%s, vartype=%s); skip", err, path, mode, "", "string")
+		file := postgresFile{
+			path: path,
+			mode: mode,
+			guc:  guc,
 		}
 
-		// Append setting to store.
-		settings = append(settings, setting)
+		// Append file to store.
+		files = append(files, file)
 	}
 
-	return settings
+	return files
 }
 
 // parseUnit parses pg_settings.unit value and normalize it to factor and base unit (bytes or seconds).

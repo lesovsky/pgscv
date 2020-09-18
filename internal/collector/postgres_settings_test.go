@@ -59,7 +59,7 @@ func Test_parsePostgresFiles(t *testing.T) {
 	var testCases = []struct {
 		name string
 		res  *model.PGResult
-		want []postgresSetting
+		want []postgresFile
 	}{
 		{
 			name: "normal output",
@@ -74,11 +74,11 @@ func Test_parsePostgresFiles(t *testing.T) {
 					{{String: "data_directory", Valid: true}, {String: "testdata/datadir", Valid: true}},
 				},
 			},
-			want: []postgresSetting{
-				{name: "testdata/datadir/postgresql.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
-				{name: "testdata/datadir/pg_hba.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
-				{name: "testdata/datadir/pg_ident.conf.golden", setting: "644", unit: "", vartype: "string", value: 0},
-				{name: "testdata/datadir", setting: "755", unit: "", vartype: "string", value: 0},
+			want: []postgresFile{
+				{path: "testdata/datadir/postgresql.conf.golden", mode: "0644", guc: "config_file"},
+				{path: "testdata/datadir/pg_hba.conf.golden", mode: "0644", guc: "hba_file"},
+				{path: "testdata/datadir/pg_ident.conf.golden", mode: "0644", guc: "ident_file"},
+				{path: "testdata/datadir", mode: "0755", guc: "data_directory"},
 			},
 		},
 	}
