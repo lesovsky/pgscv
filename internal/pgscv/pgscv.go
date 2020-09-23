@@ -156,6 +156,11 @@ func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repo
 	// metrics for every discovered service is wrapped into a separate push
 	for _, id := range servicesIDs {
 		var svc = repo.GetService(id)
+		if svc.TotalErrors > 0 {
+			log.Infof("service [%s] marked as failed: don't collect metrics until service recovers", svc.ServiceID)
+			continue
+		}
+
 		if svc.Collector == nil {
 			log.Infof("collector for service [%s] not initialized yet: try collecting metrics later", svc.ServiceID)
 			continue
