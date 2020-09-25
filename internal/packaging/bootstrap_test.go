@@ -122,8 +122,8 @@ func Test_createConfigFile(t *testing.T) {
 			err := createConfigFile(&tc.in)
 			if tc.valid {
 				assert.NoError(t, err)
-				assert.FileExists(t, "/tmp/testexec.json")
-				assert.NoError(t, os.Remove("/tmp/testexec.json"))
+				assert.FileExists(t, "/tmp/testexec.yaml")
+				assert.NoError(t, os.Remove("/tmp/testexec.yaml"))
 			} else {
 				assert.Error(t, err)
 			}

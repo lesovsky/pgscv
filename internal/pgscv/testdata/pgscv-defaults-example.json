@@ -1,9 +1,0 @@
-{
-  "listen_address": "127.0.0.1:8080",
-  "defaults": {
-    "postgres_username": "testuser",
-    "postgres_password": "testpassword",
-    "pgbouncer_username": "testuser2",
-    "pgbouncer_password": "testapassword2"
-  }
-}

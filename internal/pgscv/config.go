@@ -1,13 +1,13 @@
 package pgscv
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
+	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"
 	"time"
@@ -27,17 +27,17 @@ const (
 type Config struct {
 	BinaryPath           string                   // full path of the program, required for auto-update procedure
 	BinaryVersion        string                   // version of the program, required for auto-update procedure
-	AutoUpdateURL        string                   `json:"autoupdate_url"` // URL used for auto-update
+	AutoUpdateURL        string                   `yaml:"autoupdate_url"` // URL used for auto-update
 	RuntimeMode          int                      // application runtime mode
-	NoTrackMode          bool                     `json:"no_track_mode"`       // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                   `json:"listen_address"`      // Network address and port where the application should listen on
-	MetricsServiceURL    string                   `json:"metrics_service_url"` // URL of Weaponry service metric gateway
+	NoTrackMode          bool                     `yaml:"no_track_mode"`       // controls tracking sensitive information (query texts, etc)
+	ListenAddress        string                   `yaml:"listen_address"`      // Network address and port where the application should listen on
+	MetricsServiceURL    string                   `yaml:"metrics_service_url"` // URL of Weaponry service metric gateway
 	MetricsSendInterval  time.Duration            // Metric send interval
-	APIKey               string                   `json:"api_key"`    // API key for accessing to Weaponry
-	ProjectID            int                      `json:"project_id"` // ProjectID specifies project_id label value
-	ServicesConnSettings []service.ConnSetting    `json:"services"`   // Slice of connection settings for exact services
-	Defaults             map[string]string        `json:"defaults"`   // Defaults
-	Filters              map[string]filter.Filter `json:"filters"`
+	APIKey               string                   `yaml:"api_key"`    // API key for accessing to Weaponry
+	ProjectID            int                      `yaml:"project_id"` // ProjectID specifies project_id label value
+	ServicesConnSettings []service.ConnSetting    `yaml:"services"`   // Slice of connection settings for exact services
+	Defaults             map[string]string        `yaml:"defaults"`   // Defaults
+	Filters              map[string]filter.Filter `yaml:"filters"`
 }
 
 // NewConfig creates new config based on config file.
@@ -48,7 +48,7 @@ func NewConfig(configFilePath string) (*Config, error) {
 	}
 
 	config := Config{Defaults: map[string]string{}}
-	err = json.Unmarshal(content, &config)
+	err = yaml.Unmarshal(content, &config)
 	if err != nil {
 		return nil, err
 	}

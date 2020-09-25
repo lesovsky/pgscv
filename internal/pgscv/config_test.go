@@ -18,7 +18,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:  "valid: PULL example",
 			valid: true,
-			file:  "testdata/pgscv-pull-example.json",
+			file:  "testdata/pgscv-pull-example.yaml",
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
@@ -27,7 +27,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:  "valid: PUSH example",
 			valid: true,
-			file:  "testdata/pgscv-push-example.json",
+			file:  "testdata/pgscv-push-example.yaml",
 			want: &Config{
 				APIKey:            "TEST1234TEST-TEST-1234-TEST1234",
 				ProjectID:         1,
@@ -38,7 +38,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:  "valid: with defaults",
 			valid: true,
-			file:  "testdata/pgscv-defaults-example.json",
+			file:  "testdata/pgscv-defaults-example.yaml",
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults: map[string]string{
@@ -50,7 +50,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:  "valid: with services",
 			valid: true,
-			file:  "testdata/pgscv-services-example.json",
+			file:  "testdata/pgscv-services-example.yaml",
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
@@ -63,7 +63,7 @@ func TestNewConfig(t *testing.T) {
 		{
 			name:  "valid: with filters",
 			valid: true,
-			file:  "testdata/pgscv-filters-example.json",
+			file:  "testdata/pgscv-filters-example.yaml",
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
@@ -88,7 +88,7 @@ func TestNewConfig(t *testing.T) {
 	}
 
 	// try to open unknown file
-	_, err := NewConfig("testdata/nonexistent.json")
+	_, err := NewConfig("testdata/nonexistent.yaml")
 	assert.Error(t, err)
 
 	// try to open invalid file

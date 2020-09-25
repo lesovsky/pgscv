@@ -8,11 +8,11 @@ import (
 // Filter describes settings for filtering stats values for metrics.
 type Filter struct {
 	// Exclude pattern string.
-	Exclude string `json:"exclude,omitempty"`
+	Exclude string `yaml:"exclude,omitempty"`
 	// Compiled exclude pattern regexp.
 	ExcludeRE *regexp.Regexp
 	// Include pattern string.
-	Include string `json:"include,omitempty"`
+	Include string `yaml:"include,omitempty"`
 	// Compiled include pattern regexp.
 	IncludeRE *regexp.Regexp
 }

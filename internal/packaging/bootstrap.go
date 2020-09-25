@@ -12,18 +12,15 @@ import (
 	"text/template"
 )
 
-const confFileTemplate = `{
-  "autoupdate_url": "{{ .AutoUpdateURL}}",
-  "api_key": "{{ .APIKey }}",
-  "project_id": {{ .ProjectID }},
-  "metrics_service_url": "{{ .MetricServiceBaseURL }}",
-  "defaults": {
-    "postgres_username": "pgscv",
-    "postgres_password": "{{ .DefaultPostgresPassword }}",
-    "pgbouncer_username": "pgscv",
-    "pgbouncer_password": "{{ .DefaultPgbouncerPassword }}"
-  }
-}
+const confFileTemplate = `autoupdate_url: "{{ .AutoUpdateURL}}"
+api_key: "{{ .APIKey }}"
+project_id: {{ .ProjectID }}
+metrics_service_url: "{{ .MetricServiceBaseURL }}"
+defaults:
+    postgres_username: "pgscv"
+    postgres_password: "{{ .DefaultPostgresPassword }}"
+    pgbouncer_username: "pgscv"
+    pgbouncer_password: "{{ .DefaultPgbouncerPassword }}
 `
 
 const unitTemplate = `
@@ -39,7 +36,7 @@ User={{ .RunAsUser }}
 Group={{ .RunAsUser }}
 
 # Start the agent process
-ExecStart=/usr/bin/{{ .ExecutableName }} --config-file=/etc/{{ .ExecutableName }}.json
+ExecStart=/usr/bin/{{ .ExecutableName }} --config-file=/etc/{{ .ExecutableName }}.yaml
 
 # Only kill the agent process
 KillMode=process
@@ -190,7 +187,7 @@ func createConfigFile(config *BootstrapConfig) error {
 	}
 
 	// create config-file with proper permissions
-	conffile := fmt.Sprintf("%s/%s.json", config.configPathPrefix, config.ExecutableName)
+	conffile := fmt.Sprintf("%s/%s.yaml", config.configPathPrefix, config.ExecutableName)
 	f, err := os.Create(conffile)
 	if err != nil {
 		return fmt.Errorf("create config file failed: %s", err)

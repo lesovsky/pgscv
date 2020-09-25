@@ -61,7 +61,7 @@ type Config struct {
 	RuntimeMode  int
 	NoTrackMode  bool
 	ProjectID    string
-	ConnDefaults map[string]string `json:"defaults"` // Defaults
+	ConnDefaults map[string]string `yaml:"defaults"` // Defaults
 	ConnSettings []ConnSetting
 	Filters      map[string]filter.Filter
 }
@@ -76,9 +76,9 @@ type Collector interface {
 // is used for representing services defined by user in the config file.
 type ConnSetting struct {
 	// ServiceType defines type of service for which these connection settings are used.
-	ServiceType string `json:"service_type"`
+	ServiceType string `yaml:"service_type"`
 	// Conninfo is the connection string in service-specific format.
-	Conninfo string `json:"conninfo"`
+	Conninfo string `yaml:"conninfo"`
 }
 
 // connectionParams is the set of parameters that may be required when constructing connection string.

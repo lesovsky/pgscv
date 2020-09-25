@@ -63,7 +63,7 @@ func removeServiceUnit() error {
 // removeConfig removes configuration file
 func removeConfig() error {
 	log.Info("Remove config file")
-	return os.Remove(filepath.Clean(fmt.Sprintf("%s/%s.json", defaultConfigPathPrefix, defaultExecutableName)))
+	return os.Remove(filepath.Clean(fmt.Sprintf("%s/%s.yaml", defaultConfigPathPrefix, defaultExecutableName)))
 }
 
 // removeBinary removes binary
