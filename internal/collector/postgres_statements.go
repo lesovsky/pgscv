@@ -59,7 +59,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		calls: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "calls_total"),
-				"Total number of times query has been executed.",
+				"Total number of times statement has been executed.",
 				[]string{"usename", "datname", "md5", "query"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -74,15 +74,15 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		},
 		times: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "time_total"),
-				"Total time spent in the statement in each mode, in seconds.",
+				prometheus.BuildFQName("postgres", "statements", "time_seconds"),
+				"Time spent by the statement in each mode, in seconds.",
 				[]string{"usename", "datname", "md5", "mode"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		blocks: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "blocks_total"),
-				"Total number of block processed by the statement in each mode.",
+				prometheus.BuildFQName("postgres", "statements", "blocks"),
+				"Number of blocks processed by the statement in each mode.",
 				[]string{"usename", "datname", "md5", "type", "access"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
