@@ -145,3 +145,17 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 		})
 	}
 }
+
+func Test_selectActivityQuery(t *testing.T) {
+	testcases := []struct {
+		version int
+		want    string
+	}{
+		{version: PostgresV95, want: postgresActivityQuery95},
+		{version: PostgresV96, want: postgresActivityQueryLatest},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, selectActivityQuery(tc.version))
+	}
+}

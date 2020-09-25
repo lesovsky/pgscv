@@ -15,6 +15,7 @@ const (
 	PostgresV96 = 90600
 	PostgresV10 = 100000
 	PostgresV12 = 120000
+	PostgresV13 = 130000
 
 	// Minimal required version is 9.5.
 	PostgresVMinNum = PostgresV95

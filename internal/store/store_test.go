@@ -37,8 +37,7 @@ func TestNewWithConfig(t *testing.T) {
 		valid    bool
 		database string
 	}{
-		{valid: true, database: "postgres"},
-		{valid: true, database: ""},
+		{valid: true, database: "pgscv_fixtures"},
 		{valid: false, database: "__invalid__"},
 	}
 

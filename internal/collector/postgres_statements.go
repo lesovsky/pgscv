@@ -14,13 +14,27 @@ import (
 )
 
 const (
-	// postgresStatementsQuery defines query for querying statements metrics.
-	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
-	postgresStatementsQuery = `SELECT
+	// postgresStatementsQuery12 defines query for querying statements metrics for PG12 and older.
+	postgresStatementsQuery12 = `SELECT
     d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
     p.queryid, regexp_replace(p.query,E'\\s+', ' ', 'g') AS query,
     p.calls, p.rows,
     p.total_time, p.blk_read_time, p.blk_write_time,
+    nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
+    nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written,
+    nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read,
+    nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written,
+    nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written
+FROM pg_stat_statements p
+JOIN pg_database d ON d.oid=p.dbid`
+
+	// postgresStatementsQueryLatest defines query for querying statements metrics.
+	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
+	postgresStatementsQueryLatest = `SELECT
+    d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
+    p.queryid, regexp_replace(p.query,E'\\s+', ' ', 'g') AS query,
+    p.calls, p.rows,
+    p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time,
     nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
     nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written,
     nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read,
@@ -90,7 +104,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	}
 
 	// get pg_stat_statements stats
-	res, err := conn.Query(postgresStatementsQuery)
+	res, err := conn.Query(selectStatementsQuery(config.ServerVersionNum))
 	if err != nil {
 		return err
 	}
@@ -108,14 +122,20 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 			query = stat.query
 		}
 
+		// Note: pg_stat_statements.total_exec_time (and .total_time) includes blk_read_time and blk_write_time implicitly.
+		// Remember that when creating metrics.
+
 		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash, query)
 		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
-		ch <- c.times.mustNewConstMetric(stat.totalTime, stat.usename, stat.datname, stat.md5hash, "total")
+
+		// total = planning + execution; execution already includes io time.
+		ch <- c.times.mustNewConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash, "total")
+		ch <- c.times.mustNewConstMetric(stat.totalPlanTime, stat.usename, stat.datname, stat.md5hash, "planning")
+
+		// execution time = execution - io times.
+		ch <- c.times.mustNewConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
-		if stat.blkReadTime > 0 || stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.totalTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
-		}
 		if stat.blkReadTime > 0 {
 			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.usename, stat.datname, stat.md5hash, "ioread")
 		}
@@ -166,7 +186,8 @@ type postgresStatementStat struct {
 	md5hash           string
 	calls             float64
 	rows              float64
-	totalTime         float64
+	totalExecTime     float64
+	totalPlanTime     float64
 	blkReadTime       float64
 	blkWriteTime      float64
 	sharedBlksHit     float64
@@ -244,9 +265,13 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 				s := stats[statement]
 				s.rows += v
 				stats[statement] = s
-			case "total_time":
+			case "total_time", "total_exec_time":
 				s := stats[statement]
-				s.totalTime += v
+				s.totalExecTime += v
+				stats[statement] = s
+			case "total_plan_time":
+				s := stats[statement]
+				s.totalPlanTime += v
 				stats[statement] = s
 			case "blk_read_time":
 				s := stats[statement]
@@ -407,4 +432,14 @@ func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
 
 	// No luck, if we are here it means all database checked and pg_stat_statements is not found (not installed?)
 	return nil, fmt.Errorf("pg_stat_statements not found")
+}
+
+// selectStatementsQuery returns suitable statements query depending on passed version.
+func selectStatementsQuery(version int) string {
+	switch {
+	case version < PostgresV13:
+		return postgresStatementsQuery12
+	default:
+		return postgresStatementsQueryLatest
+	}
 }

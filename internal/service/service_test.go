@@ -103,7 +103,7 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 		},
 		{
 			name:     "unavailable service",
-			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=15432"}}},
+			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=1"}}},
 			expected: 1,
 		},
 	}
@@ -486,6 +486,6 @@ func Test_newPgbouncerConnectionString(t *testing.T) {
 }
 
 func Test_attemptConnect(t *testing.T) {
-	assert.NoError(t, attemptConnect("host=127.0.0.1 port=5432 user=postgres dbname=postgres"))
+	assert.NoError(t, attemptConnect("host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"))
 	assert.Error(t, attemptConnect("host=127.0.0.1 port=12345 user=invalid dbname=invalid"))
 }
