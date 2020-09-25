@@ -587,7 +587,7 @@ func newPostgresConnectionString(connParams connectionParams, defaults map[strin
 func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", proc.Pid)
 
-	cmdline, err := proc.CmdlineSlice()
+	cmdline, err := proc.Cmdline()
 	if err != nil {
 		return Service{}, err
 	}
@@ -596,12 +596,11 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 		return Service{}, fmt.Errorf("empty cmdline")
 	}
 
-	// inifile is always the last argument in cmdline string, take it
-	// TODO - it's not true, config file also could be between other args. Test it with -R arg.
-	var iniFilePath = cmdline[len(cmdline)-1]
+	// extract config file location from cmdline
+	configFilePath := parsePgbouncerCmdline(cmdline)
 
 	// parse ini file
-	connParams, err := parsePgbouncerIniFile(iniFilePath)
+	connParams, err := parsePgbouncerIniFile(configFilePath)
 	if err != nil {
 		return Service{}, err
 	}
@@ -730,6 +729,21 @@ func attemptConnect(connString string) error {
 	log.Debug("test connection success")
 
 	return nil
+}
+
+// parsePgbouncerCmdline parses pgbouncer's cmdline and extract config file location.
+func parsePgbouncerCmdline(cmdline string) string {
+	parts := strings.Fields(cmdline)
+
+	// For extracting config file from cmdline we should skip first argument (pgbouncer executable) and skip all arguments
+	// which starting with '-' symbol. See test function for examples.
+
+	for _, s := range parts[1:] {
+		if !strings.HasPrefix(s, "-") {
+			return s
+		}
+	}
+	return ""
 }
 
 // stringsContains returns true if array of strings contains specific string

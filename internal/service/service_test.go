@@ -489,3 +489,27 @@ func Test_attemptConnect(t *testing.T) {
 	assert.NoError(t, attemptConnect("host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"))
 	assert.Error(t, attemptConnect("host=127.0.0.1 port=12345 user=invalid dbname=invalid"))
 }
+
+func Test_parsePgbouncerCmdline(t *testing.T) {
+	testcases := []struct {
+		cmdline string
+		want    string
+	}{
+		{cmdline: "/usr/sbin/pgbouncer -d /etc/pgbouncer/pgbouncer.ini", want: "/etc/pgbouncer/pgbouncer.ini"},
+		{cmdline: "/usr/sbin/pgbouncer -d /etc/pgbouncer/pgbouncer.ini -R", want: "/etc/pgbouncer/pgbouncer.ini"},
+		// this is an unusual, but possible case.
+		{cmdline: "/usr/sbin/pgbouncer -d ./pgbouncer.ini -R", want: "./pgbouncer.ini"},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, parsePgbouncerCmdline(tc.cmdline))
+	}
+}
+
+func Test_stringsContains(t *testing.T) {
+	ss := []string{"first_example_string", "second_example_string", "third_example_string"}
+
+	assert.True(t, stringsContains(ss, "first_example_string"))
+	assert.False(t, stringsContains(ss, "unknown_string"))
+	assert.False(t, stringsContains(nil, "example"))
+}
