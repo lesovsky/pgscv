@@ -22,7 +22,7 @@ type postgresSchemaCollector struct {
 
 // NewPostgresSchemaCollector returns a new Collector exposing postgres schema stats. Stats are based on different
 // sources inside system catalog.
-func NewPostgresSchemaCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresSchemasCollector(constLabels prometheus.Labels) (Collector, error) {
 	return &postgresSchemaCollector{
 		syscatalog: typedDesc{
 			desc: prometheus.NewDesc(

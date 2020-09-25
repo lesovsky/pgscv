@@ -38,6 +38,7 @@ type Config struct {
 	ServicesConnSettings []service.ConnSetting    `yaml:"services"`   // Slice of connection settings for exact services
 	Defaults             map[string]string        `yaml:"defaults"`   // Defaults
 	Filters              map[string]filter.Filter `yaml:"filters"`
+	DisableCollectors    []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled.
 }
 
 // NewConfig creates new config based on config file.

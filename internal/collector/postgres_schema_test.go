@@ -19,7 +19,7 @@ func TestPostgresSchemaCollector_Update(t *testing.T) {
 			"postgres_schema_seq_exhaustion_ratio",
 			"postgres_schema_mistyped_fkeys_total",
 		},
-		collector: NewPostgresSchemaCollector,
+		collector: NewPostgresSchemasCollector,
 		service:   model.ServiceTypePostgresql,
 	}
 

@@ -9,7 +9,7 @@ import (
 func TestPgscvCollector_Collect(t *testing.T) {
 	// Create test stuff - factory and collector, register system only metrics.
 	f := Factories{}
-	f.RegisterSystemCollectors()
+	f.RegisterSystemCollectors([]string{})
 	c, err := NewPgscvCollector("0", "test:0", f, Config{})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)

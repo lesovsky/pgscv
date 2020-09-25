@@ -11,37 +11,87 @@ import (
 type Factories map[string]func(prometheus.Labels) (Collector, error)
 
 // RegisterSystemCollectors unions all system-related collectors and registers them in single place.
-func (f Factories) RegisterSystemCollectors() {
-	f.register("cpu", NewCPUCollector)
-	f.register("diskstats", NewDiskstatsCollector)
-	f.register("filesystem", NewFilesystemCollector)
-	f.register("netdev", NewNetdevCollector)
-	f.register("network", NewNetworkCollector)
-	f.register("memory", NewMeminfoCollector)
-	f.register("system", NewSystemCollector)
+func (f Factories) RegisterSystemCollectors(disabled []string) {
+	if stringsContains(disabled, "system") {
+		log.Debugln("disable all system collectors")
+		return
+	}
+
+	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"system/cpu":         NewCPUCollector,
+		"system/diskstats":   NewDiskstatsCollector,
+		"system/filesystems": NewFilesystemCollector,
+		"system/netdev":      NewNetdevCollector,
+		"system/network":     NewNetworkCollector,
+		"system/memory":      NewMeminfoCollector,
+		"system/sysconfig":   NewSysconfigCollector,
+	}
+
+	for name, fn := range funcs {
+		if stringsContains(disabled, name) {
+			log.Debugln("disable ", name)
+			continue
+		}
+
+		log.Debugln("enable ", name)
+		f.register(name, fn)
+	}
 }
 
 // RegisterPostgresCollectors unions all postgres-related collectors and registers them in single place.
-func (f Factories) RegisterPostgresCollectors() {
-	f.register("activity", NewPostgresActivityCollector)
-	f.register("bgwriter", NewPostgresBgwriterCollector)
-	f.register("conflicts", NewPostgresConflictsCollector)
-	f.register("database", NewPostgresDatabasesCollector)
-	f.register("index", NewPostgresIndexesCollector)
-	f.register("function", NewPostgresFunctionsCollector)
-	f.register("replication", NewPostgresReplicationCollector)
-	f.register("replication_slot", NewPostgresReplicationSlotCollector)
-	f.register("statements", NewPostgresStatementsCollector)
-	f.register("schema", NewPostgresSchemaCollector)
-	f.register("setting", NewPostgresSettingsCollector)
-	f.register("storage", NewPostgresStorageCollector)
-	f.register("table", NewPostgresTablesCollector)
+func (f Factories) RegisterPostgresCollectors(disabled []string) {
+	if stringsContains(disabled, "postgres") {
+		log.Debugln("disable all postgres collectors")
+		return
+	}
+
+	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"postgres/activity":          NewPostgresActivityCollector,
+		"postgres/bgwriter":          NewPostgresBgwriterCollector,
+		"postgres/conflicts":         NewPostgresConflictsCollector,
+		"postgres/databases":         NewPostgresDatabasesCollector,
+		"postgres/indexes":           NewPostgresIndexesCollector,
+		"postgres/functions":         NewPostgresFunctionsCollector,
+		"postgres/replication":       NewPostgresReplicationCollector,
+		"postgres/replication_slots": NewPostgresReplicationSlotsCollector,
+		"postgres/statements":        NewPostgresStatementsCollector,
+		"postgres/schemas":           NewPostgresSchemasCollector,
+		"postgres/settings":          NewPostgresSettingsCollector,
+		"postgres/storage":           NewPostgresStorageCollector,
+		"postgres/tables":            NewPostgresTablesCollector,
+	}
+
+	for name, fn := range funcs {
+		if stringsContains(disabled, name) {
+			log.Debugln("disable ", name)
+			continue
+		}
+		log.Debugln("enable ", name)
+		f.register(name, fn)
+	}
 }
 
 // RegisterPgbouncerCollectors unions all pgbouncer-related collectors and registers them in single place.
-func (f Factories) RegisterPgbouncerCollectors() {
-	f.register("pool", NewPgbouncerPoolsCollector)
-	f.register("stats", NewPgbouncerStatsCollector)
+func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
+	if stringsContains(disabled, "pgbouncer") {
+		log.Debugln("disable all pgbouncer collectors")
+		return
+	}
+
+	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"pgbouncer/pools": NewPgbouncerPoolsCollector,
+		"pgbouncer/stats": NewPgbouncerStatsCollector,
+	}
+
+	for name, fn := range funcs {
+		if stringsContains(disabled, name) {
+			log.Debugln("disable ", name)
+			continue
+		}
+
+		log.Debugln("enable ", name)
+		f.register(name, fn)
+	}
 }
 
 // register is the generic routine which register any kind of collectors.

@@ -58,12 +58,13 @@ type Service struct {
 
 // Config defines service's configuration.
 type Config struct {
-	RuntimeMode  int
-	NoTrackMode  bool
-	ProjectID    string
-	ConnDefaults map[string]string `yaml:"defaults"` // Defaults
-	ConnSettings []ConnSetting
-	Filters      map[string]filter.Filter
+	RuntimeMode        int
+	NoTrackMode        bool
+	ProjectID          string
+	ConnDefaults       map[string]string `yaml:"defaults"` // Defaults
+	ConnSettings       []ConnSetting
+	Filters            map[string]filter.Filter
+	DisabledCollectors []string
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -372,9 +373,9 @@ func (repo *Repository) setupServices(config Config) error {
 
 			switch service.ConnSettings.ServiceType {
 			case model.ServiceTypeSystem:
-				factories.RegisterSystemCollectors()
+				factories.RegisterSystemCollectors(config.DisabledCollectors)
 			case model.ServiceTypePostgresql:
-				factories.RegisterPostgresCollectors()
+				factories.RegisterPostgresCollectors(config.DisabledCollectors)
 				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
 				if err != nil {
 					log.Errorf("service [%s] setup failed: %s; skip", service.ServiceID, err)
@@ -382,7 +383,7 @@ func (repo *Repository) setupServices(config Config) error {
 				}
 				collectorConfig.PostgresServiceConfig = cfg
 			case model.ServiceTypePgbouncer:
-				factories.RegisterPgbouncerCollectors()
+				factories.RegisterPgbouncerCollectors(config.DisabledCollectors)
 			default:
 				continue
 			}

@@ -20,7 +20,7 @@ func TestSystemCollector_Update(t *testing.T) {
 		optional: []string{
 			"node_system_scaling_governors_total",
 		},
-		collector: NewSystemCollector,
+		collector: NewSysconfigCollector,
 	}
 
 	pipeline(t, input)

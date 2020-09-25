@@ -14,7 +14,7 @@ func TestPostgresReplicationSlotCollector_Update(t *testing.T) {
 		optional: []string{
 			"postgres_replication_slot_wal_retain_bytes",
 		},
-		collector: NewPostgresReplicationSlotCollector,
+		collector: NewPostgresReplicationSlotsCollector,
 		service:   model.ServiceTypePostgresql,
 	}
 

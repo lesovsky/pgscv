@@ -25,7 +25,7 @@ type postgresReplicationSlotCollector struct {
 
 // NewPostgresReplicationSlotCollector returns a new Collector exposing postgres replication slots stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-replication-slots.html
-func NewPostgresReplicationSlotCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresReplicationSlotsCollector(constLabels prometheus.Labels) (Collector, error) {
 	var labelNames = []string{"database", "slot_name", "slot_type", "active"}
 
 	return &postgresReplicationSlotCollector{

@@ -24,12 +24,13 @@ func Start(ctx context.Context, config *Config) error {
 	serviceRepo := service.NewRepository()
 
 	serviceConfig := service.Config{
-		RuntimeMode:  config.RuntimeMode,
-		NoTrackMode:  config.NoTrackMode,
-		ProjectID:    strconv.Itoa(config.ProjectID),
-		ConnDefaults: config.Defaults,
-		ConnSettings: config.ServicesConnSettings,
-		Filters:      config.Filters,
+		RuntimeMode:        config.RuntimeMode,
+		NoTrackMode:        config.NoTrackMode,
+		ProjectID:          strconv.Itoa(config.ProjectID),
+		ConnDefaults:       config.Defaults,
+		ConnSettings:       config.ServicesConnSettings,
+		Filters:            config.Filters,
+		DisabledCollectors: config.DisableCollectors,
 	}
 
 	if config.ServicesConnSettings == nil {
