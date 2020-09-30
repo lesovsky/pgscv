@@ -52,6 +52,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 		"postgres/databases":         NewPostgresDatabasesCollector,
 		"postgres/indexes":           NewPostgresIndexesCollector,
 		"postgres/functions":         NewPostgresFunctionsCollector,
+		"postgres/logs":              NewPostgresLogsCollector,
 		"postgres/replication":       NewPostgresReplicationCollector,
 		"postgres/replication_slots": NewPostgresReplicationSlotsCollector,
 		"postgres/statements":        NewPostgresStatementsCollector,

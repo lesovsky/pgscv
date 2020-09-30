@@ -14,7 +14,7 @@ func TestNew(t *testing.T) {
 		dsn   string
 		valid bool
 	}{
-		{dsn: testPostgresConnStr, valid: true},
+		{dsn: TestPostgresConnStr, valid: true},
 		{dsn: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv sslmode=require", valid: true},
 		{dsn: "host=127.0.0.1 dbname=invalid user=pgscv sslmode=disable", valid: false},
 		{dsn: "invalid_string", valid: false},
@@ -42,7 +42,7 @@ func TestNewWithConfig(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		config, err := pgx.ParseConfig(testPostgresConnStr)
+		config, err := pgx.ParseConfig(TestPostgresConnStr)
 		assert.NoError(t, err)
 
 		config.Database = tc.database
