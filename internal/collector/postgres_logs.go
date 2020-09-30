@@ -9,8 +9,11 @@ import (
 	"io"
 	"regexp"
 	"sync"
-	"time"
 )
+
+// Current implementation has an issue described here: https://github.com/nxadm/tail/issues/18.
+// When attempting to tail previously tailed logfiles, new messages are not coming from the Lines channel.
+// At the same time, test Test_runTailLoop works as intended and doesn't show the problem.
 
 type messageStore struct {
 	messages map[string]float64
@@ -19,14 +22,16 @@ type messageStore struct {
 }
 
 type postgresLogsCollector struct {
-	tail        *tail.Tail
-	tailEnabled bool
-	store       messageStore
-	messages    typedDesc
+	updateLogfile  chan string  // updateLogfile used for notify tail/collect goroutine when logfile has been changed.
+	currentLogfile string       // currentLogfile contains logfile name currently tailed and used for collecting stat.
+	store          messageStore // store contains collected stats (protected by mutex).
+	messages       typedDesc
 }
 
+// NewPostgresLogsCollector creates new collector for Postgres log messages.
 func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) {
-	return &postgresLogsCollector{
+	collector := &postgresLogsCollector{
+		updateLogfile: make(chan string),
 		store: messageStore{
 			messages: map[string]float64{},
 			mu:       sync.RWMutex{},
@@ -38,9 +43,90 @@ func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) 
 				[]string{"severity"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
-	}, nil
+	}
+
+	go runTailLoop(collector)
+
+	return collector, nil
 }
 
+// runTailLoop accepts logfile names over channel and run tail/collect functions.
+func runTailLoop(c *postgresLogsCollector) {
+	var ctx context.Context
+	var cancel context.CancelFunc
+	var wg sync.WaitGroup
+
+	// Run initial tail, it reads logfile from the end.
+	ctx, cancel = context.WithCancel(context.Background())
+	logfile := <-c.updateLogfile
+	wg.Add(1)
+	go func() {
+		tailCollect(ctx, logfile, true, &wg, c)
+	}()
+
+	// Polling logfile changes. When it change, stop initial tail and start tail a new one.
+	for logfile := range c.updateLogfile {
+		log.Infoln("logfile changed, stopping current tailing")
+		cancel()
+		wg.Wait()
+		ctx, cancel = context.WithCancel(context.Background())
+
+		wg.Add(1)
+		logfile := logfile
+		go func() {
+			tailCollect(ctx, logfile, false, &wg, c)
+		}()
+	}
+
+	cancel()
+}
+
+// tailCollect accepts logfile and tail it. Collected stats are based on received and parsed lines.
+func tailCollect(ctx context.Context, logfile string, init bool, wg *sync.WaitGroup, c *postgresLogsCollector) {
+	defer wg.Done()
+
+	// When just initialized, start tailing from the end of file - there could be many lines and reading all of them could
+	// be expensive. When logfile has been changed (logrotated) start reading from the beginning.
+	tailConfig := tail.Config{Follow: true}
+	offset := "beginning"
+	if init {
+		offset = "end"
+		tailConfig.Location = &tail.SeekInfo{Whence: io.SeekEnd}
+	}
+
+	parser := newLogParser()
+	log.Infof("starting tail of %s from the %s", logfile, offset)
+	t, err := tail.TailFile(logfile, tailConfig)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	//log.Infoln("lessqq: waiting for events")
+	for {
+		select {
+		case <-ctx.Done():
+			//log.Infoln("lessqq: got ctx.Done, stop parsing")
+			t.Cleanup()
+			err = t.Stop()
+			if err != nil {
+				log.Infoln(err)
+			}
+			return
+		case line := <-t.Lines:
+			//log.Infoln("lessqq: got the line")
+			m, found := parser.parse(line.Text)
+			if found {
+				c.store.mu.Lock()
+				c.store.messages[m]++
+				c.store.bytes += float64(len(line.Text))
+				c.store.mu.Unlock()
+			}
+		}
+	}
+}
+
+// Update method generates metrics based on collected log messages.
 func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	if !config.LoggingCollector {
 		return nil
@@ -51,11 +137,18 @@ func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metri
 		return nil
 	}
 
-	if !c.tailEnabled {
-		go runLogtail(config.ConnString, c)
-		c.tailEnabled = true
+	// Notify log collector goroutine if logfile has been changed.
+	logfile, err := queryCurrentLogfile(config.ConnString)
+	if err != nil {
+		return err
 	}
 
+	if logfile != c.currentLogfile {
+		c.currentLogfile = logfile
+		c.updateLogfile <- logfile
+	}
+
+	// Collect metrics.
 	c.store.mu.RLock()
 	for label, value := range c.store.messages {
 		ch <- c.messages.mustNewConstMetric(value, label)
@@ -63,79 +156,6 @@ func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metri
 	c.store.mu.RUnlock()
 
 	return nil
-}
-
-func runLogtail(conninfo string, c *postgresLogsCollector) {
-	logfile, err := queryCurrentLogfile(conninfo)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	log.Infof("starting log tail for %s", logfile)
-
-	// Start reading from the end, because we don't know the size of the previously written logs
-	// and don't know how much resources its processing will take.
-	t, err := tail.TailFile(logfile, tail.Config{Location: &tail.SeekInfo{Whence: io.SeekEnd}, Follow: true})
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	defer t.Cleanup()
-
-	c.tail = t
-
-	parser := newLogParser()
-
-	ticker := time.NewTicker(time.Minute)
-	lineCh := c.tail.Lines
-
-	for {
-		select {
-		case <-ticker.C:
-			recheck, err := queryCurrentLogfile(conninfo)
-			if err != nil {
-				log.Errorln(err)
-				return
-			}
-
-			// do nothing if logfile is not changed
-			if recheck == logfile {
-				break
-			}
-
-			logfile = recheck
-
-			// Otherwise stop listening notify on old log and reopen a new log.
-			c.tail.Cleanup()
-			err = c.tail.Stop()
-			if err != nil {
-				log.Errorln(err)
-				return
-			}
-
-			// Start reading from the start to avoid losing written messages.
-			log.Infof("starting log tail for %s", logfile)
-			tail2, err := tail.TailFile(logfile, tail.Config{Follow: true})
-			if err != nil {
-				log.Errorln(err)
-				return
-			}
-
-			c.tail = tail2
-			lineCh = c.tail.Lines
-
-		case line := <-lineCh:
-			log.Infoln("lessqq: got the line")
-			m, found := parser.parse(line.Text)
-			if found {
-				c.store.mu.Lock()
-				c.store.messages[m]++
-				c.store.bytes += float64(len(line.Text))
-				c.store.mu.Unlock()
-			}
-		}
-	}
 }
 
 //
