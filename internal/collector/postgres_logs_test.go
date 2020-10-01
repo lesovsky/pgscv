@@ -127,6 +127,9 @@ func Test_logParser_parseLogMessage(t *testing.T) {
 		{line: "2020-09-29 14:08:52.858 +05 1060 [] ERROR: test", want: "error", found: true},
 		{line: "2020-09-29 14:08:52.858 +05 1060 [] FATAL: test", want: "fatal", found: true},
 		{line: "2020-09-29 14:08:52.858 +05 1060 [] PANIC: test", want: "panic", found: true},
+		{line: "2020-09-29 14:08:52.858 +05 1060 [] STATEMENT: select log:(test)", want: "", found: false},
+		{line: "2020-09-29 14:08:52.858 +05 1060 [] STATEMENT: select fn(WARNING:)", want: "", found: false},
+		{line: "2020-09-29 14:08:52.858 +05 1060 [] STATEMENT: select error, test", want: "", found: false},
 		{line: "", want: "", found: false},
 		{line: "test", want: "", found: false},
 	}
