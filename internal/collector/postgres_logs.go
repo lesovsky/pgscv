@@ -181,11 +181,11 @@ type logParser struct {
 // newLogParser creates a new logParser.
 func newLogParser() *logParser {
 	patterns := map[string]string{
-		"log":     `\s+LOG:\s+`,
-		"warning": `\s+WARNING:\s+`,
-		"error":   `\s+ERROR:\s+`,
-		"fatal":   `\s+FATAL:\s+`,
-		"panic":   `\s+PANIC:\s+`,
+		"log":     `\s?LOG:\s+`,
+		"warning": `\s?WARNING:\s+`,
+		"error":   `\s?ERROR:\s+`,
+		"fatal":   `\s?FATAL:\s+`,
+		"panic":   `\s?PANIC:\s+`,
 	}
 
 	re := map[string]*regexp.Regexp{}
