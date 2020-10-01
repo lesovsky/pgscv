@@ -1,7 +1,9 @@
 package collector
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/stretchr/testify/assert"
 	"os"
@@ -113,10 +115,44 @@ func Test_queryCurrentLogfile(t *testing.T) {
 func Test_newLogParser(t *testing.T) {
 	p := newLogParser()
 	assert.NotNil(t, p)
-	assert.Greater(t, len(p.re), 0)
+	assert.Greater(t, len(p.reSeverity), 0)
+	assert.Greater(t, len(p.reNormalize), 0)
 }
 
-func Test_logParser_parseLogMessage(t *testing.T) {
+func Test_logParser_updateMessagesStats(t *testing.T) {
+	c, err := NewPostgresLogsCollector(nil)
+	assert.NoError(t, err)
+	assert.NotNil(t, c)
+	lc := c.(*postgresLogsCollector)
+
+	p := newLogParser()
+
+	f, err := os.Open("testdata/datadir/postgresql.log.golden")
+	assert.NoError(t, err)
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		p.updateMessagesStats(scanner.Text(), lc)
+	}
+
+	lc.totals.mu.RLock()
+	//fmt.Println(lc.totals.store)
+	assert.Equal(t, float64(2), lc.totals.store["fatal"])
+	assert.Equal(t, float64(1), lc.totals.store["error"])
+	assert.Equal(t, float64(6), lc.totals.store["log"])
+	lc.totals.mu.RUnlock()
+
+	lc.fatals.mu.RLock()
+	fmt.Println()
+	assert.Equal(t, 1, len(lc.fatals.store))
+	lc.fatals.mu.RUnlock()
+
+	lc.panics.mu.RLock()
+	assert.Equal(t, 0, len(lc.panics.store))
+	lc.panics.mu.RUnlock()
+}
+
+func Test_logParser_parseMessageSeverity(t *testing.T) {
 	testcases := []struct {
 		line  string
 		want  string
@@ -139,8 +175,46 @@ func Test_logParser_parseLogMessage(t *testing.T) {
 	p := newLogParser()
 
 	for _, tc := range testcases {
-		got, ok := p.parseLogMessage(tc.line)
+		got, ok := p.parseMessageSeverity(tc.line)
 		assert.Equal(t, tc.want, got)
 		assert.Equal(t, tc.found, ok)
+	}
+}
+
+func Test_logParser_normalizeMessage(t *testing.T) {
+	testcases := []struct {
+		in   string
+		want string
+	}{
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 PANIC:  syntax error at or near "invalid" at character 1`,
+			want: `syntax error at or near ? at character ?`,
+		},
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 ERROR:  syntax error at or near ")" at character 721`,
+			want: `syntax error at or near ? at character ?`,
+		},
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 ERROR:  duplicate key value violates unique constraint "oauth_access_token_authentication_id_uindex"`,
+			want: `duplicate key value violates unique constraint ?`,
+		},
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 ERROR:  insert or update on table "offer_offer_products" violates foreign key constraint "fkbbwwdruntj50nng01y0g98cof"`,
+			want: `insert or update on table ? violates foreign key constraint ?`,
+		},
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 ERROR:  could not serialize access due to concurrent update`,
+			want: `could not serialize access due to concurrent update`,
+		},
+		{
+			in:   `2020-10-01 08:37:58.208 +05 1402271 LOG:  test`,
+			want: "",
+		},
+	}
+
+	parser := newLogParser()
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, parser.normalizeMessage(tc.in))
 	}
 }
