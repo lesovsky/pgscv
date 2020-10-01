@@ -35,18 +35,18 @@ jobs:
       - name: Push image to Docker Hub
         run: make docker-push -e ENV=staging
 
-  deploy_staging:
-    runs-on: [self-hosted, staging]
-    container: barcodepro/ansible:2.9.5-alpine
-    needs: [ test, build_staging ]
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Deploy on staging
-        env:
-          KUBECONFIG: /root/.kubeconfig
-          KUBECONFIG_DATA: ${{ secrets.STAGING_KUBECONFIG_DATA }}
-        run: |
-          echo "$KUBECONFIG_DATA" > /root/.kubeconfig
-          chmod 600 /root/.kubeconfig
-          make deploy -e ENV=staging
+#  deploy_staging:
+#    runs-on: [self-hosted, staging]
+#    container: barcodepro/ansible:2.9.5-alpine
+#    needs: [ test, build_staging ]
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v2
+#      - name: Deploy on staging
+#        env:
+#          KUBECONFIG: /root/.kubeconfig
+#          KUBECONFIG_DATA: ${{ secrets.STAGING_KUBECONFIG_DATA }}
+#        run: |
+#          echo "$KUBECONFIG_DATA" > /root/.kubeconfig
+#          chmod 600 /root/.kubeconfig
+#          make deploy -e ENV=staging
