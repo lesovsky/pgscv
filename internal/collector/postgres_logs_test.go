@@ -69,10 +69,10 @@ func Test_runTailLoop(t *testing.T) {
 	time.Sleep(200 * time.Millisecond)
 
 	// check store content
-	lc.store.mu.RLock()
-	assert.Equal(t, float64(2), lc.store.messages["log"])
-	assert.Equal(t, float64(1), lc.store.messages["error"])
-	lc.store.mu.RUnlock()
+	lc.totals.mu.RLock()
+	assert.Equal(t, float64(2), lc.totals.store["log"])
+	assert.Equal(t, float64(1), lc.totals.store["error"])
+	lc.totals.mu.RUnlock()
 
 	// remove test files
 	for _, name := range []string{fname1, fname2} {
@@ -93,9 +93,9 @@ func Test_tailCollect(t *testing.T) {
 
 	wg.Add(1)
 	tailCollect(ctx, "testdata/datadir/postgresql.log.golden", false, &wg, lc)
-	assert.Equal(t, float64(6), lc.store.messages["log"])
-	assert.Equal(t, float64(1), lc.store.messages["error"])
-	assert.Equal(t, float64(2), lc.store.messages["fatal"])
+	assert.Equal(t, float64(6), lc.totals.store["log"])
+	assert.Equal(t, float64(1), lc.totals.store["error"])
+	assert.Equal(t, float64(2), lc.totals.store["fatal"])
 
 	wg.Wait()
 }
@@ -116,7 +116,7 @@ func Test_newLogParser(t *testing.T) {
 	assert.Greater(t, len(p.re), 0)
 }
 
-func Test_logParser_parse(t *testing.T) {
+func Test_logParser_parseLogMessage(t *testing.T) {
 	testcases := []struct {
 		line  string
 		want  string
@@ -134,7 +134,7 @@ func Test_logParser_parse(t *testing.T) {
 	p := newLogParser()
 
 	for _, tc := range testcases {
-		got, ok := p.parse(tc.line)
+		got, ok := p.parseLogMessage(tc.line)
 		assert.Equal(t, tc.want, got)
 		assert.Equal(t, tc.found, ok)
 	}

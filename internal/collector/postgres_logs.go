@@ -15,28 +15,27 @@ import (
 // When attempting to tail previously tailed logfiles, new messages are not coming from the Lines channel.
 // At the same time, test Test_runTailLoop works as intended and doesn't show the problem.
 
-type messageStore struct {
-	messages map[string]float64
-	bytes    float64
-	mu       sync.RWMutex
+type syncKV struct {
+	store map[string]float64
+	mu    sync.RWMutex
 }
 
 type postgresLogsCollector struct {
-	updateLogfile  chan string  // updateLogfile used for notify tail/collect goroutine when logfile has been changed.
-	currentLogfile string       // currentLogfile contains logfile name currently tailed and used for collecting stat.
-	store          messageStore // store contains collected stats (protected by mutex).
-	messages       typedDesc
+	updateLogfile  chan string // updateLogfile used for notify tail/collect goroutine when logfile has been changed.
+	currentLogfile string      // currentLogfile contains logfile name currently tailed and used for collecting stat.
+	totals         syncKV      // totals contains collected stats about total number of log messages.
+	messagesTotal  typedDesc
 }
 
 // NewPostgresLogsCollector creates new collector for Postgres log messages.
 func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) {
 	collector := &postgresLogsCollector{
 		updateLogfile: make(chan string),
-		store: messageStore{
-			messages: map[string]float64{},
-			mu:       sync.RWMutex{},
+		totals: syncKV{
+			store: map[string]float64{},
+			mu:    sync.RWMutex{},
 		},
-		messages: typedDesc{
+		messagesTotal: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "log", "messages_total"),
 				"Total number of log messages written by severity.",
@@ -115,12 +114,11 @@ func tailCollect(ctx context.Context, logfile string, init bool, wg *sync.WaitGr
 			return
 		case line := <-t.Lines:
 			//log.Infoln("lessqq: got the line")
-			m, found := parser.parse(line.Text)
+			m, found := parser.parseLogMessage(line.Text)
 			if found {
-				c.store.mu.Lock()
-				c.store.messages[m]++
-				c.store.bytes += float64(len(line.Text))
-				c.store.mu.Unlock()
+				c.totals.mu.Lock()
+				c.totals.store[m]++
+				c.totals.mu.Unlock()
 			}
 		}
 	}
@@ -149,16 +147,16 @@ func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metri
 	}
 
 	// Collect metrics.
-	c.store.mu.RLock()
-	for label, value := range c.store.messages {
-		ch <- c.messages.mustNewConstMetric(value, label)
+	c.totals.mu.RLock()
+	for label, value := range c.totals.store {
+		ch <- c.messagesTotal.mustNewConstMetric(value, label)
 	}
-	c.store.mu.RUnlock()
+	c.totals.mu.RUnlock()
 
 	return nil
 }
 
-//
+// queryCurrentLogfile returns path to logfile used by database.
 func queryCurrentLogfile(conninfo string) (string, error) {
 	conn, err := store.New(conninfo)
 	if err != nil {
@@ -175,11 +173,12 @@ func queryCurrentLogfile(conninfo string) (string, error) {
 	return logfile, nil
 }
 
-//
+// logParser contains set or regexp patterns used for parse log messages.
 type logParser struct {
 	re map[string]*regexp.Regexp
 }
 
+// newLogParser creates a new logParser.
 func newLogParser() *logParser {
 	patterns := map[string]string{
 		"log":     "LOG:",
@@ -200,8 +199,8 @@ func newLogParser() *logParser {
 	}
 }
 
-//
-func (p *logParser) parse(line string) (string, bool) {
+// parseLogMessage accepts lines and parse it using patterns from logParser.
+func (p *logParser) parseLogMessage(line string) (string, bool) {
 	if line == "" {
 		return "", false
 	}
