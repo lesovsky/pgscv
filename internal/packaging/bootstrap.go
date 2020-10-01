@@ -20,7 +20,7 @@ defaults:
     postgres_username: "pgscv"
     postgres_password: "{{ .DefaultPostgresPassword }}"
     pgbouncer_username: "pgscv"
-    pgbouncer_password: "{{ .DefaultPgbouncerPassword }}
+    pgbouncer_password: "{{ .DefaultPgbouncerPassword }}"
 `
 
 const unitTemplate = `
