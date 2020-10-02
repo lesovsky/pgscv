@@ -1,0 +1,10 @@
+2020-09-30 14:26:29.766 +05 797911 pgscv@invalid from 127.0.0.1 [vxid:7/23328 txid:0] [startup] FATAL:  database "invalid" does not exist
+2020-09-30 14:26:29.769 +05 797913 [unknown]@[unknown] from 127.0.0.1 [vxid: txid:0] [] LOG:  PID 0 in cancel request did not match any process
+2020-09-30 14:26:29.774 +05 797915 pgscv@__invalid__ from 127.0.0.1 [vxid:8/19992 txid:0] [startup] FATAL:  database "__invalid__" does not exist
+2020-09-30 14:26:29.777 +05 797922 [unknown]@[unknown] from 127.0.0.1 [vxid: txid:0] [] LOG:  PID 0 in cancel request did not match any process
+2020-09-30 14:26:29.784 +05 797923 pgscv@pgscv_fixtures from 127.0.0.1 [vxid:8/19995 txid:0] [idle] ERROR:  syntax error at or near "invalid" at character 1
+2020-09-30 14:26:29.784 +05 797923 pgscv@pgscv_fixtures from 127.0.0.1 [vxid:8/19995 txid:0] [idle] STATEMENT:  invalid
+2020-09-30 14:26:29.812 +05 797908 pgscv@pgscv_fixtures from 127.0.0.1 [vxid:6/0 txid:0] [idle] LOG:  could not receive data from client: Connection reset by peer
+2020-09-30 14:26:34.999 +05 10638 lesovsky@lesovsky from [local] [vxid:4/7010 txid:0] [idle] LOG:  statement: alter system set log_filename to 'postgresql-%Y-%m-%d-%H%M.log';
+2020-09-30 14:26:36.447 +05 1118 @ from  [vxid: txid:0] [] LOG:  received SIGHUP, reloading configuration files
+2020-09-30 14:26:36.448 +05 1118 @ from  [vxid: txid:0] [] LOG:  parameter "log_filename" changed to "postgresql-%Y-%m-%d-%H%M.log"
