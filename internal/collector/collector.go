@@ -18,6 +18,7 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 	}
 
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"system/pgscv":       NewPgscvServicesCollector,
 		"system/cpu":         NewCPUCollector,
 		"system/diskstats":   NewDiskstatsCollector,
 		"system/filesystems": NewFilesystemCollector,
@@ -46,6 +47,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 	}
 
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"postgres/pgscv":             NewPgscvServicesCollector,
 		"postgres/activity":          NewPostgresActivityCollector,
 		"postgres/bgwriter":          NewPostgresBgwriterCollector,
 		"postgres/conflicts":         NewPostgresConflictsCollector,
@@ -80,6 +82,7 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 	}
 
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
+		"pgbouncer/pgscv": NewPgscvServicesCollector,
 		"pgbouncer/pools": NewPgbouncerPoolsCollector,
 		"pgbouncer/stats": NewPgbouncerStatsCollector,
 	}
