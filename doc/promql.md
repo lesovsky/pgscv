@@ -6,6 +6,7 @@
 - [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
 - [Get indexes size depending on their usage](#get-indexes-size-depending-on-their-usage) (Значения на основе значений другой метрики)
+- [CPU usage breakdown]() (Получение CPU usage c группировкой по типу)
 ---
 
 ##### Get IO latencies
@@ -70,3 +71,15 @@ sum by (datname,usename,queryid,query) (postgres_statements_time_total{mode=~"io
 - `(...) + on(datname, schemaname, relname, indexrelname) group_right() (...)` - делаем **сумму значений** двух групп метрик на основе меток `datname`, `schemaname`, `relname`, `indexrelname`.
 - полученная группа будет содержать метрики присоединяемой группы, например `key="false"`
 - учитывая что в присоединяемой группе значения метрик равны 0 это не будет влиять на размеры (в противном случае нужно было бы метрики второй группы умножать на 0)
+
+##### CPU usage breakdown by mode
+На входе:
+- `node_cpu_seconds_total{instance=..., mode=...}` - время CPU для каждого режима
+- `node_cpu_seconds_all_total{instance=...}` - суммарное время CPU
+
+Нужно найти сколько времени (в %) занимает каждый режим относительно суммарного времени. Используем [many-to-one](https://prometheus.io/docs/prometheus/latest/querying/operators/#vector-matching) vector matching.
+
+```
+100 * sum by (mode) (rate(node_cpu_seconds_total[5m])) / on (instance) group_left sum(rate(node_cpu_seconds_all_total[5m]))
+```
+- `on (instance) group_left ...` присоединяем множество только на основе метки instance (отсекая все остальные)

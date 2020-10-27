@@ -15,6 +15,7 @@ import (
 type cpuCollector struct {
 	systicks float64
 	cpu      typedDesc
+	cpuAll   typedDesc
 	cpuGuest typedDesc
 }
 
@@ -35,15 +36,23 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 		cpu: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "cpu", "seconds_total"),
-				"Seconds the cpus spent in each mode.",
+				"Seconds the CPUs spent in each mode.",
 				[]string{"mode"}, labels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		cpuAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "cpu", "seconds_all_total"),
+				"Seconds the CPUs spent in all modes.",
+				nil, labels,
 			),
 			valueType: prometheus.CounterValue,
 		},
 		cpuGuest: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "cpu", "guest_seconds_total"),
-				"Seconds the cpus spent in guests (VMs) for each mode.",
+				"Seconds the CPUs spent in guests (VMs) for each mode.",
 				[]string{"mode"}, labels,
 			),
 			valueType: prometheus.CounterValue,
@@ -68,7 +77,9 @@ func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	ch <- c.cpu.mustNewConstMetric(stat.softirq, "softirq")
 	ch <- c.cpu.mustNewConstMetric(stat.steal, "steal")
 
-	// Guest CPU is also accounted for in cpuStat.User and cpuStat.Nice, expose these as separate metrics.
+	ch <- c.cpuAll.mustNewConstMetric(stat.user + stat.nice + stat.system + stat.idle + stat.iowait + stat.irq + stat.softirq + stat.steal)
+
+	// Guest CPU is also accounted for in stat.user and stat.nice, expose these as separate metrics.
 	ch <- c.cpuGuest.mustNewConstMetric(stat.guest, "user")
 	ch <- c.cpuGuest.mustNewConstMetric(stat.guestnice, "nice")
 
