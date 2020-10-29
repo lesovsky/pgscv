@@ -2,6 +2,7 @@
 
 #### Index
 - [Get IO latencies](#get-io-latencies) (средняя latency IO запросов).
+- [Get IO latencies with no gaps](#get-io-latencies-with-no-gaps) (средняя latency IO запросов без разрыва в графиках).
 - [Count usage over time](#count-usage-over-time) (Продолжительность длинного события).
 - [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
@@ -12,10 +13,17 @@
 ##### Get IO latencies
 Чтобы получить latency IO запросов, нужно взять отношение времени выполнения всех запросов к количеству выполненных запросов - `latency = T / n`.
 Обе метрики являются типом COUNTER поэтому считаем через rate() функцию.
-Метрика времени выражена в секундах и удобнее перевести её в миллисекунды домножив результат на 1000.
+Метрика времени `node_disk_time_seconds_total` выражена в секундах и удобнее перевести её в миллисекунды домножив результат на 1000.
 Пример ниже показывает как взять latency для read запросов:
 ```
-rate(node_disk_time_seconds_total{type="reads",device="sdb"}[5m]) / rate(node_disk_completed_total{type="reads", device="sdb"}[5m]) * 1000
+rate(node_disk_time_seconds_total{type="reads",device="sdb"}[5m]) / rate(node_disk_completed_total{type="reads",device="sdb"}[5m]) * 1000
+```
+
+##### Get IO latencies with no gaps
+Пример выше имеет недостаток - в случае деления на 0 будет NaN, результата не будет и на графике будут разрывы.
+Следовательно, 0 в знаменателе нужно сделать единицей - в числителе при этом будет 0 (0 iops выполняются за 0 секунд) и результат деления также будет равен 0:
+```
+(rate(node_disk_time_seconds_total{type="reads",device="sdb"}[5m]) / rate(node_disk_completed_total{type="reads",device="sdb"}[5m]) + on() group_left vector(1)) * 1000
 ```
 
 ##### Count usage over time
