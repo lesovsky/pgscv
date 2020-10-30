@@ -19,6 +19,7 @@ func TestMeminfoCollector_Update(t *testing.T) {
 			"node_memory_Shmem", "node_memory_PageTables", "node_memory_HugePages_Total",
 			"node_memory_HugePages_Free", "node_memory_HugePages_Rsvd", "node_memory_HugePages_Surp",
 			"node_memory_Hugepagesize",
+			"node_memory_meminfo",
 		},
 		optional: []string{
 			"node_memory_Bounce", "node_memory_FilePmdMapped", "node_memory_CmaFree", "node_memory_ShmemHugePages",

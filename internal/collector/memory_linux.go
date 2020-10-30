@@ -13,12 +13,23 @@ import (
 )
 
 type meminfoCollector struct {
+	meminfo     typedDesc
 	constLabels prometheus.Labels
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
 func NewMeminfoCollector(labels prometheus.Labels) (Collector, error) {
-	return &meminfoCollector{constLabels: labels}, nil
+	return &meminfoCollector{
+		constLabels: labels,
+		meminfo: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "memory", "meminfo"),
+				"Memory information based on /proc/meminfo.",
+				[]string{"usage"}, labels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
+	}, nil
 }
 
 // Update method collects network interfaces statistics
@@ -36,14 +47,24 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	for param, value := range stats {
 		param = re.ReplaceAllString(param, "_${1}")
 
+		// TODO: Should be removed after metric-inspector can support node_memory_meminfo.
+		// This metric is deprecated in favor node_memory_meminfo.
 		ch <- prometheus.MustNewConstMetric(
 			prometheus.NewDesc(
 				prometheus.BuildFQName("node", "memory", param),
-				fmt.Sprintf("Memory information field %s.", param),
+				fmt.Sprintf("Memory information field %s. DEPRECATED", param),
 				nil, c.constLabels,
 			), prometheus.GaugeValue, value,
 		)
+
+		ch <- c.meminfo.mustNewConstMetric(value, param)
 	}
+
+	// MemUsed and SwapUsed are composite metrics and not present in /proc/meminfo.
+	memused := stats["MemTotal"] - stats["MemFree"] - stats["Buffers"] - stats["Cached"]
+	swapused := stats["SwapTotal"] - stats["SwapFree"]
+	ch <- c.meminfo.mustNewConstMetric(memused, "MemUsed")
+	ch <- c.meminfo.mustNewConstMetric(swapused, "SwapUsed")
 
 	return nil
 }
