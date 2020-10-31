@@ -1,6 +1,6 @@
 # stage 1
-# __release_tag__ 1.14.7 was released 2020-08-06
-FROM golang:1.14.7 as build-stage
+# __release_tag__ 1.15.3 was released 2020-08-11
+FROM golang:1.15.3 as build-stage
 LABEL stage=intermediate
 WORKDIR /app
 COPY . .
