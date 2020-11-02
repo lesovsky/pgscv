@@ -46,10 +46,11 @@ JOIN pg_database d ON d.oid=p.dbid`
 
 // postgresStatementsCollector ...
 type postgresStatementsCollector struct {
-	calls  typedDesc
-	rows   typedDesc
-	times  typedDesc
-	blocks typedDesc
+	calls    typedDesc
+	rows     typedDesc
+	times    typedDesc
+	allTimes typedDesc
+	blocks   typedDesc
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
@@ -77,6 +78,13 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 				prometheus.BuildFQName("postgres", "statements", "time_seconds"),
 				"Time spent by the statement in each mode, in seconds.",
 				[]string{"usename", "datname", "md5", "mode"}, constLabels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
+		allTimes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "time_all_seconds"),
+				"Total time spent by the statement, in seconds.",
+				[]string{"usename", "datname", "md5"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		blocks: typedDesc{
@@ -129,7 +137,9 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
 
 		// total = planning + execution; execution already includes io time.
+		// TODO: postgres_statements_time_seconds{mode="total"} marked as DEPRECATED - should be removed after changes in metric-inspector
 		ch <- c.times.mustNewConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash, "total")
+		ch <- c.allTimes.mustNewConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash)
 		ch <- c.times.mustNewConstMetric(stat.totalPlanTime, stat.usename, stat.datname, stat.md5hash, "planning")
 
 		// execution time = execution - io times.
