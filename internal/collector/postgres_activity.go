@@ -8,18 +8,19 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 const (
 	postgresActivityQuery95 = `SELECT
-    state, waiting,
+    usename, datname, state, waiting,
     coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
     coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
     left(query, 32) as query
 FROM pg_stat_activity`
 
 	postgresActivityQueryLatest = `SELECT
-    state, wait_event_type, wait_event,
+    usename, datname, state, wait_event_type, wait_event,
     coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
     coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
     left(query, 32) as query
@@ -68,7 +69,7 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "max_seconds"),
 				"The current longest activity for each type of activity.",
-				[]string{"state", "type"}, constLabels,
+				[]string{"usename", "datname", "state", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		prepared: typedDesc{
@@ -127,13 +128,59 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// prepared xacts
 	ch <- c.prepared.mustNewConstMetric(stats.prepared)
 
-	// activity max times
-	ch <- c.activity.mustNewConstMetric(stats.maxIdleUser, "idle_xact", "user")
-	ch <- c.activity.mustNewConstMetric(stats.maxIdleMaint, "idle_xact", "maintenance")
-	ch <- c.activity.mustNewConstMetric(stats.maxRunUser, "running", "user")
-	ch <- c.activity.mustNewConstMetric(stats.maxRunMaint, "running", "maintenance")
-	ch <- c.activity.mustNewConstMetric(stats.maxWaitUser, "waiting", "user")
-	ch <- c.activity.mustNewConstMetric(stats.maxWaitMaint, "waiting", "maintenance")
+	// max duration of user's idle_xacts per usename/datname.
+	for k, v := range stats.maxIdleUser {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idle_xact", "user")
+		} else {
+			log.Warnf("failed to create max idle_xact user activity: incomplete string %s; skip", k)
+		}
+	}
+
+	// max duration of maintenance's idle_xacts per usename/datname.
+	for k, v := range stats.maxIdleMaint {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idle_xact", "maintenance")
+		} else {
+			log.Warnf("failed to create max idle_xact maintenance activity: incomplete string %s; skip", k)
+		}
+	}
+
+	// max duration of users running activity per usename/datname.
+	for k, v := range stats.maxRunUser {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "user")
+		} else {
+			log.Warnf("failed to create max running user activity: incomplete string %s; skip", k)
+		}
+	}
+
+	// max duration of maintenance running activity per usename/datname.
+	for k, v := range stats.maxRunMaint {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "maintenance")
+		} else {
+			log.Warnf("failed to create max running maintenance activity: incomplete string %s; skip", k)
+		}
+	}
+
+	// max duration of users waiting activity per usename/datname.
+	for k, v := range stats.maxWaitUser {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "user")
+		} else {
+			log.Warnf("failed to create max waiting user activity: incomplete string %s; skip", k)
+		}
+	}
+
+	// max duration of maintenance waiting activity per usename/datname.
+	for k, v := range stats.maxWaitMaint {
+		if names := strings.Split(k, "/"); len(names) >= 2 {
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "maintenance")
+		} else {
+			log.Warnf("failed to create max waiting maintenance activity: incomplete string %s; skip", k)
+		}
+	}
 
 	// in flight queries
 	ch <- c.inflight.mustNewConstMetric(stats.querySelect, "select")
@@ -157,33 +204,45 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 
 // postgresActivityStat describes current activity
 type postgresActivityStat struct {
-	idle         float64 // state = 'idle'
-	idlexact     float64 // state IN ('idle in transaction', 'idle in transaction (aborted)'))
-	active       float64 // state = 'active'
-	other        float64 // state IN ('fastpath function call','disabled')
-	waiting      float64 // wait_event_type = 'Lock' (or waiting = 't')
-	prepared     float64 // FROM pg_prepared_xacts
-	maxIdleUser  float64 // longest duration among idle transactions opened by user
-	maxIdleMaint float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
-	maxRunUser   float64 // longest duration among client queries
-	maxRunMaint  float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
-	maxWaitUser  float64 // longest duration being in waiting state (all activity)
-	maxWaitMaint float64 // longest duration being in waiting state (all activity)
-	querySelect  float64 // number of select queries: SELECT, TABLE
-	queryMod     float64 // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
-	queryDdl     float64 // number of DDL queries: CREATE, ALTER, DROP
-	queryMaint   float64 // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
-	queryWith    float64 // number of CTE queries
-	queryCopy    float64 // number of COPY queries
-	queryOther   float64 // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
+	idle         float64            // state = 'idle'
+	idlexact     float64            // state IN ('idle in transaction', 'idle in transaction (aborted)'))
+	active       float64            // state = 'active'
+	other        float64            // state IN ('fastpath function call','disabled')
+	waiting      float64            // wait_event_type = 'Lock' (or waiting = 't')
+	prepared     float64            // FROM pg_prepared_xacts
+	maxIdleUser  map[string]float64 // longest duration among idle transactions opened by user/database
+	maxIdleMaint map[string]float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
+	maxRunUser   map[string]float64 // longest duration among client queries
+	maxRunMaint  map[string]float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
+	maxWaitUser  map[string]float64 // longest duration being in waiting state (all activity)
+	maxWaitMaint map[string]float64 // longest duration being in waiting state (all activity)
+	querySelect  float64            // number of select queries: SELECT, TABLE
+	queryMod     float64            // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
+	queryDdl     float64            // number of DDL queries: CREATE, ALTER, DROP
+	queryMaint   float64            // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
+	queryWith    float64            // number of CTE queries
+	queryCopy    float64            // number of COPY queries
+	queryOther   float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
+}
+
+// newPostgresActivityStat creates new postgresActivityStat struct with initialized maps.
+func newPostgresActivityStat() postgresActivityStat {
+	return postgresActivityStat{
+		maxIdleUser:  make(map[string]float64),
+		maxIdleMaint: make(map[string]float64),
+		maxRunUser:   make(map[string]float64),
+		maxRunMaint:  make(map[string]float64),
+		maxWaitUser:  make(map[string]float64),
+		maxWaitMaint: make(map[string]float64),
+	}
 }
 
 func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
-	var stats postgresActivityStat
+	var stats = newPostgresActivityStat()
 
 	// Depending on Postgres version, waiting backends are observed using different column: 'waiting' used in 9.5 and older
 	// and 'wait_event_type' from 9.6. waitColumnName defines a name of column which will be used for detecting waitings.
-	// By default use "wait_event_type"
+	// By default use "wait_event_type".
 	var waitColumnName = "wait_event_type"
 
 	// Make map with column names and their indexes. This map needed to get quick access to values of exact columns within
@@ -223,28 +282,36 @@ func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
 				// Consider type of activity depending on 'state' column.
 				stateIdx := colindexes["state"]
 				eventIdx := colindexes[waitColumnName]
+				usenameIdx := colindexes["usename"]
+				datnameIdx := colindexes["datname"]
 				queryIdx := colindexes["query"]
 
 				if row[stateIdx].Valid && row[queryIdx].Valid {
 					value := row[i].String
+					usename := row[usenameIdx].String
+					datname := row[datnameIdx].String
 					state := row[stateIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
 					if state == stIdleXact || state == stIdleXactAborted {
-						stats.updateMaxIdletimeDuration(value, state, query)
+						stats.updateMaxIdletimeDuration(value, usename, datname, state, query)
 					} else {
-						stats.updateMaxRuntimeDuration(value, state, event, query)
+						stats.updateMaxRuntimeDuration(value, usename, datname, state, event, query)
 					}
 				}
 			case "since_change_seconds":
 				eventIdx := colindexes[waitColumnName]
+				usenameIdx := colindexes["usename"]
+				datnameIdx := colindexes["datname"]
 				queryIdx := colindexes["query"]
 
 				if row[eventIdx].Valid && row[queryIdx].Valid {
 					value := row[i].String
+					usename := row[usenameIdx].String
+					datname := row[datnameIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
-					stats.updateMaxWaittimeDuration(value, event, query)
+					stats.updateMaxWaittimeDuration(value, usename, datname, event, query)
 				}
 			case "query":
 				stateIdx := colindexes["state"]
@@ -283,7 +350,7 @@ func (s *postgresActivityStat) updateState(state string) {
 }
 
 // updateMaxIdletimeDuration updates max duration of idle transactions activity.
-func (s *postgresActivityStat) updateMaxIdletimeDuration(value string, state string, query string) {
+func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname, state, query string) {
 	// necessary values should not be empty (except wait_event_type)
 	if value == "" || state == "" || query == "" {
 		return
@@ -309,19 +376,21 @@ func (s *postgresActivityStat) updateMaxIdletimeDuration(value string, state str
 		return
 	}
 
+	key := usename + "/" + datname
+
 	if re.MatchString(query) {
-		if v > s.maxIdleMaint {
-			s.maxIdleMaint = v
+		if v > s.maxIdleMaint[key] {
+			s.maxIdleMaint[key] = v
 		}
 	} else {
-		if v > s.maxIdleUser {
-			s.maxIdleUser = v
+		if v > s.maxIdleUser[key] {
+			s.maxIdleUser[key] = v
 		}
 	}
 }
 
-// updateMaxRuntimeDuration updates max duration o frunning activity.
-func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state string, etype string, query string) {
+// updateMaxRuntimeDuration updates max duration of running activity.
+func (s *postgresActivityStat) updateMaxRuntimeDuration(value, usename, datname, state, etype, query string) {
 	// necessary values should not be empty (except wait_event_type)
 	if value == "" || state == "" || query == "" {
 		return
@@ -347,19 +416,21 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value string, state stri
 		return
 	}
 
+	key := usename + "/" + datname
+
 	if re.MatchString(query) {
-		if v > s.maxRunMaint {
-			s.maxRunMaint = v
+		if v > s.maxRunMaint[key] {
+			s.maxRunMaint[key] = v
 		}
 	} else {
-		if v > s.maxRunUser {
-			s.maxRunUser = v
+		if v > s.maxRunUser[key] {
+			s.maxRunUser[key] = v
 		}
 	}
 }
 
 // updateMaxWaittimeDuration updates max duration of waiting activity.
-func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, waiting string, query string) {
+func (s *postgresActivityStat) updateMaxWaittimeDuration(value, usename, datname, waiting, query string) {
 	if value == "" || waiting == "" || query == "" {
 		return
 	}
@@ -382,13 +453,15 @@ func (s *postgresActivityStat) updateMaxWaittimeDuration(value string, waiting s
 		return
 	}
 
+	key := usename + "/" + datname
+
 	if re.MatchString(query) {
-		if v > s.maxWaitMaint {
-			s.maxWaitMaint = v
+		if v > s.maxWaitMaint[key] {
+			s.maxWaitMaint[key] = v
 		}
 	} else {
-		if v > s.maxWaitUser {
-			s.maxWaitUser = v
+		if v > s.maxWaitUser[key] {
+			s.maxWaitUser[key] = v
 		}
 	}
 }
