@@ -13,14 +13,14 @@ import (
 
 const (
 	postgresActivityQuery95 = `SELECT
-    coalesce(usename, 'NULL'), coalesce(datname, 'NULL'), state, waiting,
+    coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, waiting,
     extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
     extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
     left(query, 32) as query
 FROM pg_stat_activity`
 
 	postgresActivityQueryLatest = `SELECT
-    coalesce(usename, 'NULL'), coalesce(datname, 'NULL'), state, wait_event_type, wait_event,
+    coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, wait_event_type, wait_event,
     extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
     extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
     left(query, 32) as query
@@ -51,6 +51,7 @@ type postgresActivityCollector struct {
 	prepared typedDesc
 	inflight typedDesc
 	vacuums  typedDesc
+	re       queryRegexp // regexps for queries classification
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -94,6 +95,7 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 				[]string{"type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
+		re: newQueryRegexp(),
 	}, nil
 }
 
@@ -112,7 +114,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	}
 
 	// parse pg_stat_activity stats
-	stats := parsePostgresActivityStats(res)
+	stats := parsePostgresActivityStats(res, c.re)
 
 	// get pg_prepared_xacts stats
 	var count int
@@ -207,6 +209,33 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	return nil
 }
 
+// queryRegexp used for keeping regexps for query classification.
+// It's created (compiled) at startup and used during program lifetime.
+type queryRegexp struct {
+	// query regexps
+	selects *regexp.Regexp // SELECT|TABLE
+	mod     *regexp.Regexp // INSERT|UPDATE|DELETE|TRUNCATE
+	ddl     *regexp.Regexp // CREATE|ALTER|DROP
+	maint   *regexp.Regexp // ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT
+	vacuum  *regexp.Regexp // VACUUM|autovacuum: .+
+	with    *regexp.Regexp // WITH
+	copy    *regexp.Regexp // COPY
+}
+
+// newQueryRegexp creates new queryRegexp with compiled regexp objects.
+func newQueryRegexp() queryRegexp {
+	return queryRegexp{
+		// compile regexp objects
+		selects: regexp.MustCompile(`^(?i)(SELECT|TABLE)`),
+		mod:     regexp.MustCompile(`^(?i)(INSERT|UPDATE|DELETE|TRUNCATE)`),
+		ddl:     regexp.MustCompile(`^(?i)(CREATE|ALTER|DROP)`),
+		maint:   regexp.MustCompile(`^(?i)(ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT)`),
+		vacuum:  regexp.MustCompile(`^(?i)(VACUUM|autovacuum: .+)`),
+		with:    regexp.MustCompile(`^(?i)WITH`),
+		copy:    regexp.MustCompile(`^(?i)COPY`),
+	}
+}
+
 /*
    *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
    wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
@@ -237,10 +266,12 @@ type postgresActivityStat struct {
 	queryCopy    float64            // number of COPY queries
 	queryOther   float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
 	vacuumOps    map[string]float64 // vacuum operations by type
+
+	re queryRegexp // regexps used for query classification, it comes from postgresActivityCollector.
 }
 
 // newPostgresActivityStat creates new postgresActivityStat struct with initialized maps.
-func newPostgresActivityStat() postgresActivityStat {
+func newPostgresActivityStat(re queryRegexp) postgresActivityStat {
 	return postgresActivityStat{
 		maxIdleUser:  make(map[string]float64),
 		maxIdleMaint: make(map[string]float64),
@@ -253,11 +284,12 @@ func newPostgresActivityStat() postgresActivityStat {
 			"regular":    0,
 			"user":       0,
 		},
+		re: re,
 	}
 }
 
-func parsePostgresActivityStats(r *model.PGResult) postgresActivityStat {
-	var stats = newPostgresActivityStat()
+func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActivityStat {
+	var stats = newPostgresActivityStat(re)
 
 	// Depending on Postgres version, waiting backends are observed using different column: 'waiting' used in 9.5 and older
 	// and 'wait_event_type' from 9.6. waitColumnName defines a name of column which will be used for detecting waitings.
@@ -368,8 +400,6 @@ func (s *postgresActivityStat) updateState(state string) {
 	}
 }
 
-// TODO: add tests for updateState, updateMaxIdletimeDuration, updateMaxRuntimeDuration, updateMaxWaittimeDuration, updateQueryStat.
-
 // updateMaxIdletimeDuration updates max duration of idle transactions activity.
 func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname, state, query string) {
 	// necessary values should not be empty (except wait_event_type)
@@ -418,7 +448,7 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value, usename, datname,
 	}
 
 	// don't account time for idle or blocked connections, interesting only for running activity.
-	if state == stIdle || etype == weLock {
+	if state != stActive || etype == weLock {
 		return
 	}
 
@@ -492,57 +522,30 @@ func (s *postgresActivityStat) updateQueryStat(query string, state string) {
 		return
 	}
 
-	// TODO: move all compile operations at collector creating stage.
-	//   Compilation should be one-time and compiled objects should be reusable (but not global vars).
-	var pattern = `^(?i)(SELECT|TABLE)`
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.selects.MatchString(query) {
 		s.querySelect++
 		return
 	}
 
-	pattern = `^(?i)(INSERT|UPDATE|DELETE|TRUNCATE)`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.mod.MatchString(query) {
 		s.queryMod++
 		return
 	}
 
-	pattern = `^(?i)(CREATE|ALTER|DROP)`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.ddl.MatchString(query) {
 		s.queryDdl++
 		return
 	}
 
-	pattern = `^(?i)(VACUUM|ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT|autovacuum:)`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.maint.MatchString(query) {
 		s.queryMaint++
 		return
 	}
 
-	pattern = `^(?i)(VACUUM|autovacuum: .+)`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-
-	str := re.FindString(query)
-
+	str := s.re.vacuum.FindString(query)
 	if str != "" {
+		s.queryMaint++
+
 		if strings.HasPrefix(str, "autovacuum:") && strings.Contains(str, "(to prevent wraparound)") {
 			s.vacuumOps["wraparound"]++
 			return
@@ -557,22 +560,12 @@ func (s *postgresActivityStat) updateQueryStat(query string, state string) {
 		return
 	}
 
-	pattern = `^(?i)WITH`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.with.MatchString(query) {
 		s.queryWith++
 		return
 	}
 
-	pattern = `^(?i)COPY`
-	re, err = regexp.Compile(pattern)
-	if err != nil {
-		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
-	}
-	if re.MatchString(query) {
+	if s.re.copy.MatchString(query) {
 		s.queryCopy++
 		return
 	}

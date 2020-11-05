@@ -25,6 +25,8 @@ func TestPostgresActivityCollector_Update(t *testing.T) {
 }
 
 func Test_parsePostgresActivityStats(t *testing.T) {
+	testRE := newQueryRegexp()
+
 	var testCases = []struct {
 		name string
 		res  *model.PGResult
@@ -106,7 +108,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxWaitUser:  map[string]float64{"testuser/testdb": 13},
 				maxWaitMaint: map[string]float64{"testuser/testdb": 12},
 				querySelect:  1, queryMod: 1, queryMaint: 4,
-				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				vacuumOps: map[string]float64{"regular": 1, "user": 2, "wraparound": 0},
+				re:        testRE,
 			},
 		},
 		{
@@ -154,7 +157,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxRunUser: map[string]float64{"testuser/testdb": 1}, maxRunMaint: map[string]float64{"testuser/testdb": 1},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4,
-				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				vacuumOps: map[string]float64{"regular": 1, "user": 1, "wraparound": 0},
+				re:        testRE,
 			},
 		},
 		{
@@ -182,13 +186,14 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
 				active: 2, waiting: 1, querySelect: 2,
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parsePostgresActivityStats(tc.res)
+			got := parsePostgresActivityStats(tc.res, testRE)
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
@@ -206,4 +211,200 @@ func Test_selectActivityQuery(t *testing.T) {
 	for _, tc := range testcases {
 		assert.Equal(t, tc.want, selectActivityQuery(tc.version))
 	}
+}
+
+func Test_updateMaxIdletimeDuration(t *testing.T) {
+	testRE := newQueryRegexp()
+
+	testcases := []struct {
+		value   string
+		usename string
+		datname string
+		state   string
+		query   string
+		want    postgresActivityStat
+	}{
+		{value: "1", usename: "", datname: "", state: "", query: "",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "10", usename: "testuser", datname: "testdb", state: "active", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "qq", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "UPDATE table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{"testuser/testdb": 10}, maxIdleMaint: map[string]float64{},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "autovacuum: VACUUM table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "VACUUM table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		s := newPostgresActivityStat(testRE)
+		s.updateMaxIdletimeDuration(tc.value, tc.usename, tc.datname, tc.state, tc.query)
+		assert.Equal(t, tc.want, s)
+	}
+}
+
+func Test_updateMaxRuntimeDuration(t *testing.T) {
+	testRE := newQueryRegexp()
+
+	testcases := []struct {
+		value   string
+		usename string
+		datname string
+		state   string
+		etype   string
+		query   string
+		want    postgresActivityStat
+	}{
+		{value: "1", usename: "", datname: "", state: "", etype: "", query: "",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "2", usename: "testuser", datname: "testdb", state: "idle", etype: "Client", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "3", usename: "testuser", datname: "testdb", state: "active", etype: "Lock", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "qq", usename: "testuser", datname: "testdb", state: "active", etype: "", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "4", usename: "testuser", datname: "testdb", state: "idle in transaction", etype: "", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "5", usename: "testuser", datname: "testdb", state: "active", query: "UPDATE table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
+				maxRunUser: map[string]float64{"testuser/testdb": 5}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+		{value: "6", usename: "testuser", datname: "testdb", state: "active", query: "autovacuum: VACUUM table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{"testuser/testdb": 6},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		s := newPostgresActivityStat(testRE)
+		s.updateMaxRuntimeDuration(tc.value, tc.usename, tc.datname, tc.state, tc.etype, tc.query)
+		assert.Equal(t, tc.want, s)
+	}
+}
+
+func Test_updateMaxWaittimeDuration(t *testing.T) {
+	testRE := newQueryRegexp()
+
+	testcases := []struct {
+		value   string
+		usename string
+		datname string
+		waiting string
+		query   string
+		want    postgresActivityStat
+	}{
+		{value: "1", usename: "", datname: "", waiting: "", query: "",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "2", usename: "testuser", datname: "testdb", waiting: "Client", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "qq", usename: "testuser", datname: "testdb", waiting: "Lock", query: "UPDATE table",
+			want: newPostgresActivityStat(testRE),
+		},
+		{value: "5", usename: "testuser", datname: "testdb", waiting: "Lock", query: "UPDATE table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+		{value: "6", usename: "testuser", datname: "testdb", waiting: "t", query: "autovacuum: VACUUM table",
+			want: postgresActivityStat{
+				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
+				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{"testuser/testdb": 6},
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+				re:        testRE,
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		s := newPostgresActivityStat(testRE)
+		s.updateMaxWaittimeDuration(tc.value, tc.usename, tc.datname, tc.waiting, tc.query)
+		assert.Equal(t, tc.want, s)
+	}
+}
+
+func Test_updateQueryStat(t *testing.T) {
+	testRE := newQueryRegexp()
+
+	queries := []string{
+		"SELECT test", "TABLE test", "test SELECT test", "test TABLE test",
+		"INSERT test", "UPDATE test", "DELETE test", "TRUNCATE test",
+		"test INSERT test", "test UPDATE test", "test DELETE test", "test TRUNCATE test",
+		"CREATE test", "ALTER test", "DROP test", "test CREATE test", "test ALTER test", "test DROP test",
+		"ANALYZE test", "CLUSTER test", "REINDEX test", "REFRESH test", "CHECKPOINT test",
+		"test ANALYZE test", "test CLUSTER test", "test REINDEX test", "test REFRESH test", "test CHECKPOINT test",
+		"VACUUM test", "autovacuum: VACUUM test", "autovacuum: ANALYZE test", "autovacuum: VACUUM test (to prevent wraparound)",
+		"test VACUUM test", "test autovacuum: VACUUM test", "test autovacuum: ANALYZE test", "test autovacuum: VACUUM test (to prevent wraparound)",
+		"WITH qq AS test", "COPY test", "test WITH qq AS test", "test COPY test",
+	}
+
+	s := newPostgresActivityStat(testRE)
+	s.updateQueryStat("SELECT 1", "idle")
+	assert.Equal(t, newPostgresActivityStat(testRE), s)
+
+	for _, q := range queries {
+		s.updateQueryStat(q, "active")
+	}
+
+	assert.Equal(t, postgresActivityStat{
+		maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
+		maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+		maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
+		querySelect: 2,
+		queryMod:    4,
+		queryDdl:    3,
+		queryMaint:  9,
+		queryWith:   1,
+		queryCopy:   1,
+		queryOther:  20,
+		vacuumOps:   map[string]float64{"regular": 2, "user": 1, "wraparound": 1},
+		re:          testRE,
+	}, s)
 }
