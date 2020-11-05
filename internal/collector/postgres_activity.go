@@ -13,16 +13,16 @@ import (
 
 const (
 	postgresActivityQuery95 = `SELECT
-    usename, datname, state, waiting,
-    coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
-    coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
+    coalesce(usename, 'NULL'), coalesce(datname, 'NULL'), state, waiting,
+    extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
+    extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
     left(query, 32) as query
 FROM pg_stat_activity`
 
 	postgresActivityQueryLatest = `SELECT
-    usename, datname, state, wait_event_type, wait_event,
-    coalesce(extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start))) AS since_start_seconds,
-    coalesce(extract(epoch FROM clock_timestamp() - state_change)) AS since_change_seconds,
+    coalesce(usename, 'NULL'), coalesce(datname, 'NULL'), state, wait_event_type, wait_event,
+    extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
+    extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
     left(query, 32) as query
 FROM pg_stat_activity`
 
