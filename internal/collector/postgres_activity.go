@@ -39,9 +39,6 @@ FROM pg_stat_activity`
 
 	// Wait event type names
 	weLock = "Lock"
-
-	// regexpMaintenanceActivity defines what queries should be considered as maintenance operations.
-	regexpMaintenanceActivity = `^(?i)(autovacuum:|vacuum|analyze)`
 )
 
 // postgresActivityCollector ...
@@ -218,8 +215,10 @@ type queryRegexp struct {
 	ddl     *regexp.Regexp // CREATE|ALTER|DROP
 	maint   *regexp.Regexp // ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT
 	vacuum  *regexp.Regexp // VACUUM|autovacuum: .+
+	vacanl  *regexp.Regexp // VACUUM|ANALYZE|autovacuum:
 	with    *regexp.Regexp // WITH
 	copy    *regexp.Regexp // COPY
+
 }
 
 // newQueryRegexp creates new queryRegexp with compiled regexp objects.
@@ -231,6 +230,7 @@ func newQueryRegexp() queryRegexp {
 		ddl:     regexp.MustCompile(`^(?i)(CREATE|ALTER|DROP)`),
 		maint:   regexp.MustCompile(`^(?i)(ANALYZE|CLUSTER|REINDEX|REFRESH|CHECKPOINT)`),
 		vacuum:  regexp.MustCompile(`^(?i)(VACUUM|autovacuum: .+)`),
+		vacanl:  regexp.MustCompile(`^(?i)(VACUUM|ANALYZE|autovacuum:)`),
 		with:    regexp.MustCompile(`^(?i)WITH`),
 		copy:    regexp.MustCompile(`^(?i)COPY`),
 	}
@@ -421,15 +421,9 @@ func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname
 	// all validations ok, update stats
 
 	// inspect query - is ia a user activity like queries, or maintenance tasks like automatic or regular vacuum/analyze.
-	re, err := regexp.Compile(regexpMaintenanceActivity)
-	if err != nil {
-		log.Errorf("skip collecting max idle time duration metric: %s", err)
-		return
-	}
-
 	key := usename + "/" + datname
 
-	if re.MatchString(query) {
+	if s.re.vacanl.MatchString(query) {
 		if v > s.maxIdleMaint[key] {
 			s.maxIdleMaint[key] = v
 		}
@@ -461,15 +455,9 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value, usename, datname,
 	// all validations ok, update stats
 
 	// inspect query - is ia a user activity like queries, or maintenance tasks like automatic or regular vacuum/analyze.
-	re, err := regexp.Compile(regexpMaintenanceActivity)
-	if err != nil {
-		log.Errorf("skip collecting max run time duration metric: %s", err)
-		return
-	}
-
 	key := usename + "/" + datname
 
-	if re.MatchString(query) {
+	if s.re.vacanl.MatchString(query) {
 		if v > s.maxRunMaint[key] {
 			s.maxRunMaint[key] = v
 		}
@@ -498,15 +486,9 @@ func (s *postgresActivityStat) updateMaxWaittimeDuration(value, usename, datname
 	}
 
 	// all validations ok, update stats
-	re, err := regexp.Compile(regexpMaintenanceActivity)
-	if err != nil {
-		log.Errorf("skip collecting max wait time duration metric: %s", err)
-		return
-	}
-
 	key := usename + "/" + datname
 
-	if re.MatchString(query) {
+	if s.re.vacanl.MatchString(query) {
 		if v > s.maxWaitMaint[key] {
 			s.maxWaitMaint[key] = v
 		}
