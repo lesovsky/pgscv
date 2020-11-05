@@ -15,6 +15,7 @@ func TestPostgresActivityCollector_Update(t *testing.T) {
 			"postgres_activity_max_seconds",
 			"postgres_activity_prepared_xact_total",
 			"postgres_activity_queries_in_flight",
+			"postgres_activity_vacuums_total",
 		},
 		collector: NewPostgresActivityCollector,
 		service:   model.ServiceTypePostgresql,
@@ -105,6 +106,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxWaitUser:  map[string]float64{"testuser/testdb": 13},
 				maxWaitMaint: map[string]float64{"testuser/testdb": 12},
 				querySelect:  1, queryMod: 1, queryMaint: 4,
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 			},
 		},
 		{
@@ -151,7 +153,9 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 1}, maxRunMaint: map[string]float64{"testuser/testdb": 1},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
-				active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4},
+				active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4,
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+			},
 		},
 		{
 			name: "old postgres with waiting instead of wait_event_type",
@@ -176,7 +180,9 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 10}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
-				active: 2, waiting: 1, querySelect: 2},
+				active: 2, waiting: 1, querySelect: 2,
+				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
+			},
 		},
 	}
 

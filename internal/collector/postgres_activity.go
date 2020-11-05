@@ -50,6 +50,7 @@ type postgresActivityCollector struct {
 	activity typedDesc
 	prepared typedDesc
 	inflight typedDesc
+	vacuums  typedDesc
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -83,6 +84,13 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
 				"The total number of queries executed in-flight of each type.",
+				[]string{"type"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		vacuums: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "vacuums_total"),
+				"The total number of vacuum operations of each type.",
 				[]string{"type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
@@ -191,6 +199,11 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	ch <- c.inflight.mustNewConstMetric(stats.queryCopy, "copy")
 	ch <- c.inflight.mustNewConstMetric(stats.queryOther, "other")
 
+	// vacuums
+	for k, v := range stats.vacuumOps {
+		ch <- c.vacuums.mustNewConstMetric(v, k)
+	}
+
 	return nil
 }
 
@@ -223,6 +236,7 @@ type postgresActivityStat struct {
 	queryWith    float64            // number of CTE queries
 	queryCopy    float64            // number of COPY queries
 	queryOther   float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
+	vacuumOps    map[string]float64 // vacuum operations by type
 }
 
 // newPostgresActivityStat creates new postgresActivityStat struct with initialized maps.
@@ -234,6 +248,11 @@ func newPostgresActivityStat() postgresActivityStat {
 		maxRunMaint:  make(map[string]float64),
 		maxWaitUser:  make(map[string]float64),
 		maxWaitMaint: make(map[string]float64),
+		vacuumOps: map[string]float64{
+			"wraparound": 0,
+			"regular":    0,
+			"user":       0,
+		},
 	}
 }
 
@@ -348,6 +367,8 @@ func (s *postgresActivityStat) updateState(state string) {
 		s.waiting++
 	}
 }
+
+// TODO: add tests for updateState, updateMaxIdletimeDuration, updateMaxRuntimeDuration, updateMaxWaittimeDuration, updateQueryStat.
 
 // updateMaxIdletimeDuration updates max duration of idle transactions activity.
 func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname, state, query string) {
@@ -471,6 +492,8 @@ func (s *postgresActivityStat) updateQueryStat(query string, state string) {
 		return
 	}
 
+	// TODO: move all compile operations at collector creating stage.
+	//   Compilation should be one-time and compiled objects should be reusable (but not global vars).
 	var pattern = `^(?i)(SELECT|TABLE)`
 	re, err := regexp.Compile(pattern)
 	if err != nil {
@@ -508,6 +531,29 @@ func (s *postgresActivityStat) updateQueryStat(query string, state string) {
 	}
 	if re.MatchString(query) {
 		s.queryMaint++
+		return
+	}
+
+	pattern = `^(?i)(VACUUM|autovacuum: .+)`
+	re, err = regexp.Compile(pattern)
+	if err != nil {
+		log.Errorf("failed compile regex pattern %s: %s", pattern, err)
+	}
+
+	str := re.FindString(query)
+
+	if str != "" {
+		if strings.HasPrefix(str, "autovacuum:") && strings.Contains(str, "(to prevent wraparound)") {
+			s.vacuumOps["wraparound"]++
+			return
+		}
+
+		if strings.HasPrefix(str, "autovacuum:") {
+			s.vacuumOps["regular"]++
+			return
+		}
+
+		s.vacuumOps["user"]++
 		return
 	}
 
