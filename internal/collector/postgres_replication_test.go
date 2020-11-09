@@ -15,6 +15,8 @@ func TestPostgresReplicationCollector_Update(t *testing.T) {
 			"postgres_wal_bytes_total",
 			"postgres_replication_lag_bytes",
 			"postgres_replication_lag_seconds",
+			"postgres_replication_lag_total_bytes",
+			"postgres_replication_lag_total_seconds",
 		},
 		optional:  []string{},
 		collector: NewPostgresReplicationCollector,
@@ -34,26 +36,26 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 			name: "normal output",
 			res: &model.PGResult{
 				Nrows: 1,
-				Ncols: 13,
+				Ncols: 14,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("pid")}, {Name: []byte("client_addr")}, {Name: []byte("usename")}, {Name: []byte("application_name")}, {Name: []byte("state")},
 					{Name: []byte("pending_lag_bytes")}, {Name: []byte("write_lag_bytes")}, {Name: []byte("flush_lag_bytes")},
 					{Name: []byte("replay_lag_bytes")}, {Name: []byte("total_lag_bytes")}, {Name: []byte("write_lag_seconds")},
-					{Name: []byte("flush_lag_seconds")}, {Name: []byte("replay_lag_seconds")},
+					{Name: []byte("flush_lag_seconds")}, {Name: []byte("replay_lag_seconds")}, {Name: []byte("total_lag_seconds")},
 				},
 				Rows: [][]sql.NullString{
 					{
 						{String: "123456", Valid: true}, {String: "127.0.0.1", Valid: true}, {String: "testuser", Valid: true}, {String: "testapp", Valid: true},
 						{String: "teststate", Valid: true},
 						{String: "100", Valid: true}, {String: "200", Valid: true}, {String: "300", Valid: true}, {String: "400", Valid: true},
-						{String: "500", Valid: true}, {String: "600", Valid: true}, {String: "700", Valid: true}, {String: "800", Valid: true},
+						{String: "500", Valid: true}, {String: "600", Valid: true}, {String: "700", Valid: true}, {String: "800", Valid: true}, {String: "2100", Valid: true},
 					},
 					{
 						// pg_receivewals and pg_basebackups don't have replay lag.
 						{String: "101010", Valid: true}, {String: "127.0.0.1", Valid: true}, {String: "testuser", Valid: true}, {String: "pg_receivewal", Valid: true},
 						{String: "teststate", Valid: true},
 						{String: "4257", Valid: true}, {String: "8452", Valid: true}, {String: "5785", Valid: true}, {String: "", Valid: false},
-						{String: "", Valid: false}, {String: "2458", Valid: true}, {String: "7871", Valid: true}, {String: "6896", Valid: true},
+						{String: "", Valid: false}, {String: "2458", Valid: true}, {String: "7871", Valid: true}, {String: "6896", Valid: true}, {String: "17225", Valid: true},
 					},
 				},
 			},
@@ -62,14 +64,14 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 					pid: "123456", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "testapp", state: "teststate",
 					values: map[string]float64{
 						"pending_lag_bytes": 100, "write_lag_bytes": 200, "flush_lag_bytes": 300, "replay_lag_bytes": 400, "total_lag_bytes": 500,
-						"write_lag_seconds": 600, "flush_lag_seconds": 700, "replay_lag_seconds": 800,
+						"write_lag_seconds": 600, "flush_lag_seconds": 700, "replay_lag_seconds": 800, "total_lag_seconds": 2100,
 					},
 				},
 				"101010": {
 					pid: "101010", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "pg_receivewal", state: "teststate",
 					values: map[string]float64{
 						"pending_lag_bytes": 4257, "write_lag_bytes": 8452, "flush_lag_bytes": 5785,
-						"write_lag_seconds": 2458, "flush_lag_seconds": 7871, "replay_lag_seconds": 6896,
+						"write_lag_seconds": 2458, "flush_lag_seconds": 7871, "replay_lag_seconds": 6896, "total_lag_seconds": 17225,
 					},
 				},
 			},

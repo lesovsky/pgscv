@@ -26,9 +26,10 @@ const (
 		write_location - flush_location AS flush_lag_bytes,
 		flush_location - replay_location AS replay_lag_bytes,
 		pg_current_xlog_location() - replay_location AS total_lag_bytes,
-		NULL as write_lag_seconds,
-		NULL as flush_lag_seconds,
-		NULL as replay_lag_seconds
+		NULL AS write_lag_seconds,
+		NULL AS flush_lag_seconds,
+		NULL AS replay_lag_seconds,
+    NULL AS total_lag_seconds
 FROM pg_stat_replication`
 
 	// Query for Postgres versions from 10 and newer.
@@ -39,18 +40,21 @@ FROM pg_stat_replication`
 		write_lsn - flush_lsn AS flush_lag_bytes,
 		flush_lsn - replay_lsn AS replay_lag_bytes,
 		pg_current_wal_lsn() - replay_lsn AS total_lag_bytes,
-		coalesce(extract(epoch from write_lag), 0) as write_lag_seconds,
-		coalesce(extract(epoch from flush_lag), 0) as flush_lag_seconds,
-		coalesce(extract(epoch from replay_lag), 0) as replay_lag_seconds
+		coalesce(extract(epoch from write_lag), 0) AS write_lag_seconds,
+		coalesce(extract(epoch from flush_lag), 0) AS flush_lag_seconds,
+		coalesce(extract(epoch from replay_lag), 0) AS replay_lag_seconds,
+    coalesce(extract(epoch from write_lag+flush_lag+replay_lag), 0) AS total_lag_seconds
 FROM pg_stat_replication`
 )
 
 type postgresReplicationCollector struct {
-	labelNames []string
-	recovery   typedDesc
-	wal        typedDesc
-	lagbytes   typedDesc
-	lagseconds typedDesc
+	labelNames      []string
+	recovery        typedDesc
+	wal             typedDesc
+	lagbytes        typedDesc
+	lagseconds      typedDesc
+	lagtotalbytes   typedDesc
+	lagtotalseconds typedDesc
 }
 
 // NewPostgresReplicationCollector returns a new Collector exposing postgres replication stats.
@@ -77,15 +81,29 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, 
 		lagbytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_bytes"),
-				"Current number of bytes standby is behind than primary.",
+				"Current number of bytes standby is behind than primary in each WAL processing phase.",
 				labelNames, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		lagseconds: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_seconds"),
-				"Current number of seconds standby is behind than primary.",
+				"Current number of seconds standby is behind than primary in each WAL processing phase.",
 				labelNames, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		lagtotalbytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "replication", "lag_total_bytes"),
+				"Current total number of bytes standby is behind than primary.",
+				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		lagtotalseconds: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "replication", "lag_total_seconds"),
+				"Current total number of seconds standby is behind than primary.",
+				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -132,9 +150,6 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 		if value, ok := stat.values["replay_lag_bytes"]; ok {
 			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
 		}
-		if value, ok := stat.values["total_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "total")
-		}
 		if value, ok := stat.values["write_lag_seconds"]; ok {
 			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
 		}
@@ -143,6 +158,12 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 		}
 		if value, ok := stat.values["replay_lag_seconds"]; ok {
 			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+		}
+		if value, ok := stat.values["total_lag_bytes"]; ok {
+			ch <- c.lagtotalbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
+		}
+		if value, ok := stat.values["total_lag_seconds"]; ok {
+			ch <- c.lagtotalseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
 		}
 	}
 
@@ -227,10 +248,6 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 				s := stats[pid]
 				s.values["replay_lag_bytes"] = v
 				stats[pid] = s
-			case "total_lag_bytes":
-				s := stats[pid]
-				s.values["total_lag_bytes"] = v
-				stats[pid] = s
 			case "write_lag_seconds":
 				s := stats[pid]
 				s.values["write_lag_seconds"] = v
@@ -242,6 +259,14 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 			case "replay_lag_seconds":
 				s := stats[pid]
 				s.values["replay_lag_seconds"] = v
+				stats[pid] = s
+			case "total_lag_bytes":
+				s := stats[pid]
+				s.values["total_lag_bytes"] = v
+				stats[pid] = s
+			case "total_lag_seconds":
+				s := stats[pid]
+				s.values["total_lag_seconds"] = v
 				stats[pid] = s
 			default:
 				log.Debugf("unsupported pg_stat_replication stat column: %s, skip", string(colname.Name))

@@ -218,7 +218,6 @@ type queryRegexp struct {
 	vacanl  *regexp.Regexp // VACUUM|ANALYZE|autovacuum:
 	with    *regexp.Regexp // WITH
 	copy    *regexp.Regexp // COPY
-
 }
 
 // newQueryRegexp creates new queryRegexp with compiled regexp objects.
