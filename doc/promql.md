@@ -7,7 +7,8 @@
 - [Max connected standby over period](#max-connected-standbys-over-period) (Максимальное количество подключенных реплик за период) 
 - [Sum by existential metrics](#sum-by-existential-metrics) (Сумма по метрикам которые могут отсутствовать).
 - [Get indexes size depending on their usage](#get-indexes-size-depending-on-their-usage) (Значения на основе значений другой метрики)
-- [CPU usage breakdown]() (Получение CPU usage c группировкой по типу)
+- [CPU usage breakdown by mode](#cpu-usage-breakdown-by-mode) (Получение CPU usage c группировкой по типу)
+- [Add label from joined metric](#add-label-from-joined-metric) (Добавление метки от присоединяемой метрики)
 ---
 
 ##### Get IO latencies
@@ -91,3 +92,19 @@ sum by (datname,usename,queryid,query) (postgres_statements_time_total{mode=~"io
 100 * sum by (mode) (rate(node_cpu_seconds_total[5m])) / on (instance) group_left sum(rate(node_cpu_seconds_all_total[5m]))
 ```
 - `on (instance) group_left ...` присоединяем множество только на основе метки instance (отсекая все остальные)
+
+##### Add label from joined metric
+На входе:
+- `postgres_statements_rows_total{datname,usename,md5}` - количество строк
+- `postgres_statements_calls_total{datname,usename,md5,query}` - количество вызовов, плюс текст запроса в отдельной метке `query`
+
+Нужно выяснить `rate(postgres_statements_rows_total)` с добавленем `query` метки из `postgres_statements_calls_total`
+
+```
+(rate(postgres_statements_rows_total{service_id="postgres:5432"}[5m])) + on(datname,usename,md5) group_left(query) (0 * postgres_statements_calls_total{service_id="postgres:5432"})
+```
+- `+ on(datname,usename,md5) group_left(query)` - арифметический оператор (в данном случае `+`) обязателен и является "присоединением" по условию on(datname,usename,md5)
+- `group_left(query)` - говорит нам что из правого выражения нужно взять метку `label` и добавить к левому выражению
+- `(0 * postgres_statements_calls_total{})` - умножаем на 0 чтобы при суммировании (см. выше арифметический оператор `+`) не исказить значение `postgres_statements_rows_total`.
+
+Источники: [1](https://stackoverflow.com/a/50357418/1367644), [2](https://ypereirareis.github.io/blog/2020/02/21/how-to-join-prometheus-metrics-by-label-with-promql/)
