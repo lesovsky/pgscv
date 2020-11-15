@@ -19,6 +19,7 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
 		"system/pgscv":       NewPgscvServicesCollector,
+		"system/loadaverage": NewLoadAverageCollector,
 		"system/cpu":         NewCPUCollector,
 		"system/diskstats":   NewDiskstatsCollector,
 		"system/filesystems": NewFilesystemCollector,
