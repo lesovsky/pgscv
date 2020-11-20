@@ -10,6 +10,7 @@
 - [Get indexes size depending on their usage](#get-indexes-size-depending-on-their-usage) (Значения на основе значений другой метрики)
 - [CPU usage breakdown by mode](#cpu-usage-breakdown-by-mode) (Получение CPU usage c группировкой по типу)
 - [Add label from joined metric](#add-label-from-joined-metric) (Добавление метки от присоединяемой метрики)
+- [Pgbouncer pool utilization](#pgbouncer-pool-utilization)
 ---
 
 ##### Get IO latencies
@@ -122,3 +123,13 @@ sum by (datname,usename,queryid,query) (postgres_statements_time_total{mode=~"io
 - `(0 * postgres_statements_calls_total{})` - умножаем на 0 чтобы при суммировании (см. выше арифметический оператор `+`) не исказить значение `postgres_statements_rows_total`.
 
 Источники: [1](https://stackoverflow.com/a/50357418/1367644), [2](https://ypereirareis.github.io/blog/2020/02/21/how-to-join-prometheus-metrics-by-label-with-promql/)
+
+##### Pgbouncer pool utilization
+На входе:
+- `sum by (database,user) (pgbouncer_pool_conn_total{state=~"sv_.+",database!="pgbouncer"})` - количество серверных соединений сгруппированных по database,user - по сути пара этих значений определяет конкретный "пул".
+- `max(pgbouncer_service_database_pool_size{database!="pgbouncer"} or pgbouncer_service_settings{name="default_pool_size"})` - значение `pool_size` для конкретной БД, если этого значения нет, то используется значение из `default_pool_size`.
+- берем % числа серверных соединений от значения pool_size для БД.
+- `label_join(expr, "pool", "/", "database", "user")` - опционально создаем отдельную метку `pool`.
+```
+label_join(sum by (database,user) (pgbouncer_pool_conn_total{state=~"sv_.+",database!="pgbouncer"}) / on() group_left() (max(pgbouncer_service_database_pool_size{database!="pgbouncer"} or pgbouncer_service_settings{name="default_pool_size"})) * 100, "pool", "/", "database", "user")
+```

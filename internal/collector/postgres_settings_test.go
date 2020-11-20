@@ -37,13 +37,13 @@ func Test_parsePostgresSettings(t *testing.T) {
 					{Name: []byte("name")}, {Name: []byte("setting")}, {Name: []byte("unit")}, {Name: []byte("vartype")},
 				},
 				Rows: [][]sql.NullString{
-					{
-						{String: "bgwriter_flush_after", Valid: true}, {String: "64", Valid: true}, {String: "8kB", Valid: true}, {String: "integer", Valid: true},
-					},
+					{{String: "bgwriter_flush_after", Valid: true}, {String: "64", Valid: true}, {String: "8kB", Valid: true}, {String: "integer", Valid: true}},
+					{{String: "max_connections", Valid: true}, {String: "100", Valid: true}, {String: "", Valid: true}, {String: "integer", Valid: true}},
 				},
 			},
 			want: []postgresSetting{
 				{name: "bgwriter_flush_after", setting: "524288", unit: "bytes", vartype: "integer", value: 524288},
+				{name: "max_connections", setting: "100", unit: "", vartype: "integer", value: 100},
 			},
 		},
 	}

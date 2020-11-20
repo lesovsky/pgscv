@@ -83,9 +83,10 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 	}
 
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
-		"pgbouncer/pgscv": NewPgscvServicesCollector,
-		"pgbouncer/pools": NewPgbouncerPoolsCollector,
-		"pgbouncer/stats": NewPgbouncerStatsCollector,
+		"pgbouncer/pgscv":    NewPgscvServicesCollector,
+		"pgbouncer/pools":    NewPgbouncerPoolsCollector,
+		"pgbouncer/stats":    NewPgbouncerStatsCollector,
+		"pgbouncer/settings": NewPgbouncerSettingsCollector,
 	}
 
 	for name, fn := range funcs {
