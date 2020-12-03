@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/barcodepro/pgscv/internal/model"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
@@ -121,6 +122,13 @@ func TestRepository_startBackgroundDiscovery(t *testing.T) {
 	defer cancel()
 	r.startBackgroundDiscovery(ctx, Config{})
 	assert.NotEqual(t, 0, r.totalServices())
+
+	// During discovery collectors are registered for found services,
+	// They should be unregistered to avoid register failures in concurrent tests.
+	for _, id := range r.GetServiceIDs() {
+		s := r.GetService(id)
+		prometheus.Unregister(s.Collector)
+	}
 }
 
 func TestRepository_lookupServices(t *testing.T) {
@@ -148,16 +156,6 @@ func TestRepository_setupServices(t *testing.T) {
 			},
 			expected: 2,
 		},
-		{
-			name: "valid with pull mode",
-			config: Config{
-				RuntimeMode: model.RuntimePullMode,
-				ConnSettings: []ConnSetting{
-					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
-				},
-			},
-			expected: 2,
-		},
 	}
 
 	for _, tc := range testCases {
@@ -168,6 +166,8 @@ func TestRepository_setupServices(t *testing.T) {
 		assert.NoError(t, r.setupServices(tc.config))
 		s := r.GetService("postgres:127.0.0.1:5432")
 		assert.NotNil(t, s.Collector)
+
+		prometheus.Unregister(s.Collector)
 	}
 }
 

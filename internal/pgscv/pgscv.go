@@ -1,21 +1,24 @@
 package pgscv
 
 import (
+	"bufio"
+	"bytes"
 	"context"
-	"crypto/md5" // #nosec G501
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/packaging"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/prometheus/client_golang/prometheus/push"
+	"io"
 	"io/ioutil"
 	"net/http"
-	"os"
+	"net/url"
 	"strconv"
-	"strings"
 	"time"
+)
+
+const (
+	defaultImportEndpoint = "/api/v1/import/prometheus"
 )
 
 func Start(ctx context.Context, config *Config) error {
@@ -24,7 +27,6 @@ func Start(ctx context.Context, config *Config) error {
 	serviceRepo := service.NewRepository()
 
 	serviceConfig := service.Config{
-		RuntimeMode:        config.RuntimeMode,
 		NoTrackMode:        config.NoTrackMode,
 		ProjectID:          strconv.Itoa(config.ProjectID),
 		ConnDefaults:       config.Defaults,
@@ -61,18 +63,39 @@ func Start(ctx context.Context, config *Config) error {
 		}()
 	}
 
-	switch config.RuntimeMode {
-	case model.RuntimePullMode:
-		return runPullMode(ctx, config)
-	case model.RuntimePushMode:
-		return runPushMode(ctx, config, serviceRepo)
-	default:
-		return fmt.Errorf("unknown mode selected: %d, quit", config.RuntimeMode)
+	var errCh = make(chan error)
+	defer close(errCh)
+
+	// Start HTTP metrics listener.
+	go func() {
+		if err := runMetricsListener(ctx, config); err != nil {
+			errCh <- err
+		}
+	}()
+
+	// Start metrics sender if necessary.
+	if config.SendMetricsURL != "" {
+		go func() {
+			if err := runSendMetricsLoop(ctx, config, serviceRepo); err != nil {
+				errCh <- err
+			}
+		}()
+	}
+
+	// Waiting for errors or context cancelling.
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info("exit signaled, stop application")
+			return nil
+		case err := <-errCh:
+			return err
+		}
 	}
 }
 
-func runPullMode(ctx context.Context, config *Config) error {
-	log.Infof("use PULL mode, accepting requests on http://%s/metrics", config.ListenAddress)
+func runMetricsListener(ctx context.Context, config *Config) error {
+	log.Infof("accepting requests on http://%s/metrics", config.ListenAddress)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -99,26 +122,17 @@ func runPullMode(ctx context.Context, config *Config) error {
 	// Waiting for errors or context cancelling.
 	for {
 		select {
+		case <-ctx.Done():
+			log.Info("exit signaled, stop metrics listener")
+			return nil
 		case err := <-errCh:
 			return err
-		case <-ctx.Done():
-			log.Info("exit signaled, stop listening")
-			return nil
 		}
 	}
 }
 
-// runPushMode runs application in PUSH mode - with interval collects metrics and push them to remote service
-func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repository) error {
-	log.Infof("use PUSH mode, sending metrics to %s every %d seconds", config.MetricsServiceURL, config.MetricsSendInterval/time.Second)
-
-	// A job label is the special one which provides metrics uniqueness across several hosts and guarantees metrics will
-	// not be overwritten on Pushgateway side. There is no other use-cases for this label, hence before ingesting by Prometheus
-	// this label should be removed with 'metric_relabel_config' rule.
-	jobLabelBase, err := getJobLabelBase()
-	if err != nil {
-		return err
-	}
+func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *service.Repository) error {
+	log.Infof("sending metrics to %s every %d seconds", config.SendMetricsURL, config.SendMetricsInterval/time.Second)
 
 	// Before sending metrics wait until any services appear in the repo, else need to wait an one MetricsSendInterval.
 	// This is the one-time operation and here is using a naive approach with 'for loop + sleep' instead of channels/sync stuff.
@@ -131,119 +145,124 @@ func runPushMode(ctx context.Context, config *Config, instanceRepo *service.Repo
 		}
 	}
 
-	ticker := time.NewTicker(config.MetricsSendInterval)
+	sendClient, err := newSendClient(config)
+	if err != nil {
+		return err
+	}
+
+	ticker := time.NewTicker(config.SendMetricsInterval)
 	for {
-		// push metrics to the remote service
-		pushMetrics(jobLabelBase, config.MetricsServiceURL, config.APIKey, instanceRepo)
+		buf, err := sendClient.readMetrics()
+		if err != nil {
+			log.Infof("read metrics failed: %s, try next time", err)
+			continue
+		}
+
+		err = sendClient.sendMetrics(buf)
+		if err != nil {
+			log.Infof("send metrics failed: %s, try next time", err)
+			continue
+		}
 
 		// sleeping for next iteration
 		select {
-		case <-ticker.C:
-			continue
 		case <-ctx.Done():
-			log.Info("exit signaled, stop pushing metrics")
+			log.Info("exit signaled, stop metrics sending")
 			ticker.Stop()
 			return nil
-		}
-	}
-}
-
-// pushMetrics collects metrics for discovered services and pushes them to remote service
-func pushMetrics(labelBase string, url string, apiKey string, repo *service.Repository) {
-	log.Debug("start push metrics job")
-
-	var servicesIDs = repo.GetServiceIDs()
-
-	// metrics for every discovered service is wrapped into a separate push
-	for _, id := range servicesIDs {
-		var svc = repo.GetService(id)
-		if svc.TotalErrors > 0 {
-			log.Infof("service [%s] marked as failed: don't collect metrics until service recovers", svc.ServiceID)
+		case <-ticker.C:
 			continue
 		}
-
-		if svc.Collector == nil {
-			log.Infof("collector for service [%s] not initialized yet: try collecting metrics later", svc.ServiceID)
-			continue
-		}
-
-		jobLabel := fmt.Sprintf("db_system_%s_%s", labelBase, svc.ServiceID)
-		var pusher = push.New(url, jobLabel)
-
-		// if api-key specified use custom http-client and attach api-key to http requests
-		if apiKey != "" {
-			client := newHTTPClient(apiKey)
-			pusher.Client(client)
-		}
-
-		// collect metrics for all discovered services
-		pusher.Collector(svc.Collector)
-
-		// push metrics
-		if err := pusher.Add(); err != nil {
-			// it is not critical error, just show it and continue
-			log.Warnln("push metrics failed: ", err)
-		}
 	}
-
-	log.Debug("metrics push job finished successfully")
 }
 
-// httpClient is the custom realization of HTTP client which wrap API key processing.
-type httpClient struct {
-	client http.Client
-	apiKey string
+// sendClient ...
+type sendClient struct {
+	apiKey   string
+	readURL  *url.URL
+	writeURL *url.URL
+	timeout  time.Duration
+	Client   *http.Client
 }
 
-// newHTTPClient create new httpClient instance.
-func newHTTPClient(key string) *httpClient {
-	c := http.Client{}
-	return &httpClient{client: c, apiKey: key}
-}
-
-// Do sends HTTP requests with API key attached as a header.
-func (c *httpClient) Do(req *http.Request) (*http.Response, error) {
-	req.Header.Add("X-Weaponry-Api-Key", c.apiKey)
-	return c.client.Do(req)
-}
-
-// getJobLabelBase returns a unique string for job label. The string is based on machine-id or hostname.
-func getJobLabelBase() (string, error) {
-	log.Debugln("calculating job label for pushed metrics")
-
-	// try to use machine-id-based label
-	machineID, err := getLabelByMachineID()
-	if err == nil {
-		return machineID, nil
-	}
-
-	// if getting machine-id failed, try to use hostname-based label
-	log.Warnf("read machine-id failed: %s; fallback to use hostname", err)
-	machineID, err = getLabelByHostname()
+// newSendClient ...
+func newSendClient(config *Config) (sendClient, error) {
+	readURL, err := url.Parse("http://" + config.ListenAddress + "/metrics")
 	if err != nil {
-		log.Warnln("can't create job label: ", err)
-		return "", err
+		return sendClient{}, err
 	}
-	return machineID, nil
+
+	writeURL, err := url.Parse(config.SendMetricsURL + defaultImportEndpoint)
+	if err != nil {
+		return sendClient{}, err
+	}
+
+	return sendClient{
+		apiKey:   config.APIKey,
+		readURL:  readURL,
+		writeURL: writeURL,
+		timeout:  10 * time.Second,
+		Client:   &http.Client{},
+	}, nil
 }
 
-// getLabelByMachineID reads /etc/machine-id and return its content
-func getLabelByMachineID() (string, error) {
-	if _, err := os.Stat("/etc/machine-id"); os.IsNotExist(err) {
-		return "", err
-	}
-	content, err := ioutil.ReadFile("/etc/machine-id")
+// readMetrics ...
+func (s *sendClient) readMetrics() ([]byte, error) {
+	resp, err := http.Get(s.readURL.String())
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	return strings.TrimSpace(string(content)), nil
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	return body, nil
 }
 
-// getLabelByHostname gets hostname and hashes it using MD5 and returns the hash
-func getLabelByHostname() (string, error) {
-	hostname, err := os.Hostname()
+// sendMetrics ...
+func (s *sendClient) sendMetrics(buf []byte) error {
+	log.Debugln("start sending metrics")
+
+	req, err := http.NewRequest("POST", s.writeURL.String(), bytes.NewReader(buf))
 	if err != nil {
-		return "", err
+		return err
 	}
-	return fmt.Sprintf("%x", md5.Sum([]byte(hostname))), nil // #nosec G401
+
+	req.Header.Set("Content-Type", "application/text")
+	req.Header.Set("User-Agent", "pgSCV")
+	req.Header.Add("X-Weaponry-Api-Key", s.apiKey)
+
+	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	defer cancel()
+
+	req = req.WithContext(ctx)
+
+	resp, err := s.Client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		_, _ = io.Copy(ioutil.Discard, resp.Body)
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode/100 != 2 {
+		scanner := bufio.NewScanner(io.LimitReader(resp.Body, 512))
+		line := ""
+		if scanner.Scan() {
+			line = scanner.Text()
+		}
+		return fmt.Errorf("server returned HTTP status %s: %s", resp.Status, line)
+	}
+
+	log.Debugln("sending metrics finished successfully: server returned HTTP status ", resp.Status)
+	return nil
 }

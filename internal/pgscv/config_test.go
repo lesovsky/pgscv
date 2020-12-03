@@ -16,7 +16,7 @@ func TestNewConfig(t *testing.T) {
 		want  *Config
 	}{
 		{
-			name:  "valid: PULL example",
+			name:  "valid: pull-only example",
 			valid: true,
 			file:  "testdata/pgscv-pull-example.yaml",
 			want: &Config{
@@ -25,14 +25,14 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid: PUSH example",
+			name:  "valid: pull/push example",
 			valid: true,
 			file:  "testdata/pgscv-push-example.yaml",
 			want: &Config{
-				APIKey:            "TEST1234TEST-TEST-1234-TEST1234",
-				ProjectID:         1,
-				MetricsServiceURL: "http://127.0.0.1:9091",
-				Defaults:          map[string]string{},
+				APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
+				ProjectID:      1,
+				SendMetricsURL: "http://127.0.0.1:9091",
+				Defaults:       map[string]string{},
 			},
 		},
 		{
@@ -110,22 +110,22 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name:  "valid config for PUSH Mode",
 			valid: true,
-			in:    &Config{MetricsServiceURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1},
 		},
 		{
 			name:  "invalid config for PUSH Mode: no api key present",
 			valid: false,
-			in:    &Config{MetricsServiceURL: "http://127.0.0.1:9091", ProjectID: 1},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", ProjectID: 1},
 		},
 		{
 			name:  "invalid config for PUSH Mode: no project id present",
 			valid: false,
-			in:    &Config{MetricsServiceURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
 		},
 		{
 			name:  "invalid config for PUSH Mode: empty api key",
 			valid: false,
-			in:    &Config{MetricsServiceURL: "http://127.0.0.1:9091", APIKey: ""},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: ""},
 		},
 		{
 			name:  "valid config with specified services",

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
 	"gopkg.in/yaml.v2"
@@ -20,19 +19,18 @@ const (
 	defaultPgbouncerUsername = "pgscv"
 	defaultPgbouncerDbname   = "pgbouncer"
 
-	defaultMetricsSendInterval = 60 * time.Second
+	defaultSendMetricsInterval = 60 * time.Second
 )
 
 // Config defines application's configuration.
 type Config struct {
 	BinaryPath           string                   // full path of the program, required for auto-update procedure
 	BinaryVersion        string                   // version of the program, required for auto-update procedure
-	AutoUpdateURL        string                   `yaml:"autoupdate_url"` // URL used for auto-update
-	RuntimeMode          int                      // application runtime mode
-	NoTrackMode          bool                     `yaml:"no_track_mode"`       // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                   `yaml:"listen_address"`      // Network address and port where the application should listen on
-	MetricsServiceURL    string                   `yaml:"metrics_service_url"` // URL of Weaponry service metric gateway
-	MetricsSendInterval  time.Duration            // Metric send interval
+	AutoUpdateURL        string                   `yaml:"autoupdate_url"`   // URL used for auto-update
+	NoTrackMode          bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
+	ListenAddress        string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
+	SendMetricsURL       string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
+	SendMetricsInterval  time.Duration            // Metric send interval
 	APIKey               string                   `yaml:"api_key"`    // API key for accessing to Weaponry
 	ProjectID            int                      `yaml:"project_id"` // ProjectID specifies project_id label value
 	ServicesConnSettings []service.ConnSetting    `yaml:"services"`   // Slice of connection settings for exact services
@@ -63,15 +61,10 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("API key and Project ID should be specified both")
 	}
 
-	if c.MetricsServiceURL == "" {
-		c.RuntimeMode = model.RuntimePullMode
-	} else {
-		c.RuntimeMode = model.RuntimePushMode
-		c.MetricsSendInterval = defaultMetricsSendInterval
-	}
+	c.SendMetricsInterval = defaultSendMetricsInterval
 
 	// API key is necessary when Metric Service is specified
-	if c.MetricsServiceURL != "" && c.APIKey == "" {
+	if c.SendMetricsURL != "" && c.APIKey == "" {
 		return fmt.Errorf("API key should be specified")
 	}
 

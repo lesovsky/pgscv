@@ -1,3 +1,3 @@
 api_key: "TEST1234TEST-TEST-1234-TEST1234"
 project_id: 1
-metrics_service_url: "http://127.0.0.1:9091"
+send_metrics_url: "http://127.0.0.1:9091"

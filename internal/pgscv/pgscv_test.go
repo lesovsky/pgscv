@@ -2,61 +2,47 @@ package pgscv
 
 import (
 	"context"
-	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"regexp"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 )
 
 func TestStart(t *testing.T) {
-	t.Run("pull mode", func(t *testing.T) {
-		pullModeConfig := &Config{RuntimeMode: model.RuntimePullMode, ListenAddress: "127.0.0.1:5002"}
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	// Mock HTTP server which handles incoming requests.
+	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, defaultImportEndpoint, r.URL.String())
+		body, err := ioutil.ReadAll(r.Body)
+		assert.NoError(t, err)
+		assert.Greater(t, len(body), 0)
+		assert.NoError(t, r.Body.Close())
 
-		assert.NoError(t, Start(ctx, pullModeConfig))
-		cancel()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer writeServer.Close()
 
-		http.DefaultServeMux = new(http.ServeMux) // clean http environment (which may be dirtied by other concurrently running tests)
-	})
+	// Create app config.
+	config := &Config{
+		ListenAddress: "127.0.0.1:5002",
+		APIKey:        "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+		SendMetricsURL: writeServer.URL, SendMetricsInterval: 1 * time.Second,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
 
-	t.Run("push mode", func(t *testing.T) {
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			assert.Regexp(t, regexp.MustCompile(`/metrics/job/db_system_[a-f0-9]{32}_(system|postgres|pgbouncer)%3A[0-9]+`), r.URL.String())
-			body, err := ioutil.ReadAll(r.Body)
-			assert.NoError(t, err)
-			assert.Greater(t, len(body), 0)
-
-			w.WriteHeader(http.StatusOK)
-		}))
-
-		defer server.Close()
-		pushModeConfig := &Config{
-			RuntimeMode: model.RuntimePushMode,
-			APIKey:      "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
-			MetricsServiceURL: server.URL, MetricsSendInterval: 2 * time.Second,
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		defer cancel()
-
-		assert.NoError(t, Start(ctx, pushModeConfig))
-	})
-
-	t.Run("unknown mode", func(t *testing.T) {
-		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
-		assert.Error(t, Start(ctx, &Config{RuntimeMode: -1}))
-		cancel()
-	})
+	// Start app, wait until context expires and do cleanup.
+	assert.NoError(t, Start(ctx, config))
+	http.DefaultServeMux = new(http.ServeMux)
 }
 
-func Test_runPullMode(t *testing.T) {
-	config := &Config{RuntimeMode: model.RuntimePullMode, ListenAddress: "127.0.0.1:5001"}
+func Test_runMetricsListener(t *testing.T) {
+	config := &Config{ListenAddress: "127.0.0.1:5003"}
 	wg := sync.WaitGroup{}
 
 	// Running listener function with short-live context in concurrent goroutine.
@@ -65,7 +51,7 @@ func Test_runPullMode(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 		defer cancel()
 
-		err := runPullMode(ctx, config)
+		err := runMetricsListener(ctx, config)
 		assert.NoError(t, err)
 		wg.Done()
 	}()
@@ -74,7 +60,7 @@ func Test_runPullMode(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Make request to '/' and assert response.
-	resp, err := http.Get("http://127.0.0.1:5001/")
+	resp, err := http.Get("http://127.0.0.1:5003/")
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	body, err := ioutil.ReadAll(resp.Body)
@@ -83,7 +69,7 @@ func Test_runPullMode(t *testing.T) {
 	assert.NoError(t, resp.Body.Close())
 
 	// Make request to '/metrics' and assert response.
-	resp, err = http.Get("http://127.0.0.1:5001/metrics")
+	resp, err = http.Get("http://127.0.0.1:5003/metrics")
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 
@@ -100,50 +86,44 @@ func Test_runPullMode(t *testing.T) {
 	http.DefaultServeMux = new(http.ServeMux) // clean http environment (which may be dirtied by other concurrently running tests)
 }
 
-func Test_runPushMode(t *testing.T) {
-	// Run test server which will accept HTTP requests.
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Regexp(t, regexp.MustCompile(`/metrics/job/db_system_[a-f0-9]{32}_system%3A0`), r.URL.String())
+func Test_runSendMetricsLoop(t *testing.T) {
+	// Run test read/write servers which will accept HTTP requests.
+	readServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "/metrics", r.URL.String())
+
+		w.WriteHeader(http.StatusOK)
+
+		_, err := w.Write([]byte(`"test_metric{example="example"}`))
+		assert.NoError(t, err)
+	}))
+	defer readServer.Close()
+
+	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, defaultImportEndpoint, r.URL.String())
 		body, err := ioutil.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Greater(t, len(body), 0)
+		assert.NoError(t, r.Body.Close())
 
 		w.WriteHeader(http.StatusOK)
 	}))
-
-	defer server.Close()
+	defer writeServer.Close()
 
 	// Prepare stuff, create repo with default 'system' service.
 	config := &Config{
-		RuntimeMode: model.RuntimePushMode,
-		APIKey:      "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
-		MetricsServiceURL: server.URL, MetricsSendInterval: 600 * time.Millisecond,
+		ListenAddress: strings.TrimLeft(readServer.URL, "http://"),
+		APIKey:        "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+		SendMetricsURL: writeServer.URL, SendMetricsInterval: 600 * time.Millisecond,
 	}
 	repo := service.NewRepository()
-	serviceConfig := service.Config{
-		RuntimeMode:  model.RuntimePushMode,
+	repo.AddServicesFromConfig(service.Config{
 		ProjectID:    strconv.Itoa(config.ProjectID),
 		ConnSettings: nil,
 		ConnDefaults: nil,
-	}
-	repo.AddServicesFromConfig(serviceConfig)
-	assert.NoError(t, repo.SetupServices(serviceConfig))
+	})
 
-	// Run pusher to send metrics to test server.
+	// Run sending metrics to test server.
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
-	err := runPushMode(ctx, config, repo)
-	assert.NoError(t, err)
-}
-
-func TestGetLabelByMachineID(t *testing.T) {
-	s, err := getLabelByMachineID()
-	assert.NoError(t, err)
-	assert.Regexp(t, regexp.MustCompile(`[a-f0-9]{32}`), s)
-}
-
-func TestGetLabelByHostname(t *testing.T) {
-	s, err := getLabelByHostname()
-	assert.NoError(t, err)
-	assert.Regexp(t, regexp.MustCompile(`[a-f0-9]{32}`), s)
+	assert.NoError(t, runSendMetricsLoop(ctx, config, repo))
 }

@@ -25,6 +25,10 @@ func TestPgscvCollector_Collect(t *testing.T) {
 	// Catch metrics until channel is opened.
 	var metrics []prometheus.Metric
 	for m := range ch {
+		//metric := &io_prometheus_client.Metric{}
+		//_ = m.Write(metric)
+		//fmt.Println("debug: ", proto.MarshalTextString(metric))
+
 		metrics = append(metrics, m)
 	}
 

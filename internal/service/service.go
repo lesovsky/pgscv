@@ -394,10 +394,8 @@ func (repo *Repository) setupServices(config Config) error {
 			}
 			service.Collector = mc
 
-			// running in PULL mode, the exporter should be registered. In PUSH mode this is done during the push.
-			if config.RuntimeMode == model.RuntimePullMode {
-				prometheus.MustRegister(service.Collector)
-			}
+			// Register collector.
+			prometheus.MustRegister(service.Collector)
 
 			// put updated service copy into repo
 			repo.addService(id, service)
@@ -428,7 +426,7 @@ func (repo *Repository) healthcheckServices() {
 					repo.markServiceFailed(id)
 					log.Warnf("service [%s] failed: tries remain %d/%d", id, totalErrors, errorThreshold)
 				} else {
-					// unregister service is necessary in PULL mode (but it's also safe in PUSH mode)
+					// unregister collector and remove the service.
 					if repo.Services[id].Collector != nil {
 						prometheus.Unregister(repo.Services[id].Collector)
 					}
