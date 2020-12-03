@@ -28,7 +28,7 @@ lint: ## Lint the source files
 	golangci-lint run --timeout 5m -E golint -e '(struct field|type|method|func) [a-zA-Z`]+ should be [a-zA-Z`]+'
 	gosec -quiet ./...
 
-test: dep ## Run tests
+test: dep lint ## Run tests
 	go test -race -timeout 300s -coverprofile=.test_coverage.txt ./... && \
     	go tool cover -func=.test_coverage.txt | tail -n1 | awk '{print "Total test coverage: " $$3}'
 	@rm .test_coverage.txt

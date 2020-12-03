@@ -111,7 +111,7 @@ func Test_runSendMetricsLoop(t *testing.T) {
 
 	// Prepare stuff, create repo with default 'system' service.
 	config := &Config{
-		ListenAddress: strings.TrimLeft(readServer.URL, "http://"),
+		ListenAddress: strings.TrimPrefix(readServer.URL, "http://"),
 		APIKey:        "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
 		SendMetricsURL: writeServer.URL, SendMetricsInterval: 600 * time.Millisecond,
 	}
