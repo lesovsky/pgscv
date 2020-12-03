@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestPogbouncerSettingsCollector_Update(t *testing.T) {
+func TestPgbouncerSettingsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"pgbouncer_service_settings",

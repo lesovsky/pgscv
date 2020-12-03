@@ -5,7 +5,7 @@
 # __release_tag__ gosec v2.5.0 was released 2020-10-26
 FROM postgres:12.3
 
-LABEL version="v0.0.2"
+LABEL version="v0.0.3"
 
 # install dependencies
 RUN apt-get update && \

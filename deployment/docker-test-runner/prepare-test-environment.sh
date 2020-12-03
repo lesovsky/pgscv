@@ -34,7 +34,7 @@ su - postgres -c "pgbench -i -s 5 pgscv_fixtures"
 su - postgres -c "pgbench -T 5 pgscv_fixtures"
 
 # configure pgbouncer
-sed -i -e 's/^;* = host=testserver$/* = host=127.0.0.1/g' /etc/pgbouncer/pgbouncer.ini
+sed -i -e 's/^;\* = host=testserver$/* = host=127.0.0.1/g' /etc/pgbouncer/pgbouncer.ini
 sed -i -e 's/^;admin_users = .*$/admin_users = pgscv/g' /etc/pgbouncer/pgbouncer.ini
 sed -i -e 's/^;pool_mode = session$/pool_mode = transaction/g' /etc/pgbouncer/pgbouncer.ini
 sed -i -e 's/^;ignore_startup_parameters = .*$/ignore_startup_parameters = extra_float_digits/g' /etc/pgbouncer/pgbouncer.ini

@@ -10,7 +10,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: barcodepro/weaponry-pgscv-test-runner:v0.0.2
+    container: barcodepro/weaponry-pgscv-test-runner:v0.0.3
 
     steps:
       - name: Checkout code
