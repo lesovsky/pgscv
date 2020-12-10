@@ -3,7 +3,6 @@ name: Release
 
 on:
   push:
-    branches: [ release ]
     tags: [ v* ]
 
 jobs:
@@ -21,7 +20,22 @@ jobs:
       - name: Run test
         run: make test
 
+  build_staging:
+    if: github.event.base_ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Build image
+        run: make docker-build -e ENV=staging
+      - name: Log in to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
+      - name: Push image to Docker Hub
+        run: make docker-push -e ENV=staging
+
   build_production:
+    if: github.event.base_ref == 'refs/heads/release'
     runs-on: ubuntu-latest
     needs: test
     steps:
@@ -35,6 +49,7 @@ jobs:
         run: make docker-push -e ENV=production
 
   deploy_production:
+    if: github.event.base_ref == 'refs/heads/release'
     runs-on: [self-hosted, production]
     container: barcodepro/ansible:2.9.5-alpine
     needs: [ test, build_production ]
