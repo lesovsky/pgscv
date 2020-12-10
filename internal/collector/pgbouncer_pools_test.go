@@ -11,7 +11,7 @@ import (
 func TestPgbouncerPoolsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"pgbouncer_pool_conn_total",
+			"pgbouncer_pool_connections_in_flight",
 			"pgbouncer_pool_max_wait_seconds",
 		},
 		collector: NewPgbouncerPoolsCollector,

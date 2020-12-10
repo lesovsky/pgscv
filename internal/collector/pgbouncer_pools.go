@@ -28,8 +28,8 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 	return &pgbouncerPoolsCollector{
 		conns: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "pool", "conn_total"),
-				"The total number of connections established.",
+				prometheus.BuildFQName("pgbouncer", "pool", "connections_in_flight"),
+				"The total number of connections established by each state.",
 				poolsLabelNames, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
