@@ -2,10 +2,11 @@ DOCKER_ACCOUNT = barcodepro
 APPNAME = pgscv
 IMAGENAME = weaponry-${APPNAME}-distribution
 
+TAG=$(shell git describe --tags --abbrev=0)
 COMMIT=$(shell git rev-parse --short HEAD)
 BRANCH=$(shell git rev-parse --abbrev-ref HEAD)
 
-LDFLAGS = -a -installsuffix cgo -ldflags "-X main.appName=${APPNAME} -X main.gitCommit=${COMMIT} -X main.gitBranch=${BRANCH}"
+LDFLAGS = -a -installsuffix cgo -ldflags "-X main.appName=${APPNAME} -X main.gitTag=${TAG} -X main.gitCommit=${COMMIT} -X main.gitBranch=${BRANCH}"
 
 .PHONY: help \
 		clean lint test race \
@@ -42,18 +43,18 @@ build: dep ## Build
 	cd bin; \
 		tar czf ${APPNAME}.tar.gz ${APPNAME} && \
 		sha256sum ${APPNAME}.tar.gz > ${APPNAME}.sha256 && \
-		echo ${COMMIT}-${BRANCH} > ${APPNAME}.version
+		echo "${TAG} ${COMMIT}-${BRANCH}" > ${APPNAME}.version
 
 docker-build: ## Build docker image
 	mkdir -p ./bin
 	./extras/genscript.sh ${ENV} > ./bin/install.sh
-	docker build -t ${DOCKER_ACCOUNT}/${IMAGENAME}:${COMMIT}-${ENV} .
+	docker build -t ${DOCKER_ACCOUNT}/${IMAGENAME}:${TAG} .
 	docker image prune --force --filter label=stage=intermediate
 	rm ./bin/install.sh
 	rmdir ./bin
 
 docker-push: ## Push docker image
-	docker push ${DOCKER_ACCOUNT}/${IMAGENAME}:${COMMIT}-${ENV}
+	docker push ${DOCKER_ACCOUNT}/${IMAGENAME}:${TAG}
 
 deploy: ## Deploy
 	ansible-playbook deployment/ansible/deploy.yml -e env=${ENV}

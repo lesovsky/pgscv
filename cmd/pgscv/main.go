@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	appName, gitCommit, gitBranch string
+	appName, gitTag, gitCommit, gitBranch string
 )
 
 func main() {
@@ -29,7 +29,7 @@ func main() {
 	log.SetApplication(appName)
 
 	if *showVersion {
-		fmt.Printf("%s %s-%s\n", appName, gitCommit, gitBranch)
+		fmt.Printf("%s %s %s-%s\n", appName, gitTag, gitCommit, gitBranch)
 		os.Exit(0)
 	}
 
@@ -67,7 +67,7 @@ func main() {
 	}
 
 	config.BinaryPath = os.Args[0]
-	config.BinaryVersion = fmt.Sprintf("%s-%s", gitCommit, gitBranch)
+	config.BinaryVersion = fmt.Sprintf("%s %s-%s", gitTag, gitCommit, gitBranch)
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
