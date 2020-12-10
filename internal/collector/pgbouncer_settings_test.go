@@ -11,8 +11,8 @@ import (
 func TestPgbouncerSettingsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"pgbouncer_service_settings",
-			"pgbouncer_service_database_settings",
+			"pgbouncer_service_settings_info",
+			"pgbouncer_service_database_settings_info",
 			"pgbouncer_service_database_pool_size",
 		},
 		collector: NewPgbouncerSettingsCollector,

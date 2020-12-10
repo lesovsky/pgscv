@@ -30,7 +30,7 @@ func NewPgbouncerSettingsCollector(constLabels prometheus.Labels) (Collector, er
 	return &pgbouncerSettingsCollector{
 		settings: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "service", "settings"),
+				prometheus.BuildFQName("pgbouncer", "service", "settings_info"),
 				"Labeled information about Pgbouncer configuration settings.",
 				[]string{"name", "setting"}, constLabels,
 			),
@@ -38,7 +38,7 @@ func NewPgbouncerSettingsCollector(constLabels prometheus.Labels) (Collector, er
 		},
 		dbSettings: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "service", "database_settings"),
+				prometheus.BuildFQName("pgbouncer", "service", "database_settings_info"),
 				"Labeled information about Pgbouncer's per-database configuration settings.",
 				[]string{"database", "mode", "size"}, constLabels,
 			),
