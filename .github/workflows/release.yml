@@ -21,13 +21,13 @@ jobs:
         run: make test
 
   test_1:
-    if: github.event.base.ref == 'refs/heads/master'
+    if: github.event.push.base.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Run help 1
         run: echo 1
   test_2:
-    if: github.event.base.ref == 'master'
+    if: github.event.push.base.ref == 'master'
     runs-on: ubuntu-latest
     steps:
       - name: Run help 2
