@@ -3,13 +3,12 @@ name: Release
 
 on:
   push:
-    tags: [ v* ]
+    branches: [ release ]
 
 jobs:
   test:
     runs-on: ubuntu-latest
     container: barcodepro/weaponry-pgscv-test-runner:v0.0.3
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -20,61 +19,7 @@ jobs:
       - name: Run test
         run: make test
 
-  test_1:
-    if: github.event.push.base_ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run help 1
-        run: echo 1
-  test_2:
-    if: github.event.push.base_ref == 'master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run help 2
-        run: echo 2
-  test_3:
-    if: github.base_ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Run help 3
-        run: echo 3
-  test_4:
-    runs-on: ubuntu-latest
-    if: github.base_ref == 'master'
-    steps:
-      - name: Run help 4
-        run: echo 4
-
-  build_staging:
-    if: github.event.base_ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Build image
-        run: make docker-build -e ENV=staging
-      - name: Log in to Docker Hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
-      - name: Push image to Docker Hub
-        run: make docker-push -e ENV=staging
-
-  build_production:
-    if: github.event.base_ref == 'refs/heads/release'
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Build image
-        run: make docker-build -e ENV=production
-      - name: Log in to Docker Hub
-        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
-      - name: Push image to Docker Hub
-        run: make docker-push -e ENV=production
-
   deploy_production:
-    if: github.event.base_ref == 'refs/heads/release'
     runs-on: [self-hosted, production]
     container: barcodepro/ansible:2.9.5-alpine
     needs: [ test, build_production ]
