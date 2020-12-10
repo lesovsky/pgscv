@@ -27,15 +27,15 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 		labelNames: pgbouncerLabelNames,
 		xacts: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "xacts_total"),
-				"Total number of SQL transactions pooled by pgbouncer.",
+				prometheus.BuildFQName("pgbouncer", "", "transactions_total"),
+				"Total number of SQL transactions processed, for each database.",
 				pgbouncerLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		queries: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("pgbouncer", "", "queries_total"),
-				"Total number of SQL queries pooled by pgbouncer.",
+				"Total number of SQL queries processed, for each database.",
 				pgbouncerLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
@@ -48,7 +48,7 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels) (Collector, error
 		},
 		time: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "time_seconds_total"),
+				prometheus.BuildFQName("pgbouncer", "", "spent_seconds_total"),
 				"Total number of time spent by pgbouncer when connected to PostgreSQL executing queries or processing transactions, in seconds.",
 				[]string{"database", "type", "mode"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .000001,

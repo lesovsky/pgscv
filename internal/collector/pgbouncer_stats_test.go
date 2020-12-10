@@ -12,10 +12,10 @@ import (
 func TestPgbouncerStatsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"pgbouncer_xacts_total",
+			"pgbouncer_transactions_total",
 			"pgbouncer_queries_total",
 			"pgbouncer_bytes_total",
-			"pgbouncer_time_seconds_total",
+			"pgbouncer_spent_seconds_total",
 		},
 		collector: NewPgbouncerStatsCollector,
 		service:   model.ServiceTypePgbouncer,
