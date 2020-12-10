@@ -14,8 +14,10 @@ import (
 )
 
 type filesystemCollector struct {
-	bytes typedDesc
-	files typedDesc
+	bytes      typedDesc
+	bytesTotal typedDesc
+	files      typedDesc
+	filesTotal typedDesc
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
@@ -24,15 +26,29 @@ func NewFilesystemCollector(labels prometheus.Labels) (Collector, error) {
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "filesystem", "bytes"),
-				"Total number of bytes of filesystem by each type.",
+				"Number of bytes of filesystem by usage.",
 				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			), valueType: prometheus.GaugeValue,
+		},
+		bytesTotal: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "filesystem", "bytes_total"),
+				"Total number of bytes of filesystem capacity.",
+				[]string{"device", "mountpoint", "fstype"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
 		files: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "filesystem", "files"),
-				"Total number of files (inodes) of filesystem by each type.",
+				"Number of files (inodes) of filesystem by usage.",
 				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			), valueType: prometheus.GaugeValue,
+		},
+		filesTotal: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "filesystem", "files_total"),
+				"Total number of files (inodes) of filesystem capacity.",
+				[]string{"device", "mountpoint", "fstype"}, labels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -49,14 +65,13 @@ func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric)
 		// Truncate device paths to device names, e.g /dev/sda -> sda
 		device := truncateDeviceName(s.mount.device)
 
-		// bytes
-		ch <- c.bytes.mustNewConstMetric(s.size, device, s.mount.mountpoint, s.mount.fstype, "total")
-		ch <- c.bytes.mustNewConstMetric(s.free, device, s.mount.mountpoint, s.mount.fstype, "free")
+		// bytes; free = avail + reserved; total = used + free
+		ch <- c.bytesTotal.mustNewConstMetric(s.size, device, s.mount.mountpoint, s.mount.fstype)
 		ch <- c.bytes.mustNewConstMetric(s.avail, device, s.mount.mountpoint, s.mount.fstype, "avail")
 		ch <- c.bytes.mustNewConstMetric(s.free-s.avail, device, s.mount.mountpoint, s.mount.fstype, "reserved")
 		ch <- c.bytes.mustNewConstMetric(s.size-s.free, device, s.mount.mountpoint, s.mount.fstype, "used")
 		// files (inodes)
-		ch <- c.files.mustNewConstMetric(s.files, device, s.mount.mountpoint, s.mount.fstype, "total")
+		ch <- c.filesTotal.mustNewConstMetric(s.files, device, s.mount.mountpoint, s.mount.fstype)
 		ch <- c.files.mustNewConstMetric(s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "free")
 		ch <- c.files.mustNewConstMetric(s.files-s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "used")
 	}

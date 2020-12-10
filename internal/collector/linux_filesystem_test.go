@@ -13,7 +13,9 @@ func TestFilesystemCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"node_filesystem_bytes",
+			"node_filesystem_bytes_total",
 			"node_filesystem_files",
+			"node_filesystem_files_total",
 		},
 		collector: NewFilesystemCollector,
 	}
