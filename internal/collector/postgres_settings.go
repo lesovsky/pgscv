@@ -25,7 +25,7 @@ func NewPostgresSettingsCollector(constLabels prometheus.Labels) (Collector, err
 	return &postgresSettingsCollector{
 		settings: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "service", "settings"),
+				prometheus.BuildFQName("postgres", "service", "settings_info"),
 				"Labeled information about Postgres configuration settings.",
 				[]string{"name", "setting", "unit", "vartype", "source"}, constLabels,
 			),
@@ -33,7 +33,7 @@ func NewPostgresSettingsCollector(constLabels prometheus.Labels) (Collector, err
 		},
 		files: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "service", "files"),
+				prometheus.BuildFQName("postgres", "service", "files_info"),
 				"Labeled information about Postgres system files.",
 				[]string{"guc", "mode", "path"}, constLabels,
 			),

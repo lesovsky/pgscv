@@ -12,8 +12,8 @@ import (
 func TestPostgresSettingsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_service_settings",
-			"postgres_service_files",
+			"postgres_service_settings_info",
+			"postgres_service_files_info",
 		},
 		collector: NewPostgresSettingsCollector,
 		service:   model.ServiceTypePostgresql,
