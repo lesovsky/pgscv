@@ -4,8 +4,7 @@ name: Main
 on:
   push:
     branches: [ master ]
-  pull_request:
-    branches: [ master ]
+    tags: [ v* ]
 
 jobs:
   test:
