@@ -25,8 +25,6 @@ type postgresBgwriterCollector struct {
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-BGWRITER-VIEW
 func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, error) {
-	labels := []string{"type"}
-
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
 			"checkpoints": {
@@ -40,14 +38,14 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_total"),
 					"Total amount of time that has been spent processing data during checkpoint, in seconds.",
-					[]string{"op"}, constLabels,
+					[]string{"stage"}, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"written_bytes": {
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "written", "bytes_total"),
 					"Total number of bytes written by each subsystem, in bytes.",
-					labels, constLabels,
+					[]string{"process"}, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"maxwritten_clean": {
@@ -67,7 +65,7 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 			"alloc_bytes": {
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "backends", "allocated_bytes_total"),
-					"Total number of bytes allocated by backend.",
+					"Total number of bytes allocated by backends.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
