@@ -20,10 +20,14 @@ const databaseQuery = `SELECT
 FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)`
 
 type postgresDatabasesCollector struct {
+	commits    typedDesc
+	rollbacks  typedDesc
+	conflicts  typedDesc
+	deadlocks  typedDesc
 	blocks     typedDesc
 	tuples     typedDesc
-	events     typedDesc
 	tempbytes  typedDesc
+	tempfiles  typedDesc
 	blockstime typedDesc
 	sizes      typedDesc
 	statsage   typedDesc
@@ -37,32 +41,60 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 
 	return &postgresDatabasesCollector{
 		labelNames: databaseLabelNames,
-		events: typedDesc{
+		commits: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "database", "events_total"),
-				"Total number of events occurred in this database in each event type.",
-				[]string{"datname", "type"}, constLabels,
+				prometheus.BuildFQName("postgres", "database", "xact_commits_total"),
+				"Total number of transactions had been commited.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		rollbacks: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "xact_rollbacks_total"),
+				"Total number of transactions had been rolled back.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		conflicts: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "conflicts_total"),
+				"Total number of recovery conflicts occurred.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		deadlocks: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "deadlocks_total"),
+				"Total number of deadlocks occurred.",
+				databaseLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		blocks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "blocks_total"),
-				"Total number of disk blocks accesses in this database in each access type.",
+				"Total number of disk blocks had been accessed by each type of access.",
 				[]string{"datname", "access"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		tuples: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "tuples_total"),
-				"Total number of rows processed in this database in each operation type.",
+				"Total number of rows processed by each type of operation.",
 				[]string{"datname", "op"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		tempbytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "temp_bytes_total"),
-				"Total amount of data written to temporary files by queries in this database.",
-				[]string{"datname"}, constLabels,
+				"Total amount of data written to temporary files by queries.",
+				databaseLabelNames, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		tempfiles: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "database", "temp_files_total"),
+				"Total number of temporary files created by queries.",
+				databaseLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		blockstime: typedDesc{
@@ -105,11 +137,10 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	stats := parsePostgresDatabasesStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		ch <- c.events.mustNewConstMetric(stat.xactcommit, stat.datname, "xact_commit")
-		ch <- c.events.mustNewConstMetric(stat.xactrollback, stat.datname, "xact_rollback")
-		ch <- c.events.mustNewConstMetric(stat.conflicts, stat.datname, "conflicts")
-		ch <- c.events.mustNewConstMetric(stat.tempfiles, stat.datname, "tempfiles")
-		ch <- c.events.mustNewConstMetric(stat.deadlocks, stat.datname, "deadlocks")
+		ch <- c.commits.mustNewConstMetric(stat.xactcommit, stat.datname)
+		ch <- c.rollbacks.mustNewConstMetric(stat.xactrollback, stat.datname)
+		ch <- c.conflicts.mustNewConstMetric(stat.conflicts, stat.datname)
+		ch <- c.deadlocks.mustNewConstMetric(stat.deadlocks, stat.datname)
 		ch <- c.blocks.mustNewConstMetric(stat.blksread, stat.datname, "read")
 		ch <- c.blocks.mustNewConstMetric(stat.blkshit, stat.datname, "hit")
 		ch <- c.tuples.mustNewConstMetric(stat.tupreturned, stat.datname, "returned")
@@ -119,6 +150,7 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 		ch <- c.tuples.mustNewConstMetric(stat.tupdeleted, stat.datname, "deleted")
 
 		ch <- c.tempbytes.mustNewConstMetric(stat.tempbytes, stat.datname)
+		ch <- c.tempfiles.mustNewConstMetric(stat.tempfiles, stat.datname)
 		ch <- c.blockstime.mustNewConstMetric(stat.blkreadtime, stat.datname, "read")
 		ch <- c.blockstime.mustNewConstMetric(stat.blkwritetime, stat.datname, "write")
 		ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname)

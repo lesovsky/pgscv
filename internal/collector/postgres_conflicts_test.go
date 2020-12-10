@@ -11,7 +11,7 @@ import (
 func TestPostgresConflictsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		optional: []string{
-			"postgres_conflicts_total",
+			"postgres_recovery_conflicts_total",
 		},
 		collector: NewPostgresConflictsCollector,
 		service:   model.ServiceTypePostgresql,

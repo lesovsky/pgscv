@@ -32,8 +32,8 @@ func NewPostgresConflictsCollector(constLabels prometheus.Labels) (Collector, er
 		labelNames: labelNames,
 		conflicts: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "conflicts", "total"),
-				"Total number of recovery conflicts occurred in the database in each conflict type.",
+				prometheus.BuildFQName("postgres", "recovery", "conflicts_total"),
+				"Total number of recovery conflicts occurred by each conflict type.",
 				labelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
