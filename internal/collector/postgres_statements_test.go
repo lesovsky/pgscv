@@ -15,9 +15,9 @@ func TestPostgresStatementsCollector_Update(t *testing.T) {
 		required: []string{
 			"postgres_statements_calls_total",
 			"postgres_statements_rows_total",
-			"postgres_statements_time_seconds",
-			"postgres_statements_time_all_seconds",
-			"postgres_statements_blocks",
+			"postgres_statements_time_seconds_total",
+			"postgres_statements_time_all_seconds_total",
+			"postgres_statements_blocks_total",
 		},
 		optional:  []string{},
 		collector: NewPostgresStatementsCollector,

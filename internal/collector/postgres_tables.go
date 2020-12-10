@@ -95,7 +95,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 		tuplestotal: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_total"),
-				"Estimated total number of rows in the table.",
+				"Estimated total number of tuples in the table by each type.",
 				[]string{"datname", "schemaname", "relname", "type"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
@@ -103,7 +103,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 		maintLastVacuum: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "last_vacuum_seconds"),
-				"Time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.",
+				"Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.",
 				tablesLabelNames, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -111,7 +111,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 		maintLastAnalyze: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "last_analyze_seconds"),
-				"Time since table was analyzed manually or automatically, in seconds.",
+				"Total time since table was analyzed manually or automatically, in seconds.",
 				tablesLabelNames, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -119,7 +119,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 		maintenance: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "maintenance_total"),
-				"Total number of times this table has been vacuumed or analyzed.",
+				"Total number of times this table has been maintained by each type of maintenance operation.",
 				[]string{"datname", "schemaname", "relname", "type"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -134,11 +134,11 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 		},
 		sizes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "size_bytes_total"),
+				prometheus.BuildFQName("postgres", "table", "size_bytes"),
 				"Total size of the table, in bytes.",
 				[]string{"datname", "schemaname", "relname"}, constLabels,
 			),
-			valueType: prometheus.CounterValue,
+			valueType: prometheus.GaugeValue,
 		},
 	}, nil
 }

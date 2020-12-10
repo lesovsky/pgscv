@@ -35,14 +35,14 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 		tempFiles: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "temp_files", "in_flight"),
-				"Total number of temporary files processed in flight.",
+				"Number of temporary files processed in flight.",
 				[]string{"tablespace"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		tempBytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "temp_bytes", "in_flight"),
-				"Total number bytes occupied by temporary files processed in flight.",
+				"Number bytes occupied by temporary files processed in flight.",
 				[]string{"tablespace"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
@@ -55,7 +55,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 		},
 		dirstats: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "directory_size", "bytes_total"),
+				prometheus.BuildFQName("postgres", "directory_size", "bytes"),
 				"The size of Postgres server directories of each type, in bytes.",
 				[]string{"device", "mountpoint", "path", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,

@@ -64,11 +64,11 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, erro
 		},
 		sizes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "index", "size_bytes_total"),
+				prometheus.BuildFQName("postgres", "index", "size_bytes"),
 				"Total size of the index, in bytes.",
 				[]string{"datname", "schemaname", "relname", "indexrelname"}, constLabels,
 			),
-			valueType: prometheus.CounterValue,
+			valueType: prometheus.GaugeValue,
 		},
 	}, nil
 }

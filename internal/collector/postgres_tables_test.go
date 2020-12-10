@@ -20,7 +20,7 @@ func TestPostgresTablesCollector_Update(t *testing.T) {
 			"postgres_table_last_vacuum_seconds",
 			"postgres_table_last_analyze_seconds",
 			"postgres_table_maintenance_total",
-			"postgres_table_size_bytes_total",
+			"postgres_table_size_bytes",
 		},
 		optional: []string{
 			"postgres_table_io_blocks_total",
