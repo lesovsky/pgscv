@@ -6,14 +6,14 @@
   vars_files:
     - ./vars/{{ env }}.yml
   tasks:
-    - name: Versioning | Register release commit
-      command: git rev-parse --short HEAD
-      register: hash
+    - name: Versioning | Register release tag
+      command: git describe --tags --abbrev=0
+      register: tag
 
     - name: Facts | Set fact about deployed application
       set_fact:
-        app_version: "{{ hash.stdout }}"
-        tmpdir: "/tmp/{{ appname }}-{{ env }}-{{ hash.stdout }}"
+        app_version: "{{ tag.stdout }}"
+        tmpdir: "/tmp/{{ appname }}-{{ env }}-{{ tag.stdout }}"
 
     - name: Paths | Create manifests temp directory
       file:

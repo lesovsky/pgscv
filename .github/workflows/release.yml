@@ -4,8 +4,7 @@ name: Release
 on:
   push:
     branches: [ release ]
-  pull_request:
-    branches: [ release ]
+    tags: [ v* ]
 
 jobs:
   test:
