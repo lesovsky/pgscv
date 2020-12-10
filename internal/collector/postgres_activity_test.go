@@ -11,11 +11,11 @@ import (
 func TestPostgresActivityCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_activity_conn_total",
+			"postgres_activity_connections_in_flight",
 			"postgres_activity_max_seconds",
-			"postgres_activity_prepared_xact_total",
+			"postgres_activity_prepared_transactions_in_flight",
 			"postgres_activity_queries_in_flight",
-			"postgres_activity_vacuums_total",
+			"postgres_activity_vacuums_in_flight",
 		},
 		collector: NewPostgresActivityCollector,
 		service:   model.ServiceTypePostgresql,

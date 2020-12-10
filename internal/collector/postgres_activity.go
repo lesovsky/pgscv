@@ -59,36 +59,36 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 	return &postgresActivityCollector{
 		states: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "conn_total"),
-				"The total number of connections in each state.",
+				prometheus.BuildFQName("postgres", "activity", "connections_in_flight"),
+				"Number of connections in-flight in each state.",
 				[]string{"state"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		activity: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "max_seconds"),
-				"The current longest activity for each type of activity.",
+				"Longest activity for each user, database and activity type.",
 				[]string{"usename", "datname", "state", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		prepared: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "prepared_xact_total"),
-				"The total number of transactions that are currently prepared for two-phase commit.",
+				prometheus.BuildFQName("postgres", "activity", "prepared_transactions_in_flight"),
+				"Number of transactions that are currently prepared for two-phase commit.",
 				nil, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		inflight: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
-				"The total number of queries executed in-flight of each type.",
+				"Number of queries running in-flight of each type.",
 				[]string{"type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		vacuums: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "vacuums_total"),
-				"The total number of vacuum operations of each type.",
+				prometheus.BuildFQName("postgres", "activity", "vacuums_in_flight"),
+				"Number of vacuum operations running in-flight of each type.",
 				[]string{"type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
