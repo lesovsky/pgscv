@@ -292,7 +292,7 @@ func newLogParser() *logParser {
 
 // updateMessagesStats process the message string, parse and update stats.
 func (p *logParser) updateMessagesStats(line string, c *postgresLogsCollector) {
-	//log.Infoln("lessqq: got the line")
+	//log.Infoln("debug: got the line")
 	m, found := p.parseMessageSeverity(line)
 	if !found {
 		return

@@ -66,7 +66,7 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, 
 		labelNames: labelNames,
 		recovery: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "recovery", "state"),
+				prometheus.BuildFQName("postgres", "recovery", "info"),
 				"Current recovery state, 0 - not in recovery; 1 - in recovery.",
 				[]string{}, constLabels,
 			), valueType: prometheus.GaugeValue,
@@ -81,28 +81,28 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, 
 		lagbytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_bytes"),
-				"Current number of bytes standby is behind than primary in each WAL processing phase.",
+				"Number of bytes standby is behind than primary in each WAL processing phase.",
 				labelNames, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		lagseconds: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_seconds"),
-				"Current number of seconds standby is behind than primary in each WAL processing phase.",
+				"Number of seconds standby is behind than primary in each WAL processing phase.",
 				labelNames, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		lagtotalbytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_total_bytes"),
-				"Current total number of bytes standby is behind than primary.",
+				"Number of bytes standby is behind than primary including all phases.",
 				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		lagtotalseconds: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication", "lag_total_seconds"),
-				"Current total number of seconds standby is behind than primary.",
+				"Number of seconds standby is behind than primary including all phases.",
 				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},

@@ -41,7 +41,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, erro
 		indexes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "scans_total"),
-				"Total number of index scans initiated on this index.",
+				"Total number of index scans initiated.",
 				tablesLabelNames, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -49,7 +49,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, erro
 		tuples: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "tuples_total"),
-				"Total number of index entries processed by scans on this index.",
+				"Total number of index entries processed by scans.",
 				[]string{"datname", "schemaname", "relname", "indexrelname", "op"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -57,7 +57,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels) (Collector, erro
 		io: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index_io", "blocks_total"),
-				"Total number of index's blocks processed.",
+				"Total number of indexes' blocks processed.",
 				[]string{"datname", "schemaname", "relname", "indexrelname", "cache_hit"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,

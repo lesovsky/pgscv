@@ -11,7 +11,7 @@ import (
 func TestPostgresReplicationCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_recovery_state",
+			"postgres_recovery_info",
 			"postgres_wal_bytes_total",
 			"postgres_replication_lag_bytes",
 			"postgres_replication_lag_seconds",

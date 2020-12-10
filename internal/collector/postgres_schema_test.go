@@ -11,13 +11,13 @@ import (
 func TestPostgresSchemaCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_schema_system_catalog_bytes_total",
-			"postgres_schema_non_pk_tables_total",
-			"postgres_schema_invalid_index_bytes_total",
-			"postgres_schema_non_indexed_fk_total",
-			"postgres_schema_redundant_indexes_bytes_total",
+			"postgres_schema_system_catalog_bytes",
+			"postgres_schema_non_pk_tables",
+			"postgres_schema_invalid_indexes_bytes",
+			"postgres_schema_non_indexed_fkeys",
+			"postgres_schema_redundant_indexes_bytes",
 			"postgres_schema_seq_exhaustion_ratio",
-			"postgres_schema_mistyped_fkeys_total",
+			"postgres_schema_mistyped_fkeys",
 		},
 		collector: NewPostgresSchemasCollector,
 		service:   model.ServiceTypePostgresql,

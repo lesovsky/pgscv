@@ -26,15 +26,15 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels) (Collector, erro
 	return &postgresSchemaCollector{
 		syscatalog: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "system_catalog_bytes_total"),
-				"Total number of bytes occupied by system catalog.",
+				prometheus.BuildFQName("postgres", "schema", "system_catalog_bytes"),
+				"Number of bytes occupied by system catalog.",
 				[]string{"datname"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
 		nonpktables: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "non_pk_tables_total"),
+				prometheus.BuildFQName("postgres", "schema", "non_pk_tables"),
 				"Labeled information about tables with no primary or unique key constraints.",
 				[]string{"datname", "schemaname", "relname"}, constLabels,
 			),
@@ -42,24 +42,24 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels) (Collector, erro
 		},
 		invalididx: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "invalid_index_bytes_total"),
-				"Total number of bytes occupied by invalid indexes.",
+				prometheus.BuildFQName("postgres", "schema", "invalid_indexes_bytes"),
+				"Number of bytes occupied by invalid indexes.",
 				[]string{"datname", "schemaname", "relname", "indexrelname"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
 		nonidxfkey: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "non_indexed_fk_total"),
-				"Total number of non-indexed FOREIGN key constraints.",
+				prometheus.BuildFQName("postgres", "schema", "non_indexed_fkeys"),
+				"Number of non-indexed FOREIGN key constraints.",
 				[]string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
 		redundantidx: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "redundant_indexes_bytes_total"),
-				"Total number of bytes occupied by redundant indexes.",
+				prometheus.BuildFQName("postgres", "schema", "redundant_indexes_bytes"),
+				"Number of bytes occupied by redundant indexes.",
 				[]string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
@@ -74,8 +74,8 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels) (Collector, erro
 		},
 		difftypefkey: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "mistyped_fkeys_total"),
-				"Total number of foreign key constraints with different data type.",
+				prometheus.BuildFQName("postgres", "schema", "mistyped_fkeys"),
+				"Number of foreign key constraints with different data type.",
 				[]string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,

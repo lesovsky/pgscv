@@ -29,21 +29,21 @@ func NewPostgresFunctionsCollector(constLabels prometheus.Labels) (Collector, er
 		calls: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "function", "calls_total"),
-				"Total number of times this function has been called.",
+				"Total number of times functions had been called.",
 				labelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		totaltime: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "function", "total_time_seconds"),
-				"Total time spent in this function and all other functions called by it, in seconds.",
+				"Total time spent in function and all other functions called by it, in seconds.",
 				labelNames, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		selftime: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "function", "self_time_seconds"),
-				"Total time spent in this function itself, not including other functions called by it, in seconds.",
+				"Total time spent in function itself, not including other functions called by it, in seconds.",
 				labelNames, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},

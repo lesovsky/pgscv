@@ -33,7 +33,7 @@ func NewPostgresReplicationSlotsCollector(constLabels prometheus.Labels) (Collec
 		restart: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "replication_slot", "wal_retain_bytes"),
-				"Total number of WAL retained and required by consumers, in bytes.",
+				"Number of WAL retained and required by consumers, in bytes.",
 				labelNames, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
