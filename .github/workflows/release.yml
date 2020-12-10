@@ -20,6 +20,27 @@ jobs:
       - name: Run test
         run: make test
 
+  test_1:
+    if: github.event.base_ref == 'refs/heads/master'
+    steps:
+      - name: Run help 1
+        run: make help
+  test_2:
+    if: github.event.base_ref == 'master'
+    steps:
+      - name: Run help 1
+        run: make help
+  test_3:
+    if: github.base_ref == 'refs/heads/master'
+    steps:
+      - name: Run help 1
+        run: make help
+  test_4:
+    if: github.base_ref == 'master'
+    steps:
+      - name: Run help 1
+        run: make help
+
   build_staging:
     if: github.event.base_ref == 'refs/heads/master'
     runs-on: ubuntu-latest
