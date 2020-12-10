@@ -13,6 +13,7 @@ import (
 )
 
 type meminfoCollector struct {
+	re          *regexp.Regexp
 	meminfo     typedDesc
 	constLabels prometheus.Labels
 }
@@ -20,6 +21,7 @@ type meminfoCollector struct {
 // NewMeminfoCollector returns a new Collector exposing memory stats.
 func NewMeminfoCollector(labels prometheus.Labels) (Collector, error) {
 	return &meminfoCollector{
+		re:          regexp.MustCompile(`\((.*)\)`),
 		constLabels: labels,
 		meminfo: typedDesc{
 			desc: prometheus.NewDesc(
@@ -39,24 +41,8 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		return fmt.Errorf("get /proc/meminfo stats failed: %s", err)
 	}
 
-	re, err := regexp.Compile(`\((.*)\)`)
-	if err != nil {
-		return fmt.Errorf("compile regexp failed: %s", err)
-	}
-
 	for param, value := range stats {
-		param = re.ReplaceAllString(param, "_${1}")
-
-		// TODO: Should be removed after metric-inspector can support node_memory_meminfo.
-		// This metric is deprecated in favor node_memory_meminfo.
-		ch <- prometheus.MustNewConstMetric(
-			prometheus.NewDesc(
-				prometheus.BuildFQName("node", "memory", param),
-				fmt.Sprintf("Memory information field %s. DEPRECATED", param),
-				nil, c.constLabels,
-			), prometheus.GaugeValue, value,
-		)
-
+		param = c.re.ReplaceAllString(param, "_${1}")
 		ch <- c.meminfo.mustNewConstMetric(value, param)
 	}
 
