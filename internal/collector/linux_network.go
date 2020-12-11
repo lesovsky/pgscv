@@ -9,17 +9,25 @@ import (
 )
 
 type networkCollector struct {
-	addresses typedDesc
+	privateAddresses typedDesc
+	publicAddresses  typedDesc
 }
 
 func NewNetworkCollector(labels prometheus.Labels) (Collector, error) {
 	return &networkCollector{
-		addresses: typedDesc{
+		publicAddresses: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "addresses_total"),
-				"Total number network addresses present on the system, by type.",
-				[]string{"type"}, labels,
-			), valueType: prometheus.CounterValue,
+				prometheus.BuildFQName("node", "network", "public_addresses"),
+				"Number of public network addresses present on the system, by type.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
+		},
+		privateAddresses: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "network", "private_addresses"),
+				"Number of private network addresses present on the system, by type.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
 }
@@ -32,9 +40,8 @@ func (c *networkCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 	stats := parseInterfaceAddresses(addresses)
 
-	ch <- c.addresses.mustNewConstMetric(float64(stats["public"]+stats["private"]), "total")
-	ch <- c.addresses.mustNewConstMetric(float64(stats["public"]), "public")
-	ch <- c.addresses.mustNewConstMetric(float64(stats["private"]), "private")
+	ch <- c.publicAddresses.mustNewConstMetric(float64(stats["public"]))
+	ch <- c.privateAddresses.mustNewConstMetric(float64(stats["private"]))
 
 	return nil
 }

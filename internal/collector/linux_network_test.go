@@ -9,7 +9,8 @@ import (
 func TestNetworkCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"node_network_addresses_total",
+			"node_network_public_addresses",
+			"node_network_private_addresses",
 		},
 		collector: NewNetworkCollector,
 	}
