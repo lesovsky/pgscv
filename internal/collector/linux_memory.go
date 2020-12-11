@@ -14,8 +14,9 @@ import (
 
 type meminfoCollector struct {
 	re          *regexp.Regexp
-	meminfo     typedDesc
 	constLabels prometheus.Labels
+	memused     typedDesc
+	swapused    typedDesc
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
@@ -23,13 +24,19 @@ func NewMeminfoCollector(labels prometheus.Labels) (Collector, error) {
 	return &meminfoCollector{
 		re:          regexp.MustCompile(`\((.*)\)`),
 		constLabels: labels,
-		meminfo: typedDesc{
+		memused: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "memory", "meminfo"),
-				"Memory information based on /proc/meminfo.",
-				[]string{"usage"}, labels,
-			),
-			valueType: prometheus.GaugeValue,
+				prometheus.BuildFQName("node", "memory", "MemUsed"),
+				"Memory information composite field MemUsed.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
+		},
+		swapused: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "memory", "SwapUsed"),
+				"Memory information composite field SwapUsed.",
+				nil, labels,
+			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
 }
@@ -43,14 +50,18 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 	for param, value := range stats {
 		param = c.re.ReplaceAllString(param, "_${1}")
-		ch <- c.meminfo.mustNewConstMetric(value, param)
+		ch <- prometheus.MustNewConstMetric(
+			prometheus.NewDesc(
+				prometheus.BuildFQName("node", "memory", param),
+				fmt.Sprintf("Memory information field %s.", param),
+				nil, c.constLabels,
+			), prometheus.GaugeValue, value,
+		)
 	}
 
 	// MemUsed and SwapUsed are composite metrics and not present in /proc/meminfo.
-	memused := stats["MemTotal"] - stats["MemFree"] - stats["Buffers"] - stats["Cached"]
-	swapused := stats["SwapTotal"] - stats["SwapFree"]
-	ch <- c.meminfo.mustNewConstMetric(memused, "MemUsed")
-	ch <- c.meminfo.mustNewConstMetric(swapused, "SwapUsed")
+	ch <- c.memused.mustNewConstMetric(stats["MemTotal"] - stats["MemFree"] - stats["Buffers"] - stats["Cached"])
+	ch <- c.swapused.mustNewConstMetric(stats["SwapTotal"] - stats["SwapFree"])
 
 	return nil
 }

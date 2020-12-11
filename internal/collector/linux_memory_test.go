@@ -10,7 +10,24 @@ import (
 func TestMeminfoCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"node_memory_meminfo",
+			"node_memory_MemTotal", "node_memory_MemFree", "node_memory_MemAvailable", "node_memory_MemUsed",
+			"node_memory_Buffers", "node_memory_Cached", "node_memory_SwapCached",
+			"node_memory_Active", "node_memory_Inactive", "node_memory_Active_anon",
+			"node_memory_Inactive_anon", "node_memory_Active_file", "node_memory_Inactive_file",
+			"node_memory_SwapTotal", "node_memory_SwapFree", "node_memory_SwapUsed",
+			"node_memory_Dirty", "node_memory_Writeback", "node_memory_AnonPages", "node_memory_Mapped",
+			"node_memory_Shmem", "node_memory_PageTables", "node_memory_HugePages_Total",
+			"node_memory_HugePages_Free", "node_memory_HugePages_Rsvd", "node_memory_HugePages_Surp",
+			"node_memory_Hugepagesize",
+		},
+		optional: []string{
+			"node_memory_Bounce", "node_memory_FilePmdMapped", "node_memory_CmaFree", "node_memory_ShmemHugePages",
+			"node_memory_KReclaimable", "node_memory_CommitLimit", "node_memory_Slab", "node_memory_AnonHugePages",
+			"node_memory_FileHugePages", "node_memory_DirectMap4k", "node_memory_VmallocTotal", "node_memory_SReclaimable",
+			"node_memory_VmallocUsed", "node_memory_DirectMap1G", "node_memory_Committed_AS", "node_memory_Unevictable",
+			"node_memory_WritebackTmp", "node_memory_NFS_Unstable", "node_memory_DirectMap2M", "node_memory_Hugetlb",
+			"node_memory_CmaTotal", "node_memory_Mlocked", "node_memory_ShmemPmdMapped", "node_memory_SUnreclaim",
+			"node_memory_KernelStack", "node_memory_VmallocChunk", "node_memory_Percpu", "node_memory_HardwareCorrupted",
 		},
 		collector: NewMeminfoCollector,
 	}
