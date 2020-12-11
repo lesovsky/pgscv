@@ -43,12 +43,13 @@ FROM pg_stat_activity`
 
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
-	states   typedDesc
-	activity typedDesc
-	prepared typedDesc
-	inflight typedDesc
-	vacuums  typedDesc
-	re       queryRegexp // regexps for queries classification
+	states    typedDesc
+	statesAll typedDesc
+	activity  typedDesc
+	prepared  typedDesc
+	inflight  typedDesc
+	vacuums   typedDesc
+	re        queryRegexp // regexps for queries classification
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -62,6 +63,13 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, err
 				prometheus.BuildFQName("postgres", "activity", "connections_in_flight"),
 				"Number of connections in-flight in each state.",
 				[]string{"state"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		statesAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "connections_all_in_flight"),
+				"Number of all connections in-flight.",
+				nil, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		activity: typedDesc{
@@ -125,7 +133,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// connection states
 	// totals doesn't account waitings because they have 'active' state.
 	var total = stats.active + stats.idle + stats.idlexact + stats.other
-	ch <- c.states.mustNewConstMetric(total, "total")
+	ch <- c.statesAll.mustNewConstMetric(total)
 	ch <- c.states.mustNewConstMetric(stats.active, "active")
 	ch <- c.states.mustNewConstMetric(stats.idle, "idle")
 	ch <- c.states.mustNewConstMetric(stats.idlexact, "idlexact")
