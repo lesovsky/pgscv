@@ -13,9 +13,13 @@ func TestDiskstatsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"node_disk_completed_total",
+			"node_disk_completed_all_total",
 			"node_disk_merged_total",
+			"node_disk_merged_all_total",
 			"node_disk_bytes_total",
+			"node_disk_bytes_all_total",
 			"node_disk_time_seconds_total",
+			"node_disk_time_seconds_all_total",
 			"node_disk_io_now",
 			"node_disk_io_time_seconds_total",
 			"node_disk_io_time_weighted_seconds_total",

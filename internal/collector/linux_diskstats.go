@@ -22,9 +22,13 @@ const (
 
 type diskstatsCollector struct {
 	completed      typedDesc
+	completedAll   typedDesc
 	merged         typedDesc
+	mergedAll      typedDesc
 	bytes          typedDesc
+	bytesAll       typedDesc
 	times          typedDesc
+	timesAll       typedDesc
 	ionow          typedDesc
 	iotime         typedDesc
 	iotimeweighted typedDesc
@@ -44,11 +48,25 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 				diskLabelNames, labels,
 			), valueType: prometheus.CounterValue,
 		},
+		completedAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "disk", "completed_all_total"),
+				"The total number of IO requests completed successfully.",
+				[]string{"device"}, labels,
+			), valueType: prometheus.CounterValue,
+		},
 		merged: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "disk", "merged_total"),
 				"The total number of merged IO requests of each type.",
 				diskLabelNames, labels,
+			), valueType: prometheus.CounterValue,
+		},
+		mergedAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "disk", "merged_all_total"),
+				"The total number of merged IO requests.",
+				[]string{"device"}, labels,
 			), valueType: prometheus.CounterValue,
 		},
 		bytes: typedDesc{
@@ -58,11 +76,25 @@ func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
 				diskLabelNames, labels,
 			), valueType: prometheus.CounterValue, factor: diskSectorSize,
 		},
+		bytesAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "disk", "bytes_all_total"),
+				"The total number of bytes processed by IO requests.",
+				[]string{"device"}, labels,
+			), valueType: prometheus.CounterValue, factor: diskSectorSize,
+		},
 		times: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("node", "disk", "time_seconds_total"),
 				"The total number of seconds spent on all requests of each type.",
 				diskLabelNames, labels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
+		timesAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "disk", "time_seconds_all_total"),
+				"The total number of seconds spent on all requests.",
+				[]string{"device"}, labels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		ionow: typedDesc{
@@ -145,10 +177,10 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 		}
 
 		// Send accumulated totals.
-		ch <- c.completed.mustNewConstMetric(completedTotal, dev, "total")
-		ch <- c.merged.mustNewConstMetric(mergedTotal, dev, "total")
-		ch <- c.bytes.mustNewConstMetric(bytesTotal, dev, "total")
-		ch <- c.times.mustNewConstMetric(secondsTotal, dev, "total")
+		ch <- c.completedAll.mustNewConstMetric(completedTotal, dev)
+		ch <- c.mergedAll.mustNewConstMetric(mergedTotal, dev)
+		ch <- c.bytesAll.mustNewConstMetric(bytesTotal, dev)
+		ch <- c.timesAll.mustNewConstMetric(secondsTotal, dev)
 	}
 
 	// Collect storages properties.
