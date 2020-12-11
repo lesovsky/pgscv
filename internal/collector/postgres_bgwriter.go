@@ -37,8 +37,15 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels) (Collector, err
 			"checkpoint_time": {
 				desc: prometheus.NewDesc(
 					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_total"),
-					"Total amount of time that has been spent processing data during checkpoint, in seconds.",
+					"Total amount of time that has been spent processing data during checkpoint in each stage, in seconds.",
 					[]string{"stage"}, constLabels,
+				), valueType: prometheus.CounterValue, factor: .001,
+			},
+			"checkpoint_time_all": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_all_total"),
+					"Total amount of time that has been spent processing data during checkpoint, in seconds.",
+					nil, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"written_bytes": {
@@ -102,9 +109,10 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 			ch <- desc.mustNewConstMetric(stats.ckptTimed, "timed")
 			ch <- desc.mustNewConstMetric(stats.ckptReq, "req")
 		case "checkpoint_time":
-			ch <- desc.mustNewConstMetric(stats.ckptWriteTime+stats.ckptSyncTime, "total")
 			ch <- desc.mustNewConstMetric(stats.ckptWriteTime, "write")
 			ch <- desc.mustNewConstMetric(stats.ckptSyncTime, "sync")
+		case "checkpoint_time_all":
+			ch <- desc.mustNewConstMetric(stats.ckptWriteTime + stats.ckptSyncTime)
 		case "maxwritten_clean":
 			ch <- desc.mustNewConstMetric(stats.bgwrMaxWritten)
 		case "written_bytes":
