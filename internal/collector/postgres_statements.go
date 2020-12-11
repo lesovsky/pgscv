@@ -82,7 +82,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		},
 		allTimes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "time_all_seconds_total"),
+				prometheus.BuildFQName("postgres", "statements", "time_seconds_all_total"),
 				"Total time spent by the statement, in seconds.",
 				[]string{"usename", "datname", "md5"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
