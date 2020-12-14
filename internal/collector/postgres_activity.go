@@ -146,18 +146,18 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of user's idle_xacts per usename/datname.
 	for k, v := range stats.maxIdleUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idle_xact", "user")
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "user")
 		} else {
-			log.Warnf("failed to create max idle_xact user activity: incomplete string %s; skip", k)
+			log.Warnf("failed to create max idlexact user activity: incomplete string %s; skip", k)
 		}
 	}
 
 	// max duration of maintenance's idle_xacts per usename/datname.
 	for k, v := range stats.maxIdleMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idle_xact", "maintenance")
+			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "maintenance")
 		} else {
-			log.Warnf("failed to create max idle_xact maintenance activity: incomplete string %s; skip", k)
+			log.Warnf("failed to create max idlexact maintenance activity: incomplete string %s; skip", k)
 		}
 	}
 
