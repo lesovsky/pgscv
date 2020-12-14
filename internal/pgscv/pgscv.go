@@ -17,10 +17,6 @@ import (
 	"time"
 )
 
-const (
-	defaultImportEndpoint = "/api/v1/import/prometheus"
-)
-
 func Start(ctx context.Context, config *Config) error {
 	log.Debug("start application")
 
@@ -192,7 +188,7 @@ func newSendClient(config *Config) (sendClient, error) {
 		return sendClient{}, err
 	}
 
-	writeURL, err := url.Parse(config.SendMetricsURL + defaultImportEndpoint)
+	writeURL, err := url.Parse(config.SendMetricsURL)
 	if err != nil {
 		return sendClient{}, err
 	}

@@ -17,7 +17,6 @@ import (
 func TestStart(t *testing.T) {
 	// Mock HTTP server which handles incoming requests.
 	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, defaultImportEndpoint, r.URL.String())
 		body, err := ioutil.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Greater(t, len(body), 0)
@@ -99,7 +98,6 @@ func Test_runSendMetricsLoop(t *testing.T) {
 	defer readServer.Close()
 
 	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, defaultImportEndpoint, r.URL.String())
 		body, err := ioutil.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Greater(t, len(body), 0)
