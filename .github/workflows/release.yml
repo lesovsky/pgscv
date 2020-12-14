@@ -22,7 +22,7 @@ jobs:
   deploy_production:
     runs-on: [self-hosted, production]
     container: barcodepro/ansible:2.9.5-alpine
-    needs: [ test, build_production ]
+    needs: [ test ]
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
