@@ -15,7 +15,7 @@ import (
 const confFileTemplate = `autoupdate_url: "{{ .AutoUpdateURL}}"
 api_key: "{{ .APIKey }}"
 project_id: {{ .ProjectID }}
-metrics_service_url: "{{ .MetricServiceBaseURL }}"
+send_metrics_url: "{{ .SendMetricsURL }}"
 defaults:
     postgres_username: "pgscv"
     postgres_password: "{{ .DefaultPostgresPassword }}"
@@ -58,7 +58,7 @@ type BootstrapConfig struct {
 	ExecutableName           string
 	AutoStart                bool
 	RunAsUser                string
-	MetricServiceBaseURL     string
+	SendMetricsURL           string
 	AutoUpdateURL            string
 	APIKey                   string
 	ProjectID                string
@@ -81,8 +81,8 @@ func (c *BootstrapConfig) Validate() error {
 		return fmt.Errorf("specified user does not exists: %s ", err)
 	}
 
-	if c.MetricServiceBaseURL == "" {
-		return fmt.Errorf("PGSCV_METRICS_SERVICE_BASE_URL is not defined")
+	if c.SendMetricsURL == "" {
+		return fmt.Errorf("PGSCV_SEND_METRICS_URL is not defined")
 	}
 	if c.AutoUpdateURL == "" {
 		return fmt.Errorf("PGSCV_AUTOUPDATE_URL is not defined")

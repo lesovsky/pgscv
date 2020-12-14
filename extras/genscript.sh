@@ -28,7 +28,7 @@ cat <<EOF
 if [ \$# -eq 0 ]; then { echo "API key is not specified, exit"; exit 1; }; fi
 
 export PGSCV_RUN_AS_USER=root \
-PGSCV_METRICS_SERVICE_BASE_URL="https://push.${BASE_DOMAIN}" \
+PGSCV_SEND_METRICS_URL="https://push.${BASE_DOMAIN}" \
 PGSCV_AUTOUPDATE_URL="https://dist.${BASE_DOMAIN}" \
 PGSCV_PROJECT_ID=\$1 \
 PGSCV_API_KEY=\$2
