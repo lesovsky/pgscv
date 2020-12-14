@@ -46,6 +46,7 @@ JOIN pg_database d ON d.oid=p.dbid`
 
 // postgresStatementsCollector ...
 type postgresStatementsCollector struct {
+	query    typedDesc
 	calls    typedDesc
 	rows     typedDesc
 	times    typedDesc
@@ -57,11 +58,19 @@ type postgresStatementsCollector struct {
 // For details see https://www.postgresql.org/docs/current/pgstatstatements.html
 func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, error) {
 	return &postgresStatementsCollector{
+		query: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "query_info"),
+				"Labeled info about statements has been executed.",
+				[]string{"usename", "datname", "md5", "query"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
 		calls: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "calls_total"),
 				"Total number of times statement has been executed.",
-				[]string{"usename", "datname", "md5", "query"}, constLabels,
+				[]string{"usename", "datname", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -133,7 +142,9 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		// Note: pg_stat_statements.total_exec_time (and .total_time) includes blk_read_time and blk_write_time implicitly.
 		// Remember that when creating metrics.
 
-		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash, query)
+		ch <- c.query.mustNewConstMetric(1, stat.usename, stat.datname, stat.md5hash, query)
+
+		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash)
 		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
 
 		// total = planning + execution; execution already includes io time.

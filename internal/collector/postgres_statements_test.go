@@ -13,6 +13,7 @@ import (
 func TestPostgresStatementsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
+			"postgres_statements_query_info",
 			"postgres_statements_calls_total",
 			"postgres_statements_rows_total",
 			"postgres_statements_time_seconds_total",
