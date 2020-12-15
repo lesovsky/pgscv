@@ -34,13 +34,13 @@ rate(node_disk_time_seconds_total{type="reads",device="sdb"}[5m]) / rate(node_di
 Задача получить утилизацию блочных устройств. По сути утилизация это объем выполненной работы за N времени (как правило это 1 секунда), следовательно утилизация диска
 это время затраченное на выполнение IO относительно 1 секунды. 
 ```
-(sum by (device) (rate(node_disk_io_time_seconds_total{}[2m])) / on() group_left() rate(node_cpu_seconds_all_total{}[2m])) * 1000
+sum by (device) (rate(node_disk_io_time_seconds_total{}[1m]) / on() group_left() rate(node_uptime_up_seconds_total{}[1m]) * 100
 ```
 - `node_disk_io_time_seconds_total` - эта метрика соответствует значению в поле #13 в `/proc/diskstats` - time spent doing I/Os (ms) (iostat также использует это поле при расчете утилизации)
-- `node_cpu_seconds_all_total` - это системный uptime
+- `node_uptime_up_seconds_total` - это системный uptime на основе /proc/uptime.
 - соответственно просто находим процентное отношение времени затраченного на IO относительно общего времени.
 - `/ on() group_left()` - присоединение правой части выражения, т.к. метрики разные.
-- остается не ясным зачем нужно домножение на 1000 (тут надо погружаться в исходники sysstat/iostat, скорей всего эта какая-то подгонка под логику iostat).
+- домножение на 100 - перевод долей единицы в проценты о 0 до 100.
 
 ##### Count usage over time
 Есть процедура резервного копирования: 1) запускается с периодичностью; 2) имеет время начала и конца.
