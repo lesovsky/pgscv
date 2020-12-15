@@ -13,6 +13,8 @@ func TestCPUCollector_Update(t *testing.T) {
 			"node_cpu_seconds_total",
 			"node_cpu_seconds_all_total",
 			"node_cpu_guest_seconds_total",
+			"node_uptime_up_seconds_total",
+			"node_uptime_idle_seconds_total",
 		},
 		collector: NewCPUCollector,
 	}
@@ -21,28 +23,39 @@ func TestCPUCollector_Update(t *testing.T) {
 }
 
 func Test_parseProcCPUStat(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/proc/stat.golden"))
-	assert.NoError(t, err)
-	defer func() { _ = file.Close() }()
-
-	want := cpuStat{
-		user:      30976.68,
-		nice:      15.93,
-		system:    14196.18,
-		idle:      1322422.58,
-		iowait:    425.35,
-		irq:       0,
-		softirq:   3846.86,
-		steal:     0,
-		guest:     0,
-		guestnice: 0,
+	testcases := []struct {
+		in    string
+		valid bool
+		want  cpuStat
+	}{
+		{in: "testdata/proc/stat.golden", valid: true, want: cpuStat{
+			user:      30976.68,
+			nice:      15.93,
+			system:    14196.18,
+			idle:      1322422.58,
+			iowait:    425.35,
+			irq:       0,
+			softirq:   3846.86,
+			steal:     0,
+			guest:     0,
+			guestnice: 0,
+		}},
+		{in: "testdata/proc/stat.invalid", valid: false},
 	}
 
-	// assume that sys_ticks is 100
-	got, err := parseProcCPUStat(file, 100)
-	assert.NoError(t, err)
+	for _, tc := range testcases {
+		file, err := os.Open(filepath.Clean(tc.in))
+		assert.NoError(t, err)
 
-	assert.Equal(t, want, got)
+		got, err := parseProcCPUStat(file, 100)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		} else {
+			assert.Error(t, err)
+		}
+		assert.NoError(t, file.Close())
+	}
 }
 
 func Test_parseCPUStat(t *testing.T) {
@@ -73,4 +86,14 @@ func Test_parseCPUStat(t *testing.T) {
 			assert.Error(t, err)
 		}
 	}
+}
+
+func Test_getProcUptime(t *testing.T) {
+	up, idle, err := getProcUptime("testdata/proc/uptime.golden")
+	assert.NoError(t, err)
+	assert.Equal(t, float64(187477.470), up)
+	assert.Equal(t, float64(1397296.120), idle)
+
+	_, _, err = getProcUptime("testdata/proc/stat.golden")
+	assert.Error(t, err)
 }

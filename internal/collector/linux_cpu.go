@@ -2,12 +2,15 @@ package collector
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
 	"io"
+	"io/ioutil"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -17,6 +20,8 @@ type cpuCollector struct {
 	cpu      typedDesc
 	cpuAll   typedDesc
 	cpuGuest typedDesc
+	uptime   typedDesc
+	idletime typedDesc
 }
 
 // NewCPUCollector returns a new Collector exposing kernel/system statistics.
@@ -57,6 +62,22 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 			),
 			valueType: prometheus.CounterValue,
 		},
+		uptime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "uptime", "up_seconds_total"),
+				"Total number of seconds the system has been up, accordingly to /proc/uptime.",
+				nil, labels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		idletime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("node", "uptime", "idle_seconds_total"),
+				"Total number of seconds all cores have spent idle, accordingly to /proc/uptime.",
+				nil, labels,
+			),
+			valueType: prometheus.CounterValue,
+		},
 	}
 	return c, nil
 }
@@ -68,6 +89,12 @@ func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 		return fmt.Errorf("collect cpu usage stats failed: %s; skip", err)
 	}
 
+	uptime, idletime, err := getProcUptime("/proc/uptime")
+	if err != nil {
+		return fmt.Errorf("collect uptime stats failed: %s; skip", err)
+	}
+
+	// Collected time represents summary time spent by ALL cpu cores.
 	ch <- c.cpu.mustNewConstMetric(stat.user, "user")
 	ch <- c.cpu.mustNewConstMetric(stat.nice, "nice")
 	ch <- c.cpu.mustNewConstMetric(stat.system, "system")
@@ -82,6 +109,10 @@ func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	// Guest CPU is also accounted for in stat.user and stat.nice, expose these as separate metrics.
 	ch <- c.cpuGuest.mustNewConstMetric(stat.guest, "user")
 	ch <- c.cpuGuest.mustNewConstMetric(stat.guestnice, "nice")
+
+	// Up and idle time values from /proc/uptime. Idle time accounted as summary for all cpu cores.
+	ch <- c.uptime.mustNewConstMetric(uptime)
+	ch <- c.idletime.mustNewConstMetric(idletime)
 
 	return nil
 }
@@ -163,4 +194,27 @@ func parseCPUStat(line string, systicks float64) (cpuStat, error) {
 	s.guestnice /= systicks
 
 	return s, nil
+}
+
+// getProcUptime parses uptime file (e.g. /proc/uptime) and return uptime and idletime values.
+func getProcUptime(procfile string) (float64, float64, error) {
+	content, err := ioutil.ReadFile(filepath.Clean(procfile))
+	if err != nil {
+		return 0, 0, err
+	}
+
+	reader := bufio.NewReader(bytes.NewBuffer(content))
+
+	line, _, err := reader.ReadLine()
+	if err != nil {
+		return 0, 0, err
+	}
+
+	var up, idle float64
+	_, err = fmt.Sscanf(string(line), "%f %f", &up, &idle)
+	if err != nil {
+		return 0, 0, err
+	}
+
+	return up, idle, nil
 }

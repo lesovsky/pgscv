@@ -75,24 +75,30 @@ func Test_countNumaNodes(t *testing.T) {
 }
 
 func Test_parseProcStat(t *testing.T) {
-	file, err := os.Open(filepath.Clean("testdata/proc/stat.golden"))
-	assert.NoError(t, err)
-	defer func() { _ = file.Close() }()
-
-	want := systemProcStat{
-		ctxt:  3253088019,
-		btime: 1596255715,
-		forks: 214670,
+	testcases := []struct {
+		in    string
+		valid bool
+		want  systemProcStat
+	}{
+		{in: "testdata/proc/stat.golden", valid: true, want: systemProcStat{
+			ctxt:  3253088019,
+			btime: 1596255715,
+			forks: 214670,
+		}},
+		{in: "testdata/proc/stat.invalid", valid: false},
 	}
 
-	got, err := parseProcStat(file)
-	assert.NoError(t, err)
-	assert.Equal(t, want, got)
+	for _, tc := range testcases {
+		file, err := os.Open(filepath.Clean(tc.in))
+		assert.NoError(t, err)
 
-	// open invalid file
-	file, err = os.Open(filepath.Clean("testdata/proc/stat.invalid.golden"))
-	assert.NoError(t, err)
-	_, err = parseProcStat(file)
-	assert.Error(t, err)
-
+		got, err := parseProcStat(file)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		} else {
+			assert.Error(t, err)
+		}
+		assert.NoError(t, file.Close())
+	}
 }
