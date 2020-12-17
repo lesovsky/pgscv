@@ -6,26 +6,26 @@ import (
 	"testing"
 )
 
-func TestDefaultFilters(t *testing.T) {
+func TestFilters_SetDefault(t *testing.T) {
 	var testcases = []struct {
 		name string
-		in   map[string]Filter
-		want map[string]Filter
+		in   Filters
+		want Filters
 	}{
-		{name: "empty map", in: map[string]Filter{}, want: map[string]Filter{
+		{name: "empty map", in: New(), want: Filters{
 			"diskstats/device":  {Exclude: `^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`},
 			"netdev/device":     {Exclude: `docker|virbr`},
 			"filesystem/fstype": {Include: `^(ext3|ext4|xfs|btrfs)$`},
 		}},
 		{
 			name: "defined filters",
-			in: map[string]Filter{
+			in: Filters{
 				"diskstats/device":  {Include: "^(test123|example123)$"},
 				"netdev/device":     {Include: "^(test456|example456)$"},
 				"filesystem/fstype": {Exclude: "^(test789|example789)$"},
 				"test/example":      {Exclude: "^(test|example)$"},
 			},
-			want: map[string]Filter{
+			want: Filters{
 				"diskstats/device":  {Include: "^(test123|example123)$"},
 				"netdev/device":     {Include: "^(test456|example456)$"},
 				"filesystem/fstype": {Exclude: "^(test789|example789)$"},
@@ -36,36 +36,36 @@ func TestDefaultFilters(t *testing.T) {
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			DefaultFilters(tc.in)
+			tc.in.SetDefault()
 			assert.Equal(t, tc.want, tc.in)
 		})
 	}
 }
 
-func TestCompileFilters(t *testing.T) {
+func TestFilters_Compile(t *testing.T) {
 	var testcases = []struct {
 		name  string
 		valid bool
-		in    map[string]Filter
+		in    Filters
 	}{
 		{
 			name: "defined filters", valid: true,
-			in: map[string]Filter{
+			in: Filters{
 				"test/example": {Exclude: "^(test|example)$", Include: "^(rumba|samba)$"},
 			},
 		},
-		{name: "invalid exclude", valid: false, in: map[string]Filter{"test": {Exclude: "["}}},
-		{name: "invalid include", valid: false, in: map[string]Filter{"test": {Include: "["}}},
+		{name: "invalid exclude", valid: false, in: Filters{"test": {Exclude: "["}}},
+		{name: "invalid include", valid: false, in: Filters{"test": {Include: "["}}},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.valid {
-				assert.NoError(t, CompileFilters(tc.in))
+				assert.NoError(t, tc.in.Compile())
 				assert.NotNil(t, tc.in["test/example"].ExcludeRE)
 				assert.NotNil(t, tc.in["test/example"].IncludeRE)
 			} else {
-				assert.Error(t, CompileFilters(tc.in))
+				assert.Error(t, tc.in.Compile())
 			}
 
 		})
@@ -92,5 +92,47 @@ func TestFilter_Pass(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, tc.want, tc.in.Pass("test"))
 		})
+	}
+}
+
+// Pass2 test for passing default filters.
+func TestFilter_Pass2(t *testing.T) {
+	testcases := []struct {
+		in    string
+		ftype string
+		pass  bool
+	}{
+		{in: "hda", ftype: "diskstats/device", pass: true},
+		{in: "sdb", ftype: "diskstats/device", pass: true},
+		{in: "vdc", ftype: "diskstats/device", pass: true},
+		{in: "xvdd", ftype: "diskstats/device", pass: true},
+		{in: "ram1", ftype: "diskstats/device", pass: false},
+		{in: "loop0", ftype: "diskstats/device", pass: false},
+		{in: "fd2", ftype: "diskstats/device", pass: false},
+		{in: "hda1", ftype: "diskstats/device", pass: false},
+		{in: "sdb2", ftype: "diskstats/device", pass: false},
+		{in: "vdc3", ftype: "diskstats/device", pass: false},
+		{in: "xvdd4", ftype: "diskstats/device", pass: false},
+		{in: "nvme0n1p1", ftype: "diskstats/device", pass: false},
+		{in: "eth0", ftype: "netdev/device", pass: true},
+		{in: "docker0", ftype: "netdev/device", pass: false},
+		{in: "virbr", ftype: "netdev/device", pass: false},
+		{in: "ext3", ftype: "filesystem/fstype", pass: true},
+		{in: "ext4", ftype: "filesystem/fstype", pass: true},
+		{in: "xfs", ftype: "filesystem/fstype", pass: true},
+		{in: "btrfs", ftype: "filesystem/fstype", pass: true},
+		{in: "ramfs", ftype: "filesystem/fstype", pass: false},
+		{in: "overlay", ftype: "filesystem/fstype", pass: false},
+		{in: "tmpfs", ftype: "filesystem/fstype", pass: false},
+	}
+
+	filters := New()
+	filters.SetDefault()
+
+	assert.NoError(t, filters.Compile())
+
+	for _, tc := range testcases {
+		f := filters[tc.ftype]
+		assert.Equal(t, tc.pass, f.Pass(tc.in))
 	}
 }

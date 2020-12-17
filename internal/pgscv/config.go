@@ -24,19 +24,19 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryPath           string                   // full path of the program, required for auto-update procedure
-	BinaryVersion        string                   // version of the program, required for auto-update procedure
-	AutoUpdateURL        string                   `yaml:"autoupdate_url"`   // URL used for auto-update
-	NoTrackMode          bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
-	SendMetricsURL       string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
-	SendMetricsInterval  time.Duration            // Metric send interval
-	APIKey               string                   `yaml:"api_key"`    // API key for accessing to Weaponry
-	ProjectID            int                      `yaml:"project_id"` // ProjectID specifies project_id label value
-	ServicesConnSettings []service.ConnSetting    `yaml:"services"`   // Slice of connection settings for exact services
-	Defaults             map[string]string        `yaml:"defaults"`   // Defaults
-	Filters              map[string]filter.Filter `yaml:"filters"`
-	DisableCollectors    []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled.
+	BinaryPath           string                // full path of the program, required for auto-update procedure
+	BinaryVersion        string                // version of the program, required for auto-update procedure
+	AutoUpdateURL        string                `yaml:"autoupdate_url"`   // URL used for auto-update
+	NoTrackMode          bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
+	ListenAddress        string                `yaml:"listen_address"`   // Network address and port where the application should listen on
+	SendMetricsURL       string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
+	SendMetricsInterval  time.Duration         // Metric send interval
+	APIKey               string                `yaml:"api_key"`    // API key for accessing to Weaponry
+	ProjectID            int                   `yaml:"project_id"` // ProjectID specifies project_id label value
+	ServicesConnSettings []service.ConnSetting `yaml:"services"`   // Slice of connection settings for exact services
+	Defaults             map[string]string     `yaml:"defaults"`   // Defaults
+	Filters              filter.Filters        `yaml:"filters"`
+	DisableCollectors    []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
 }
 
 // NewConfig creates new config based on config file.
@@ -119,10 +119,10 @@ func (c *Config) Validate() error {
 
 	// Add default filters and compile regexps.
 	if c.Filters == nil {
-		c.Filters = make(map[string]filter.Filter)
+		c.Filters = filter.New()
 	}
-	filter.DefaultFilters(c.Filters)
-	if err := filter.CompileFilters(c.Filters); err != nil {
+	c.Filters.SetDefault()
+	if err := c.Filters.Compile(); err != nil {
 		return err
 	}
 
