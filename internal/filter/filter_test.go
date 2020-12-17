@@ -13,7 +13,7 @@ func TestFilters_SetDefault(t *testing.T) {
 		want Filters
 	}{
 		{name: "empty map", in: New(), want: Filters{
-			"diskstats/device":  {Exclude: `^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`},
+			"diskstats/device":  {Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`},
 			"netdev/device":     {Exclude: `docker|virbr`},
 			"filesystem/fstype": {Include: `^(ext3|ext4|xfs|btrfs)$`},
 		}},
@@ -109,6 +109,7 @@ func TestFilter_Pass2(t *testing.T) {
 		{in: "ram1", ftype: "diskstats/device", pass: false},
 		{in: "loop0", ftype: "diskstats/device", pass: false},
 		{in: "fd2", ftype: "diskstats/device", pass: false},
+		{in: "sr0", ftype: "diskstats/device", pass: false},
 		{in: "hda1", ftype: "diskstats/device", pass: false},
 		{in: "sdb2", ftype: "diskstats/device", pass: false},
 		{in: "vdc3", ftype: "diskstats/device", pass: false},

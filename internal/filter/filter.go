@@ -71,7 +71,7 @@ func (f Filters) SetDefault() {
 
 	// Setting up default EXCLUDE pattern for storage devices.
 	if _, ok := f["diskstats/device"]; !ok {
-		f["diskstats/device"] = Filter{Exclude: `^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`}
+		f["diskstats/device"] = Filter{Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`}
 	}
 
 	// Setting up default EXCLUDE pattern for network devices.
