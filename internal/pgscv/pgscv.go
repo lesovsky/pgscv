@@ -11,6 +11,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"io"
 	"io/ioutil"
+	"math"
+	"math/rand"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -147,20 +149,31 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 	}
 
 	ticker := time.NewTicker(config.SendMetricsInterval)
+	var delay time.Duration
 	for {
+		if delay > 0 {
+			log.Debugf("waiting for delay %s", delay.String())
+			time.Sleep(delay)
+		}
+
 		buf, err := sendClient.readMetrics()
 		if err != nil {
-			log.Infof("read metrics failed: %s, try next time", err)
+			delay = time.Second
+			log.Infof("read metrics failed: %s, retry after %s", err, delay.String())
 			continue
 		}
 
 		err = sendClient.sendMetrics(buf)
 		if err != nil {
-			log.Infof("send metrics failed: %s, try next time", err)
+			delay = addDelay(delay)
+			log.Infof("send metrics failed: %s, retry after %s", err, delay.String())
 			continue
 		}
 
-		// sleeping for next iteration
+		// Reading and sending successful, reset delay.
+		delay = 0
+
+		// Sleeping for next iteration.
 		select {
 		case <-ctx.Done():
 			log.Info("exit signaled, stop metrics sending")
@@ -261,4 +274,12 @@ func (s *sendClient) sendMetrics(buf []byte) error {
 
 	log.Debugln("sending metrics finished successfully: server returned HTTP status ", resp.Status)
 	return nil
+}
+
+// addDelay increments passed delay to random value between 1 and 10 seconds.
+func addDelay(d time.Duration) time.Duration {
+	sec := int(math.Max(float64(d/time.Second), 1))
+	sec = int(math.Min(float64(sec+rand.New(rand.NewSource(time.Now().Unix())).Intn(9))+1, 60)) // #nosec G404
+
+	return time.Duration(sec) * time.Second
 }

@@ -125,3 +125,22 @@ func Test_runSendMetricsLoop(t *testing.T) {
 	defer cancel()
 	assert.NoError(t, runSendMetricsLoop(ctx, config, repo))
 }
+
+func Test_addDelay(t *testing.T) {
+	var dPrev time.Duration
+
+	var loop int
+	for i := 0; i < 20; i++ {
+		loop++
+		dCurr := addDelay(dPrev)
+		assert.Greater(t, int64(dCurr-dPrev), int64(time.Duration(0)*time.Second))
+		assert.Less(t, int64(dCurr-dPrev), int64(11*time.Second))
+		dPrev = dCurr
+		if dCurr >= 60*time.Second {
+			break
+		}
+	}
+
+	// at least 5 iterations should be done
+	assert.Greater(t, loop, 5)
+}
