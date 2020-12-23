@@ -211,7 +211,13 @@ func newSendClient(config *Config) (sendClient, error) {
 		readURL:  readURL,
 		writeURL: writeURL,
 		timeout:  10 * time.Second,
-		Client:   &http.Client{},
+		Client: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:    5,
+				IdleConnTimeout: 120 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		},
 	}, nil
 }
 
