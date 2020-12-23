@@ -41,8 +41,14 @@ func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) 
 	collector := &postgresLogsCollector{
 		updateLogfile: make(chan string),
 		totals: syncKV{
-			store: map[string]float64{},
-			mu:    sync.RWMutex{},
+			store: map[string]float64{
+				"log":     0,
+				"warning": 0,
+				"error":   0,
+				"fatal":   0,
+				"panic":   0,
+			},
+			mu: sync.RWMutex{},
 		},
 		panics: syncKV{
 			store: map[string]float64{},
@@ -63,8 +69,8 @@ func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) 
 		messagesTotal: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "log", "messages_total"),
-				"Total number of log messages written by severity.",
-				[]string{"severity"}, constLabels,
+				"Total number of log messages written by each level.",
+				[]string{"level"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		panicMessages: typedDesc{
