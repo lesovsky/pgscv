@@ -33,8 +33,13 @@ type postgresTablesCollector struct {
 	seqtupread       typedDesc
 	idxscan          typedDesc
 	idxtupfetch      typedDesc
-	tuples           typedDesc
-	tuplestotal      typedDesc
+	tupInserted      typedDesc
+	tupUpdated       typedDesc
+	tupHotUpdated    typedDesc
+	tupDeleted       typedDesc
+	tupLive          typedDesc
+	tupDead          typedDesc
+	tupModified      typedDesc
 	maintLastVacuum  typedDesc
 	maintLastAnalyze typedDesc
 	maintenance      typedDesc
@@ -84,19 +89,59 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error
 			),
 			valueType: prometheus.CounterValue,
 		},
-		tuples: typedDesc{
+		tupInserted: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_modified_total"),
-				"Total number of operations have been made on rows in the table.",
-				[]string{"datname", "schemaname", "relname", "operation"}, constLabels,
+				prometheus.BuildFQName("postgres", "table", "tuples_inserted_total"),
+				"Total number of tuples (rows) have been inserted in the table.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
-		tuplestotal: typedDesc{
+		tupUpdated: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_total"),
-				"Estimated total number of tuples in the table by each type.",
-				[]string{"datname", "schemaname", "relname", "type"}, constLabels,
+				prometheus.BuildFQName("postgres", "table", "tuples_updated_total"),
+				"Total number of tuples (rows) have been updated in the table (including HOT).",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		tupHotUpdated: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "tuples_hot_updated_total"),
+				"Total number of tuples (rows) have been updated in the table.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		tupDeleted: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "tuples_deleted_total"),
+				"Total number of tuples (rows) have been deleted in the table.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		tupLive: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "tuples_live_total"),
+				"Estimated total number of live tuples in the table.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
+		tupDead: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "tuples_dead_total"),
+				"Estimated total number of dead tuples in the table.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
+		tupModified: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "table", "tuples_modified_total"),
+				"Estimated total number of modified tuples in the table since last vacuum.",
+				[]string{"datname", "schemaname", "relname"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -186,15 +231,15 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 			ch <- c.idxtupfetch.mustNewConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname)
 
 			// tuples stats
-			ch <- c.tuples.mustNewConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname, "inserted")
-			ch <- c.tuples.mustNewConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname, "updated")
-			ch <- c.tuples.mustNewConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname, "deleted")
-			ch <- c.tuples.mustNewConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname, "hot_updated")
+			ch <- c.tupInserted.mustNewConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupUpdated.mustNewConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupDeleted.mustNewConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupHotUpdated.mustNewConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname)
 
 			// tuples total stats
-			ch <- c.tuplestotal.mustNewConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname, "live")
-			ch <- c.tuplestotal.mustNewConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname, "dead")
-			ch <- c.tuplestotal.mustNewConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname, "modified")
+			ch <- c.tupLive.mustNewConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupDead.mustNewConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupModified.mustNewConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname)
 
 			// maintenance stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
 			if stat.lastvacuum > 0 {
