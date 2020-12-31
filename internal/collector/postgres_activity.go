@@ -327,8 +327,11 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 			case "state":
 				// Count activity only if query is not NULL (if query is NULL it means this is a background server process
 				// and is not a client backend).
-				idx := colindexes["query"]
-				if row[idx].String != "" && row[idx].Valid {
+				// Also check backend is not in waiting state. Waiting backends are accounted separately.
+				waitColIdx := colindexes[waitColumnName]
+				queryColIdx := colindexes["query"]
+
+				if (row[waitColIdx].String != weLock && row[waitColIdx].String != "t") && (row[queryColIdx].String != "" && row[queryColIdx].Valid) {
 					stats.updateState(row[i].String)
 				}
 			case waitColumnName:

@@ -101,7 +101,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				},
 			},
 			want: postgresActivityStat{
-				active: 6, idle: 1, idlexact: 3, other: 1, waiting: 2,
+				active: 4, idle: 1, idlexact: 3, other: 1, waiting: 2,
 				maxIdleUser:  map[string]float64{"testuser/testdb": 20},
 				maxIdleMaint: map[string]float64{"testuser/testdb": 28},
 				maxRunUser:   map[string]float64{"testuser/testdb": 10},
@@ -185,7 +185,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 10}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
-				active: 2, waiting: 1, querySelect: 2,
+				active: 1, waiting: 1, querySelect: 2,
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
 			},
