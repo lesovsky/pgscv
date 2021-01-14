@@ -46,12 +46,21 @@ JOIN pg_database d ON d.oid=p.dbid`
 
 // postgresStatementsCollector ...
 type postgresStatementsCollector struct {
-	query    typedDesc
-	calls    typedDesc
-	rows     typedDesc
-	times    typedDesc
-	allTimes typedDesc
-	blocks   typedDesc
+	query         typedDesc
+	calls         typedDesc
+	rows          typedDesc
+	times         typedDesc
+	allTimes      typedDesc
+	sharedHit     typedDesc
+	sharedRead    typedDesc
+	sharedDirtied typedDesc
+	sharedWritten typedDesc
+	localHit      typedDesc
+	localRead     typedDesc
+	localDirtied  typedDesc
+	localWritten  typedDesc
+	tempRead      typedDesc
+	tempWritten   typedDesc
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
@@ -96,11 +105,83 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 				[]string{"usename", "datname", "md5"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
-		blocks: typedDesc{
+		sharedHit: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "blocks_total"),
-				"Number of blocks processed by the statement in each mode.",
-				[]string{"usename", "datname", "md5", "type", "access"}, constLabels,
+				prometheus.BuildFQName("postgres", "statements", "shared_hits_total"),
+				"Total number of hits occurred when requesting blocks from shared buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		sharedRead: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "shared_read_bytes_total"),
+				"Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		sharedDirtied: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "shared_dirtied_bytes_total"),
+				"Total number of bytes dirtied in shared buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		sharedWritten: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "shared_written_bytes_total"),
+				"Total number of bytes written to shared buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		localHit: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "local_hits_total"),
+				"Total number of hits occurred when requesting blocks from local buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		localRead: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "local_read_bytes_total"),
+				"Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		localDirtied: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "local_dirtied_bytes_total"),
+				"Total number of bytes dirtied in local buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		localWritten: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "local_written_bytes_total"),
+				"Total number of bytes written to local buffers by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		tempRead: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "temp_read_bytes_total"),
+				"Total number of bytes read from temporary files by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
+			),
+			valueType: prometheus.CounterValue,
+		},
+		tempWritten: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "statements", "temp_written_bytes_total"),
+				"Total number of bytes written to temporary files by the statement.",
+				[]string{"usename", "datname", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -130,6 +211,8 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 
 	// parse pg_stat_statements stats
 	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "queryid", "query"})
+
+	blockSize := float64(config.BlockSize)
 
 	for _, stat := range stats {
 		var query string
@@ -162,34 +245,34 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksHit, stat.usename, stat.datname, stat.md5hash, "shared", "hit")
+			ch <- c.sharedHit.mustNewConstMetric(stat.sharedBlksHit, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksRead, stat.usename, stat.datname, stat.md5hash, "shared", "read")
+			ch <- c.sharedRead.mustNewConstMetric(stat.sharedBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksDirtied, stat.usename, stat.datname, stat.md5hash, "shared", "dirtied")
+			ch <- c.sharedDirtied.mustNewConstMetric(stat.sharedBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.sharedBlksWritten, stat.usename, stat.datname, stat.md5hash, "shared", "written")
+			ch <- c.sharedWritten.mustNewConstMetric(stat.sharedBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksHit, stat.usename, stat.datname, stat.md5hash, "local", "hit")
+			ch <- c.localHit.mustNewConstMetric(stat.localBlksHit, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksRead, stat.usename, stat.datname, stat.md5hash, "local", "read")
+			ch <- c.localRead.mustNewConstMetric(stat.localBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksDirtied, stat.usename, stat.datname, stat.md5hash, "local", "dirtied")
+			ch <- c.localDirtied.mustNewConstMetric(stat.localBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.localBlksWritten, stat.usename, stat.datname, stat.md5hash, "local", "written")
+			ch <- c.localWritten.mustNewConstMetric(stat.localBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksRead, stat.usename, stat.datname, stat.md5hash, "temp", "read")
+			ch <- c.tempRead.mustNewConstMetric(stat.tempBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.blocks.mustNewConstMetric(stat.tempBlksWritten, stat.usename, stat.datname, stat.md5hash, "temp", "written")
+			ch <- c.tempWritten.mustNewConstMetric(stat.tempBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 	}
 
