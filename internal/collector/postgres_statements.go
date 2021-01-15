@@ -107,8 +107,8 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		},
 		sharedHit: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "shared_hits_total"),
-				"Total number of hits occurred when requesting blocks from shared buffers by the statement.",
+				prometheus.BuildFQName("postgres", "statements", "shared_hit_bytes_total"),
+				"Total number of bytes found in shared buffers by the statement.",
 				[]string{"usename", "datname", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -139,8 +139,8 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 		},
 		localHit: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "local_hits_total"),
-				"Total number of hits occurred when requesting blocks from local buffers by the statement.",
+				prometheus.BuildFQName("postgres", "statements", "local_hit_bytes_total"),
+				"Total number of bytes found in local buffers by the statement.",
 				[]string{"usename", "datname", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
@@ -245,7 +245,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.sharedHit.mustNewConstMetric(stat.sharedBlksHit, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedHit.mustNewConstMetric(stat.sharedBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksRead > 0 {
 			ch <- c.sharedRead.mustNewConstMetric(stat.sharedBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
@@ -257,7 +257,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 			ch <- c.sharedWritten.mustNewConstMetric(stat.sharedBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.localHit.mustNewConstMetric(stat.localBlksHit, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localHit.mustNewConstMetric(stat.localBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksRead > 0 {
 			ch <- c.localRead.mustNewConstMetric(stat.localBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)

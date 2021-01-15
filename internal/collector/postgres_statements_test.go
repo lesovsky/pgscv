@@ -20,11 +20,11 @@ func TestPostgresStatementsCollector_Update(t *testing.T) {
 			"postgres_statements_time_seconds_all_total",
 		},
 		optional: []string{
-			"postgres_statements_shared_hits_total",
+			"postgres_statements_shared_hit_bytes_total",
 			"postgres_statements_shared_read_bytes_total",
 			"postgres_statements_shared_dirtied_bytes_total",
 			"postgres_statements_shared_written_bytes_total",
-			"postgres_statements_local_hits_total",
+			"postgres_statements_local_hit_bytes_total",
 			"postgres_statements_local_read_bytes_total",
 			"postgres_statements_local_dirtied_bytes_total",
 			"postgres_statements_local_written_bytes_total",
