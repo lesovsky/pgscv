@@ -11,6 +11,7 @@ import (
 func TestPostgresActivityCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
+			"postgres_activity_wait_events_in_flight",
 			"postgres_activity_connections_in_flight",
 			"postgres_activity_connections_all_in_flight",
 			"postgres_activity_max_seconds",
@@ -54,7 +55,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 						{String: "10", Valid: true}, {String: "10", Valid: true}, {String: "SELECT active", Valid: true},
 					},
 					{
-						{String: "testuser", Valid: true}, {String: "testdb", Valid: true}, {String: "idle", Valid: true}, {}, {},
+						{String: "testuser", Valid: true}, {String: "testdb", Valid: true}, {String: "idle", Valid: true},
+						{String: "Client", Valid: true}, {String: "ClientRead", Valid: true},
 						{String: "100", Valid: true}, {String: "100", Valid: true}, {String: "SELECT idle", Valid: true},
 					},
 					{
@@ -102,6 +104,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 			},
 			want: postgresActivityStat{
 				active: 4, idle: 1, idlexact: 3, other: 1, waiting: 2,
+				waitEvents:   map[string]float64{"Client/ClientRead": 4, "Lock/transactionid": 2},
 				maxIdleUser:  map[string]float64{"testuser/testdb": 20},
 				maxIdleMaint: map[string]float64{"testuser/testdb": 28},
 				maxRunUser:   map[string]float64{"testuser/testdb": 10},
@@ -154,6 +157,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				},
 			},
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 1}, maxRunMaint: map[string]float64{"testuser/testdb": 1},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -182,6 +186,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				},
 			},
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 10}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
@@ -236,6 +241,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 		},
 		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "UPDATE table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{"testuser/testdb": 10}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -245,6 +251,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 		},
 		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "autovacuum: VACUUM table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -254,6 +261,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 		},
 		{value: "10", usename: "testuser", datname: "testdb", state: "idle in transaction", query: "VACUUM table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -299,6 +307,7 @@ func Test_updateMaxRuntimeDuration(t *testing.T) {
 		},
 		{value: "5", usename: "testuser", datname: "testdb", state: "active", query: "UPDATE table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{"testuser/testdb": 5}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -308,6 +317,7 @@ func Test_updateMaxRuntimeDuration(t *testing.T) {
 		},
 		{value: "6", usename: "testuser", datname: "testdb", state: "active", query: "autovacuum: VACUUM table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{"testuser/testdb": 6},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
@@ -346,6 +356,7 @@ func Test_updateMaxWaittimeDuration(t *testing.T) {
 		},
 		{value: "5", usename: "testuser", datname: "testdb", waiting: "Lock", query: "UPDATE table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
@@ -355,6 +366,7 @@ func Test_updateMaxWaittimeDuration(t *testing.T) {
 		},
 		{value: "6", usename: "testuser", datname: "testdb", waiting: "t", query: "autovacuum: VACUUM table",
 			want: postgresActivityStat{
+				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{"testuser/testdb": 6},
@@ -395,6 +407,7 @@ func Test_updateQueryStat(t *testing.T) {
 	}
 
 	assert.Equal(t, postgresActivityStat{
+		waitEvents:  map[string]float64{},
 		maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
 		maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
 		maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},

@@ -35,7 +35,7 @@ FROM pg_stat_activity`
 	stIdleXactAborted = "idle in transaction (aborted)"
 	stFastpath        = "fastpath function call"
 	stDisabled        = "disabled"
-	stWaiting         = "waiting" // fake state based on 'wait_event_type'
+	stWaiting         = "waiting" // fake state based on 'wait_event_type == Lock'
 
 	// Wait event type names
 	weLock = "Lock"
@@ -43,13 +43,14 @@ FROM pg_stat_activity`
 
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
-	states    typedDesc
-	statesAll typedDesc
-	activity  typedDesc
-	prepared  typedDesc
-	inflight  typedDesc
-	vacuums   typedDesc
-	re        queryRegexp // regexps for queries classification
+	waitEvents typedDesc
+	states     typedDesc
+	statesAll  typedDesc
+	activity   typedDesc
+	prepared   typedDesc
+	inflight   typedDesc
+	vacuums    typedDesc
+	re         queryRegexp // regexps for queries classification
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -58,6 +59,13 @@ type postgresActivityCollector struct {
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
 func NewPostgresActivityCollector(constLabels prometheus.Labels) (Collector, error) {
 	return &postgresActivityCollector{
+		waitEvents: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "activity", "wait_events_in_flight"),
+				"Number of wait events in-flight in each state.",
+				[]string{"type", "event"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
 		states: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "connections_in_flight"),
@@ -128,6 +136,18 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		log.Warnf("failed to read pg_prepared_xacts: %s; skip", err)
 	} else {
 		stats.prepared = float64(count)
+	}
+
+	// Send collected metrics.
+
+	// wait_events
+	for k, v := range stats.waitEvents {
+		// 'key' is the pair of wait_event_type/wait_event - split them and use as label values.
+		if labels := strings.Split(k, "/"); len(labels) >= 2 {
+			ch <- c.waitEvents.mustNewConstMetric(v, labels[0], labels[1])
+		} else {
+			log.Warnf("failed to create wait_event activity: incomplete string %s; skip", k)
+		}
 	}
 
 	// connection states
@@ -258,6 +278,7 @@ type postgresActivityStat struct {
 	active       float64            // state = 'active'
 	other        float64            // state IN ('fastpath function call','disabled')
 	waiting      float64            // wait_event_type = 'Lock' (or waiting = 't')
+	waitEvents   map[string]float64 // wait_event_type/wait_event counters
 	prepared     float64            // FROM pg_prepared_xacts
 	maxIdleUser  map[string]float64 // longest duration among idle transactions opened by user/database
 	maxIdleMaint map[string]float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
@@ -280,6 +301,7 @@ type postgresActivityStat struct {
 // newPostgresActivityStat creates new postgresActivityStat struct with initialized maps.
 func newPostgresActivityStat(re queryRegexp) postgresActivityStat {
 	return postgresActivityStat{
+		waitEvents:   make(map[string]float64),
 		maxIdleUser:  make(map[string]float64),
 		maxIdleMaint: make(map[string]float64),
 		maxRunUser:   make(map[string]float64),
@@ -338,6 +360,14 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 				// Count waitings only if waiting = 't' or wait_event_type = 'Lock'.
 				if row[i].String == weLock || row[i].String == "t" {
 					stats.updateState("waiting")
+				}
+
+				// Update wait_event stats for newer Postgres versions.
+				if waitColumnName == "wait_event_type" {
+					waitEventColIdx := colindexes["wait_event"]
+
+					key := row[i].String + "/" + row[waitEventColIdx].String
+					stats.waitEvents[key]++
 				}
 			case "since_start_seconds":
 				// Consider type of activity depending on 'state' column.
