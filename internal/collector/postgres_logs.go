@@ -192,10 +192,9 @@ func runTailLoop(c *postgresLogsCollector) {
 		ctx, cancel = context.WithCancel(context.Background())
 
 		wg.Add(1)
-		logfile := logfile
-		go func() {
+		go func(logfile string) {
 			tailCollect(ctx, logfile, false, &wg, c)
-		}()
+		}(logfile)
 	}
 
 	cancel()
@@ -222,12 +221,10 @@ func tailCollect(ctx context.Context, logfile string, init bool, wg *sync.WaitGr
 		return
 	}
 
-	//log.Infoln("lessqq: waiting for events")
 	for {
 		select {
 		case <-ctx.Done():
-			//log.Infoln("lessqq: got ctx.Done, stop parsing")
-			t.Cleanup()
+			//t.Cleanup()
 			err = t.Stop()
 			if err != nil {
 				log.Infoln(err)

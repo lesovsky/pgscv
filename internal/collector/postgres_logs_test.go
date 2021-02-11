@@ -27,53 +27,89 @@ func Test_runTailLoop(t *testing.T) {
 	for _, name := range []string{fname1, fname2} {
 		f, err := os.Create(name)
 		assert.NoError(t, err)
-		err = f.Close()
-		assert.NoError(t, err)
+		assert.NoError(t, f.Close())
 	}
 
-	// tail first file
+	// tail first file from the beginning
 	lc.updateLogfile <- fname1
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	// write to first file
+	// write line to first file
 	f, err := os.OpenFile(fname1, os.O_RDWR|os.O_APPEND, 0644)
 	assert.NoError(t, err)
 	_, err = f.WriteString(fstr1)
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
+
+	// check store content -- should be log:1, error:0
+	lc.totals.mu.RLock()
+	assert.Equal(t, float64(1), lc.totals.store["log"])
+	assert.Equal(t, float64(0), lc.totals.store["error"])
+	lc.totals.mu.RUnlock()
 
 	// tail second file
 	lc.updateLogfile <- fname2
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	// write to second file
+	// write line to second file
 	f, err = os.OpenFile(fname2, os.O_RDWR|os.O_APPEND, 0644)
 	assert.NoError(t, err)
 	_, err = f.WriteString(fstr2)
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	// tail first file again
+	// check store content -- should be log:1, error:1
+	lc.totals.mu.RLock()
+	assert.Equal(t, float64(1), lc.totals.store["log"])
+	assert.Equal(t, float64(1), lc.totals.store["error"])
+	lc.totals.mu.RUnlock()
+
+	// tail first file again (tail will start from the beginning, read all existing lines)
 	lc.updateLogfile <- fname1
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	// write to first file
+	// append one more line to first file
 	f, err = os.OpenFile(fname1, os.O_RDWR|os.O_APPEND, 0644)
 	assert.NoError(t, err)
 	_, err = f.WriteString(fstr1)
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(200 * time.Millisecond)
+	time.Sleep(20 * time.Millisecond)
 
-	// check store content
+	// check store content -- should be log:3, error:1 (3 because, 1 line in first reading and 2 lines in second reading.)
 	lc.totals.mu.RLock()
-	assert.Equal(t, float64(2), lc.totals.store["log"])
+	assert.Equal(t, float64(3), lc.totals.store["log"])
 	assert.Equal(t, float64(1), lc.totals.store["error"])
+	lc.totals.mu.RUnlock()
+
+	// truncate second file.
+	f, err = os.OpenFile(fname2, os.O_RDWR|os.O_TRUNC, 0644)
+	assert.NoError(t, err)
+	assert.NoError(t, f.Sync())
+	assert.NoError(t, f.Close())
+
+	// tail second (truncated) file again
+	lc.updateLogfile <- fname2
+	time.Sleep(20 * time.Millisecond)
+
+	// add line to second file
+	f, err = os.OpenFile(fname2, os.O_RDWR|os.O_APPEND, 0644)
+	assert.NoError(t, err)
+	_, err = f.WriteString(fstr2)
+	assert.NoError(t, err)
+	assert.NoError(t, f.Sync())
+	assert.NoError(t, f.Close())
+	time.Sleep(20 * time.Millisecond)
+
+	// check store content -- should be log:3, error:2
+	lc.totals.mu.RLock()
+	assert.Equal(t, float64(3), lc.totals.store["log"])
+	assert.Equal(t, float64(2), lc.totals.store["error"])
 	lc.totals.mu.RUnlock()
 
 	// remove test files
