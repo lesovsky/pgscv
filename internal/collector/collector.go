@@ -1,8 +1,8 @@
 package collector
 
 import (
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
 	"os"
 	"sync"
 )

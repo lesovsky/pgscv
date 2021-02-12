@@ -2,9 +2,9 @@ package collector
 
 import (
 	"context"
-	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
 	"testing"
 )
 

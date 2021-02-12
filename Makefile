@@ -1,6 +1,6 @@
-DOCKER_ACCOUNT = barcodepro
+DOCKER_ACCOUNT = weaponry
 APPNAME = pgscv
-IMAGENAME = weaponry-${APPNAME}-distribution
+IMAGENAME = ${APPNAME}-distribution
 
 TAG=$(shell git describe --tags --abbrev=0)
 COMMIT=$(shell git rev-parse --short HEAD)
@@ -62,9 +62,9 @@ deploy: ## Deploy
 docker-build-test-runner: ## Build environmental docker image for CI tests
 	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
 	cd ./deployment/docker-test-runner; \
-		docker build -t ${DOCKER_ACCOUNT}/weaponry-pgscv-test-runner:${VERSION} .
+		docker build -t ${DOCKER_ACCOUNT}/pgscv-test-runner:${VERSION} .
 
 docker-push-test-runner: ## Build environmental docker image for CI tests
 	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
 	cd ./deployment/docker-test-runner; \
-		docker push ${DOCKER_ACCOUNT}/weaponry-pgscv-test-runner:${VERSION}
+		docker push ${DOCKER_ACCOUNT}/pgscv-test-runner:${VERSION}

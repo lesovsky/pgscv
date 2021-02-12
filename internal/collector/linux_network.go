@@ -2,8 +2,8 @@ package collector
 
 import (
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
 	"net"
 	"strings"
 )

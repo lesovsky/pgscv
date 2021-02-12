@@ -8,7 +8,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/log"
 	"golang.org/x/sys/unix"
 	"io"
 	"io/ioutil"

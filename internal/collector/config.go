@@ -2,10 +2,10 @@ package collector
 
 import (
 	"context"
-	"github.com/barcodepro/pgscv/internal/filter"
-	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
+	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/store"
 	"strconv"
 	"strings"
 )

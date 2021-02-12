@@ -2,10 +2,10 @@ package pgscv
 
 import (
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/filter"
-	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/jackc/pgx/v4"
+	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/service"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"path/filepath"

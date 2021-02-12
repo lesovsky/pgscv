@@ -3,9 +3,9 @@ package store
 import (
 	"context"
 	"database/sql"
-	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/model"
 	"github.com/jackc/pgx/v4"
+	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 )
 
 // DB is the database representation

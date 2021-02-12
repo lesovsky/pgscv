@@ -1,10 +1,10 @@
 package pgscv
 
 import (
-	"github.com/barcodepro/pgscv/internal/filter"
-	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/service"
 	"testing"
 )
 

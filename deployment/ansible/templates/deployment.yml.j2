@@ -19,7 +19,7 @@ spec:
     spec:
       containers:
         - name: {{ appname }}
-          image: barcodepro/weaponry-{{ appname }}:{{ app_version }}-{{ env }}
+          image: weaponry/{{ appname }}:{{ app_version }}-{{ env }}
 {% if env == "production" %}
           resources:
             requests:

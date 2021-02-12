@@ -2,8 +2,8 @@ package pgscv
 
 import (
 	"context"
-	"github.com/barcodepro/pgscv/internal/service"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/service"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"

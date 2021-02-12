@@ -1,6 +1,6 @@
 package service
 
-import "github.com/barcodepro/pgscv/internal/model"
+import "github.com/weaponry/pgscv/internal/model"
 
 // TestSystemService returns system service for testing purposes
 func TestSystemService() Service {

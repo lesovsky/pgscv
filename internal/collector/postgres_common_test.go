@@ -2,10 +2,10 @@ package collector
 
 import (
 	"database/sql"
-	"github.com/barcodepro/pgscv/internal/model"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
 	"testing"
 )
 

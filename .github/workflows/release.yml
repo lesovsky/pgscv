@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: barcodepro/weaponry-pgscv-test-runner:v0.0.4
+    container: weaponry/pgscv-test-runner:v0.0.4
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -21,7 +21,7 @@ jobs:
 
   deploy_production:
     runs-on: [self-hosted, production]
-    container: barcodepro/ansible:2.9.5-alpine
+    container: weaponry/ansible:2.9.5-alpine
     needs: [ test ]
     steps:
       - name: Checkout code

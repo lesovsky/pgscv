@@ -1,4 +1,4 @@
-module github.com/barcodepro/pgscv
+module github.com/weaponry/pgscv
 
 go 1.14
 

@@ -3,8 +3,8 @@ package collector
 import (
 	"bufio"
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/filter"
-	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/log"
 	"io"
 	"os"
 	"strings"

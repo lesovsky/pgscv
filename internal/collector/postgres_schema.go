@@ -1,10 +1,10 @@
 package collector
 
 import (
-	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/store"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/store"
 	"golang.org/x/net/context"
 	"strings"
 )

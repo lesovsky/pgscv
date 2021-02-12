@@ -2,7 +2,7 @@ package packaging
 
 import (
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/log"
 	"os"
 	"os/exec"
 	"path/filepath"

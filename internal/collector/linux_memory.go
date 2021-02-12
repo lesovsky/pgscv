@@ -3,8 +3,8 @@ package collector
 import (
 	"bufio"
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
 	"io"
 	"os"
 	"regexp"

@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/barcodepro/pgscv/internal/log"
-	"github.com/barcodepro/pgscv/internal/packaging"
-	"github.com/barcodepro/pgscv/internal/pgscv"
+	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/packaging"
+	"github.com/weaponry/pgscv/internal/pgscv"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"os/signal"

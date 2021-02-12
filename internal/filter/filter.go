@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"github.com/barcodepro/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/log"
 	"regexp"
 )
 

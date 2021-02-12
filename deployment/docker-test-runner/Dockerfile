@@ -1,4 +1,4 @@
-# barcodepro/weaponry-pgscv-test-runner
+# weaponry/pgscv-test-runner
 # __release_tag__ postrges 13.1 was released 2020-11-12
 # __release_tag__ golang 1.15.6 was released 2020-12-03
 # __release_tag__ golangci-lint v1.33.0 was released 2020-11-23
@@ -25,4 +25,4 @@ RUN apt-get update && \
 COPY prepare-test-environment.sh /usr/local/bin/
 COPY fixtures.sql /usr/local/testing/
 
-CMD ["echo", "I'm weaponry-pgscv test runner v0.0.4"]
+CMD ["echo", "I'm weaponry pgscv test runner v0.0.4"]

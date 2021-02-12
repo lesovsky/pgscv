@@ -1,8 +1,8 @@
 package collector
 
 import (
-	"github.com/barcodepro/pgscv/internal/filter"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/filter"
 	"os"
 	"path/filepath"
 	"regexp"
