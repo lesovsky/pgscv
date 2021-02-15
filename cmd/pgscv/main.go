@@ -20,7 +20,7 @@ func main() {
 	var (
 		showVersion = kingpin.Flag("version", "show version and exit").Default().Bool()
 		logLevel    = kingpin.Flag("log-level", "set log level: debug, info, warn, error").Default("info").Envar("LOG_LEVEL").String()
-		configFile  = kingpin.Flag("config-file", "path to config file").Default("/etc/pgscv.yaml").Envar("PGSCV_CONFIG_FILE").String()
+		configFile  = kingpin.Flag("config-file", "path to config file").Default("").Envar("PGSCV_CONFIG_FILE").String()
 		doBootstrap = kingpin.Flag("bootstrap", "run bootstrap, requires root privileges").Default("false").Envar("PGSCV_BOOTSTRAP").Bool()
 		doUninstall = kingpin.Flag("uninstall", "run uninstall, requires root privileges").Default("false").Envar("PGSCV_UNINSTALL").Bool()
 	)
@@ -57,7 +57,7 @@ func main() {
 
 	config, err := pgscv.NewConfig(*configFile)
 	if err != nil {
-		log.Errorln("parse config failed: ", err)
+		log.Errorln("create config failed: ", err)
 		os.Exit(1)
 	}
 

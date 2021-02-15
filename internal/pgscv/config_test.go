@@ -73,6 +73,14 @@ func TestNewConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "empty config-file opt",
+			valid: true,
+			file:  "",
+			want: &Config{
+				Defaults: map[string]string{},
+			},
+		},
 	}
 
 	for _, tc := range testcases {

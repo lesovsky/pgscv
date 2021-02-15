@@ -39,8 +39,12 @@ type Config struct {
 	DisableCollectors    []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
 }
 
-// NewConfig creates new config based on config file.
+// NewConfig creates new config based on config file or return default config of config is not exists.
 func NewConfig(configFilePath string) (*Config, error) {
+	if configFilePath == "" {
+		return &Config{Defaults: map[string]string{}}, nil
+	}
+
 	content, err := ioutil.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
@@ -52,6 +56,7 @@ func NewConfig(configFilePath string) (*Config, error) {
 		return nil, err
 	}
 
+	log.Infoln("read configuration from ", configFilePath)
 	return &config, nil
 }
 
