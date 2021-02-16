@@ -4,7 +4,7 @@
 
 ### pgSCV
 - primarily developed for needs of [Weaponry](https://weaponry.io).
-- collects a lot of stats about system, PostgreSQL, Pgbouncers, etc
+- [collects](./doc/collectors.md) a lot of stats about system, PostgreSQL, Pgbouncers, etc
 - provides all metrics through well-known /metrics endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 - could be configured
     1. in standalone listening-only mode for serving requests from Prometheus.
@@ -13,8 +13,8 @@
 
 ### Development and contribution
 - pgSCV is open-source software.
-- All features implemented are focused to Weaponry needs.
-- All contributions should be proposed with tests.
+- All features implemented are focused for Weaponry needs.
+- All contributions should be proposed with detailed explanation and with tests.
 
 ### License
 BSD-3. See [LICENSE](./LICENSE) for more details.
