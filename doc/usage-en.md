@@ -162,7 +162,7 @@ binary is stored.
 
 **Postgres access**
 - regular, unprivileged database role is *NOT* sufficient to read all necessary stats
-- at least `pg_monitor` role must be granted to the role (available since Postgres 10)
+- at least `pg_monitor` and `pg_read_server_files` roles must be granted to the role (available since Postgres 10)
 - an `EXECUTE` privilege must be granted on `pg_current_logfile()` function in database used for connecting (default is
   `postgres`)
 
@@ -170,7 +170,7 @@ binary is stored.
 - user specified in `stats_users` of `pgbouncer.ini` is sufficient to read all necessary stats.
 
 ### Troubleshooting
-- Check pgSCV is running by systemd - service should be **active (running)**
+- Check pgSCV is running by systemd - service should be in **active (running)** state:
 ```
 # systemctl status pgscv
 ● pgscv.service - pgSCV is the Weaponry platform agent for PostgreSQL ecosystem
