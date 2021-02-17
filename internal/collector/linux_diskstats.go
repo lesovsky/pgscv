@@ -209,6 +209,8 @@ func getDiskstats(filter filter.Filter) (map[string][]float64, error) {
 
 // parseDiskstat reads stats file and returns stats structs.
 func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
+	log.Debug("parse disk stats")
+
 	var scanner = bufio.NewScanner(r)
 	var stats = map[string][]float64{}
 
@@ -218,21 +220,22 @@ func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, er
 		// Linux kernel <= 4.18 have 14 columns, 4.18+ have 18, 5.5+ have 20 columns
 		// for details see https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats)
 		if len(values) != 14 && len(values) != 18 && len(values) != 20 {
-			return nil, fmt.Errorf("invalid /proc/diskstats file, too few columns in line: %s", scanner.Text())
+			return nil, fmt.Errorf("invalid input, '%s': wrong number of values", scanner.Text())
 		}
 
 		var device = values[2]
 		if !filter.Pass(device) {
-			log.Debugln("ignore device ", device)
+			log.Debugf("skip device %s", device)
 			continue
 		}
+		log.Debugf("pass device %s", device)
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-3)
 		for i := range stat {
 			value, err := strconv.ParseFloat(values[i+3], 64)
 			if err != nil {
-				log.Errorf("convert string to float64 failed: %s; skip", err)
+				log.Errorf("invalid input, parse '%s' failed: %s, skip", values[i+3], err.Error())
 				continue
 			}
 			stat[i] = value
@@ -253,6 +256,8 @@ type storageDeviceProperties struct {
 
 // getStorageProperties reads storages properties.
 func getStorageProperties(path string, filter filter.Filter) ([]storageDeviceProperties, error) {
+	log.Debugf("parse storage properties: %s", path)
+
 	dirs, err := filepath.Glob(path)
 	if err != nil {
 		return nil, err
@@ -265,9 +270,10 @@ func getStorageProperties(path string, filter filter.Filter) ([]storageDevicePro
 		device := parts[len(parts)-1]
 
 		if !filter.Pass(device) {
-			log.Debugln("skip device ", device)
+			log.Debugf("skip device %s", device)
 			continue
 		}
+		log.Debugf("pass device %s", device)
 
 		// Read 'rotational' property.
 		rotational, err := getDeviceRotational(devpath)
@@ -315,7 +321,7 @@ func getDeviceRotational(devpath string) (string, error) {
 }
 
 // getDeviceScheduler returns name of the IO scheduler used by device.
-func getDeviceScheduler(devpath string) (sched string, err error) {
+func getDeviceScheduler(devpath string) (string, error) {
 	re, err := regexp.Compile(`[[a-z-]+]|none`)
 	if err != nil {
 		return "", err

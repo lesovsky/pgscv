@@ -74,6 +74,8 @@ type postgresReplicationSlotStat struct {
 
 // parsePostgresReplicationSlotStats parses PGResult and returns struct with stats values.
 func parsePostgresReplicationSlotStats(r *model.PGResult, labelNames []string) map[string]postgresReplicationSlotStat {
+	log.Debug("parse postgres replication slots stats")
+
 	var stats = make(map[string]postgresReplicationSlotStat)
 
 	for _, row := range r.Rows {
@@ -103,20 +105,19 @@ func parsePostgresReplicationSlotStats(r *model.PGResult, labelNames []string) m
 		for i, colname := range r.Colnames {
 			// skip columns if its value used as a label
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debug("skip label mapped column")
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
 			v, err := strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
-				log.Errorf("skip collecting metric: %s", err)
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 

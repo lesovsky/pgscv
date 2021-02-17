@@ -45,12 +45,10 @@ func (f *Filter) Pass(target string) bool {
 
 	// Exclude is specified and target matches 'exclude' - reject.
 	if f.ExcludeRE != nil && f.ExcludeRE.MatchString(target) {
-		log.Debugln("exclude target ", target)
 		return false
 	}
 	// Include is specified and target doesn't match 'include' - reject.
 	if f.IncludeRE != nil && !f.IncludeRE.MatchString(target) {
-		log.Debugln("exclude target ", target)
 		return false
 	}
 	// Here means Include is specified and target matches 'include' - pass.

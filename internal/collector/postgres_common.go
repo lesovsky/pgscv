@@ -31,6 +31,8 @@ type postgresGenericStat struct {
 // parsePostgresGenericStats extracts values from query result, generates metrics using extracted values and passed
 // labels and send them to Prometheus.
 func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[string]postgresGenericStat {
+	log.Debug("parse postgres generic stats")
+
 	var stats = make(map[string]postgresGenericStat)
 
 	// process row by row
@@ -60,20 +62,19 @@ func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[strin
 			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
 			// is in the labelNames, skip that column.
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debug("skip label mapped column")
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
 			v, err := strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
-				log.Errorf("skip collecting metric: %s", err)
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 

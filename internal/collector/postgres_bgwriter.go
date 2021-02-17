@@ -151,20 +151,21 @@ type postgresBgwriterStat struct {
 
 // parsePostgresBgwriterStats parses PGResult and returns struct with data values
 func parsePostgresBgwriterStats(r *model.PGResult) postgresBgwriterStat {
+	log.Debug("parse postgres bgwriter/checkpointer stats")
+
 	var stats postgresBgwriterStat
 
 	for _, row := range r.Rows {
 		for i, colname := range r.Colnames {
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
 			v, err := strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
-				log.Errorf("skip collecting metric: %s", err)
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 

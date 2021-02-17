@@ -89,11 +89,13 @@ type postgresSetting struct {
 
 // parsePostgresSettings parses PGResult and returns structs with settings data.
 func parsePostgresSettings(r *model.PGResult) []postgresSetting {
+	log.Debug("parse postgres settings")
+
 	var settings []postgresSetting
 
 	for _, row := range r.Rows {
 		if len(row) != 4 {
-			log.Warnln("invalid number of columns, skip")
+			log.Warnln("invalid input, wrong number of columns; skip")
 			continue
 		}
 
@@ -101,7 +103,8 @@ func parsePostgresSettings(r *model.PGResult) []postgresSetting {
 		n, s, u, v := row[0].String, row[1].String, row[2].String, row[3].String
 		setting, err := newPostgresSetting(n, s, u, v)
 		if err != nil {
-			log.Warnf("failed normalize setting: %s; (name=%s, setting=%s, unit=%s, vartype=%s); skip", err, n, s, u, v)
+			log.Warnf("normalize setting (name=%s, setting=%s, unit=%s, vartype=%s) failed: %s; skip", n, s, u, v, err.Error())
+			continue
 		}
 
 		// Append setting to store.
@@ -133,7 +136,7 @@ func newPostgresSetting(name, setting, unit, vartype string) (postgresSetting, e
 		case "on":
 			value = 1
 		default:
-			return postgresSetting{}, fmt.Errorf("unknown value for bool: %s", setting)
+			return postgresSetting{}, fmt.Errorf("invalid bool value: '%s'", setting)
 		}
 
 		return postgresSetting{
@@ -186,7 +189,7 @@ func newPostgresSetting(name, setting, unit, vartype string) (postgresSetting, e
 			value:   v,
 		}, nil
 	default:
-		return postgresSetting{}, fmt.Errorf("unknown vartype: %s", vartype)
+		return postgresSetting{}, fmt.Errorf("unknown vartype: '%s'", vartype)
 	}
 }
 
@@ -199,11 +202,13 @@ type postgresFile struct {
 
 // parsePostgresFiles parses query result and produces slice with info about Postgres system files.
 func parsePostgresFiles(r *model.PGResult) []postgresFile {
+	log.Debug("parse postgres files")
+
 	var files []postgresFile
 
 	for _, row := range r.Rows {
 		if len(row) != 2 {
-			log.Warnln("invalid number of columns, skip")
+			log.Warnln("invalid input, wrong number of columns, skip")
 			continue
 		}
 
@@ -211,7 +216,7 @@ func parsePostgresFiles(r *model.PGResult) []postgresFile {
 		guc, path := row[0].String, row[1].String
 		fi, err := os.Stat(path)
 		if err != nil {
-			log.Warnf("%s stat failed: %s; skip", path, err)
+			log.Warnf("stat %s failed: %s; skip", path, err)
 		}
 
 		mode := fmt.Sprintf("%04o", fi.Mode().Perm())
@@ -244,7 +249,7 @@ func parseUnit(unit string) (float64, string, error) {
 	match := re.FindStringSubmatch(unit)
 
 	if len(match) != 3 {
-		return 1, "", fmt.Errorf("invalid number of items: %d", len(match))
+		return 1, "", fmt.Errorf("invalid number of values: %d", len(match))
 	}
 
 	var factor float64 = 1

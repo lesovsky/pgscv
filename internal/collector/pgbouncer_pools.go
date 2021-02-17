@@ -91,6 +91,8 @@ type pgbouncerPoolStat struct {
 }
 
 func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string]pgbouncerPoolStat {
+	log.Debug("parse pgbouncer pools stats")
+
 	var stats = map[string]pgbouncerPoolStat{}
 
 	for _, row := range r.Rows {
@@ -116,58 +118,60 @@ func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string
 			// Column's values act as metric values or as labels values.
 			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
 			// is in the labelNames, skip that column.
-			if !stringsContains(labelNames, string(colname.Name)) {
-				// Skip empty (NULL) values.
-				if row[i].String == "" {
-					log.Debug("got empty (NULL) value, skip")
-					continue
-				}
+			if stringsContains(labelNames, string(colname.Name)) {
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
+				continue
+			}
 
-				// Get data value and convert it to float64 used by Prometheus.
-				v, err := strconv.ParseFloat(row[i].String, 64)
-				if err != nil {
-					log.Errorf("skip collecting metric: %s", err)
-					continue
-				}
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
 
-				// Update stats struct
-				switch string(colname.Name) {
-				case "cl_active":
-					s := stats[poolname]
-					s.clActive = v
-					stats[poolname] = s
-				case "cl_waiting":
-					s := stats[poolname]
-					s.clWaiting = v
-					stats[poolname] = s
-				case "sv_active":
-					s := stats[poolname]
-					s.svActive = v
-					stats[poolname] = s
-				case "sv_idle":
-					s := stats[poolname]
-					s.svIdle = v
-					stats[poolname] = s
-				case "sv_used":
-					s := stats[poolname]
-					s.svUsed = v
-					stats[poolname] = s
-				case "sv_tested":
-					s := stats[poolname]
-					s.svTested = v
-					stats[poolname] = s
-				case "sv_login":
-					s := stats[poolname]
-					s.svLogin = v
-					stats[poolname] = s
-				case "maxwait":
-					s := stats[poolname]
-					s.maxWait = v
-					stats[poolname] = s
-				default:
-					log.Debugf("unsupported 'SHOW POOLS' stat column: %s, skip", string(colname.Name))
-					continue
-				}
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s, skip", row[i].String, err)
+				continue
+			}
+
+			// Update stats struct
+			switch string(colname.Name) {
+			case "cl_active":
+				s := stats[poolname]
+				s.clActive = v
+				stats[poolname] = s
+			case "cl_waiting":
+				s := stats[poolname]
+				s.clWaiting = v
+				stats[poolname] = s
+			case "sv_active":
+				s := stats[poolname]
+				s.svActive = v
+				stats[poolname] = s
+			case "sv_idle":
+				s := stats[poolname]
+				s.svIdle = v
+				stats[poolname] = s
+			case "sv_used":
+				s := stats[poolname]
+				s.svUsed = v
+				stats[poolname] = s
+			case "sv_tested":
+				s := stats[poolname]
+				s.svTested = v
+				stats[poolname] = s
+			case "sv_login":
+				s := stats[poolname]
+				s.svLogin = v
+				stats[poolname] = s
+			case "maxwait":
+				s := stats[poolname]
+				s.maxWait = v
+				stats[poolname] = s
+			default:
+				log.Debugf("unsupported 'SHOW POOLS' stat column: %s, skip", string(colname.Name))
+				continue
 			}
 		}
 	}

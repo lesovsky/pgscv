@@ -31,9 +31,10 @@ func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
 		return nil, fmt.Errorf("determine clock frequency failed: %s", err)
 	}
 
-	systicks, err := strconv.ParseFloat(strings.TrimSpace(string(cmdOutput)), 64)
+	value := strings.TrimSpace(string(cmdOutput))
+	systicks, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		return nil, fmt.Errorf("parse clock frequency value failed: %s", err)
+		return nil, fmt.Errorf("invalid input: parse '%s' failed: %w", value, err)
 	}
 
 	c := &cpuCollector{
@@ -144,12 +145,14 @@ func getCPUStat(systicks float64) (cpuStat, error) {
 
 // parseProcCPUStat parses stat file and returns total CPU usage stat.
 func parseProcCPUStat(r io.Reader, systicks float64) (cpuStat, error) {
+	log.Debug("parse CPU stats")
+
 	var scanner = bufio.NewScanner(r)
 
 	for scanner.Scan() {
 		parts := strings.Fields(scanner.Text())
 		if len(parts) < 2 {
-			log.Debugf("/proc/stat bad line; skip")
+			log.Debug("CPU stat invalid input: too few values; skip")
 			continue
 		}
 
@@ -176,10 +179,10 @@ func parseCPUStat(line string, systicks float64) (cpuStat, error) {
 	)
 
 	if err != nil && err != io.EOF {
-		return cpuStat{}, fmt.Errorf("parse %s (cpu) failed: %s", line, err)
+		return cpuStat{}, fmt.Errorf("invalid input, parse '%s' failed: %w", line, err)
 	}
 	if count != 11 {
-		return cpuStat{}, fmt.Errorf("parse %s (cpu) failed: insufficient elements parsed", line)
+		return cpuStat{}, fmt.Errorf("invalid input, parse '%s' failed: wrong number of values", line)
 	}
 
 	s.user /= systicks

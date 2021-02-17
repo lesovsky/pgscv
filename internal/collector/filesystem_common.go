@@ -20,6 +20,7 @@ type mount struct {
 
 // parseProcMounts parses /proc/mounts and returns slice of mounted filesystems properties.
 func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, error) {
+	log.Debug("parse mounted filesystems")
 	var (
 		scanner = bufio.NewScanner(r)
 		mounts  []mount
@@ -30,15 +31,17 @@ func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, er
 		parts := strings.Fields(scanner.Text())
 
 		if len(parts) != 6 {
-			return nil, fmt.Errorf("/proc/mounts invalid line: %s; skip", scanner.Text())
+			return nil, fmt.Errorf("invalid input: '%s', skip", scanner.Text())
 		}
 
-		fstype := parts[2]
+		mountpoint, fstype := parts[1], parts[2]
 		if f, ok := filters["filesystem/fstype"]; ok {
 			if !f.Pass(fstype) {
-				log.Debugln("ignore filesystem ", fstype)
+				log.Debugf("skip %s filesystem %s", fstype, mountpoint)
 				continue
 			}
+
+			log.Debugf("pass %s filesystem %s", fstype, mountpoint)
 		}
 
 		s := mount{

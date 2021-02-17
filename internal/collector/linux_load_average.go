@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
 	"io/ioutil"
 	"strconv"
 	"strings"
@@ -67,9 +68,11 @@ func getLoadAverageStats() ([]float64, error) {
 
 // parseLoadAverageStats parses content from /proc/loadavg and return load stats.
 func parseLoadAverageStats(data string) ([]float64, error) {
+	log.Debug("parse load average stats")
+
 	parts := strings.Fields(data)
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("/proc/loadavg bad content: %s", data)
+		return nil, fmt.Errorf("invalid input, '%s': too few values", data)
 	}
 
 	var err error
@@ -77,7 +80,7 @@ func parseLoadAverageStats(data string) ([]float64, error) {
 	for i, load := range parts[0:3] {
 		loads[i], err = strconv.ParseFloat(load, 64)
 		if err != nil {
-			return nil, fmt.Errorf("parse /proc/loadavg value '%s' failed: %w", load, err)
+			return nil, fmt.Errorf("invalid input, parse '%s' failed: %w", load, err)
 		}
 	}
 	return loads, nil

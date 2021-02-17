@@ -150,12 +150,12 @@ func readSysctls(list []string) map[string]float64 {
 	for _, item := range list {
 		data, err := ioutil.ReadFile(path.Join("/proc/sys", strings.Replace(item, ".", "/", -1)))
 		if err != nil {
-			log.Warnf("read sysctl %s failed: %s; skip", item, err)
+			log.Warnf("read '%s' failed: %s; skip", item, err)
 			continue
 		}
 		value, err := strconv.ParseFloat(strings.Trim(string(data), " \n"), 64)
 		if err != nil {
-			log.Warnf("parse sysctl %s value failed: %s; skip", item, err)
+			log.Warnf("invalid input, parse '%s' failed: %s; skip", item, err)
 			continue
 		}
 
@@ -279,6 +279,7 @@ func getProcStat() (systemProcStat, error) {
 }
 
 func parseProcStat(r io.Reader) (systemProcStat, error) {
+	log.Debug("parse system stats")
 	var (
 		scanner = bufio.NewScanner(r)
 		stat    = systemProcStat{}
@@ -286,9 +287,10 @@ func parseProcStat(r io.Reader) (systemProcStat, error) {
 	)
 
 	for scanner.Scan() {
-		parts := strings.Fields(scanner.Text())
+		line := scanner.Text()
+		parts := strings.Fields(line)
 		if len(parts) < 2 {
-			log.Debugf("/proc/stat bad line; skip")
+			log.Debugf("invalid input, '%s': too few values; skip", line)
 			continue
 		}
 
@@ -296,17 +298,17 @@ func parseProcStat(r io.Reader) (systemProcStat, error) {
 		case "ctxt":
 			stat.ctxt, err = strconv.ParseFloat(parts[1], 64)
 			if err != nil {
-				return stat, fmt.Errorf("parse %s (ctxt) failed: %s; skip", parts[1], err)
+				return stat, fmt.Errorf("invalid input, parse '%s' (ctxt) failed: %s; skip", parts[1], err)
 			}
 		case "btime":
 			stat.btime, err = strconv.ParseFloat(parts[1], 64)
 			if err != nil {
-				return stat, fmt.Errorf("parse %s (btime) failed: %s; skip", parts[1], err)
+				return stat, fmt.Errorf("invalid input, parse '%s' (btime) failed: %s; skip", parts[1], err)
 			}
 		case "processes":
 			stat.forks, err = strconv.ParseFloat(parts[1], 64)
 			if err != nil {
-				return stat, fmt.Errorf("parse %s (processes) failed: %s, skip", parts[1], err)
+				return stat, fmt.Errorf("invalid input, parse '%s' (processes) failed: %s; skip", parts[1], err)
 			}
 		default:
 			continue

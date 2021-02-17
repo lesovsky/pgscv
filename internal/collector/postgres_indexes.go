@@ -149,6 +149,8 @@ type postgresIndexStat struct {
 
 // parsePostgresIndexStats parses PGResult and returns structs with stats values.
 func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]postgresIndexStat {
+	log.Debug("parse postgres indexes stats")
+
 	var stats = make(map[string]postgresIndexStat)
 
 	var indexname string
@@ -176,52 +178,52 @@ func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]
 		stats[indexname] = index
 
 		for i, colname := range r.Colnames {
-			// Column's values act as metric values or as labels values.
-			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
-			// is in the labelNames, skip that column.
-			if !stringsContains(labelNames, string(colname.Name)) {
-				// Skip empty (NULL) values.
-				if row[i].String == "" {
-					log.Debug("got empty (NULL) value, skip")
-					continue
-				}
+			// skip columns if its value used as a label
+			if stringsContains(labelNames, string(colname.Name)) {
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
+				continue
+			}
 
-				// Get data value and convert it to float64 used by Prometheus.
-				v, err := strconv.ParseFloat(row[i].String, 64)
-				if err != nil {
-					log.Errorf("skip collecting metric: %s", err)
-					continue
-				}
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
 
-				switch string(colname.Name) {
-				case "idx_scan":
-					s := stats[indexname]
-					s.idxscan = v
-					stats[indexname] = s
-				case "idx_tup_read":
-					s := stats[indexname]
-					s.idxtupread = v
-					stats[indexname] = s
-				case "idx_tup_fetch":
-					s := stats[indexname]
-					s.idxtupfetch = v
-					stats[indexname] = s
-				case "idx_blks_read":
-					s := stats[indexname]
-					s.idxread = v
-					stats[indexname] = s
-				case "idx_blks_hit":
-					s := stats[indexname]
-					s.idxhit = v
-					stats[indexname] = s
-				case "size_bytes":
-					s := stats[indexname]
-					s.sizebytes = v
-					stats[indexname] = s
-				default:
-					log.Debugf("unsupported pg_stat_user_indexes (or pg_statio_user_indexes) stat column: %s, skip", string(colname.Name))
-					continue
-				}
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+				continue
+			}
+
+			switch string(colname.Name) {
+			case "idx_scan":
+				s := stats[indexname]
+				s.idxscan = v
+				stats[indexname] = s
+			case "idx_tup_read":
+				s := stats[indexname]
+				s.idxtupread = v
+				stats[indexname] = s
+			case "idx_tup_fetch":
+				s := stats[indexname]
+				s.idxtupfetch = v
+				stats[indexname] = s
+			case "idx_blks_read":
+				s := stats[indexname]
+				s.idxread = v
+				stats[indexname] = s
+			case "idx_blks_hit":
+				s := stats[indexname]
+				s.idxhit = v
+				stats[indexname] = s
+			case "size_bytes":
+				s := stats[indexname]
+				s.sizebytes = v
+				stats[indexname] = s
+			default:
+				log.Debugf("unsupported pg_stat_user_indexes (or pg_statio_user_indexes) stat column: %s, skip", string(colname.Name))
+				continue
 			}
 		}
 	}

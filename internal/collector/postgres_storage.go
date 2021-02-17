@@ -122,6 +122,8 @@ type postgresTempfilesStat struct {
 
 // parsePostgresTempFileInflght parses PGResult, extract data and return struct with stats values.
 func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfilesStat {
+	log.Debug("parse postgres storage stats")
+
 	var stats = make(map[string]postgresTempfilesStat)
 
 	// process row by row
@@ -146,20 +148,19 @@ func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfile
 		for i, colname := range r.Colnames {
 			// skip tablespace column - it's mapped as a label
 			if string(colname.Name) == "tablespace" {
-				log.Debug("skip label mapped column")
+				log.Debug("skip label mapped column, 'tablespace'")
 				continue
 			}
 
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
 			v, err := strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
-				log.Errorf("skip collecting metric: %s", err)
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 
@@ -404,7 +405,6 @@ func findMountpoint(mounts []mount, path string) (string, string, error) {
 	// Check path in a list of all mounts.
 	for _, m := range mounts {
 		if m.mountpoint == path {
-			log.Debugf("mountpoint found: %s", path)
 			return path, m.device, nil
 		}
 	}
@@ -412,7 +412,7 @@ func findMountpoint(mounts []mount, path string) (string, string, error) {
 	// If path is not in mounts list, truncate path by one directory and try again.
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 {
-		return "", "", fmt.Errorf("mountpoint not found")
+		return "", "", fmt.Errorf("mountpoint '%s' not found", path)
 	}
 
 	path = strings.Join(parts[0:len(parts)-1], "/")

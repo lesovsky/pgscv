@@ -56,18 +56,20 @@ func (c *postgresLocksCollector) Update(config Config, ch chan<- prometheus.Metr
 
 // parsePostgresLocksStats parses result returned from Postgres and return stats map.
 func parsePostgresLocksStats(r *model.PGResult) map[string]float64 {
+	log.Debug("parse postgres locks stats")
+
 	stats := make(map[string]float64)
 
 	for _, row := range r.Rows {
 		if len(row) != 2 {
-			log.Warnf("wrong number of columns in result: %d, must be 2, skip", len(row))
+			log.Warn("invalid input: wrong number of columns, skip")
 		}
 
 		mode := row[0].String
 
 		v, err := strconv.ParseFloat(row[1].String, 64)
 		if err != nil {
-			log.Errorf("skip collecting metric: %s", err)
+			log.Errorf("invalid input, parse '%s' failed: %s; skip", row[1].String, err)
 			continue
 		}
 

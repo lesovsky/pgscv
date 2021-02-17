@@ -47,6 +47,7 @@ func (c *networkCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 }
 
 func parseInterfaceAddresses(addresses []net.Addr) map[string]int {
+	log.Debug("parse network addresses")
 	addrByType := map[string]int{
 		"private": 0,
 		"public":  0,
@@ -55,7 +56,7 @@ func parseInterfaceAddresses(addresses []net.Addr) map[string]int {
 	for _, addr := range addresses {
 		private, err := isPrivate(addr.String())
 		if err != nil {
-			log.Warnf("failed parse network address: %s; skip", err)
+			log.Warnf("invalid input, parse '%s' failed: %s, skip", addr.String(), err)
 			continue
 		}
 

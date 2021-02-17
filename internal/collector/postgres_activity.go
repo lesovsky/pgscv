@@ -133,7 +133,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	var count int
 	err = conn.Conn().QueryRow(context.Background(), postgresPreparedXactQuery).Scan(&count)
 	if err != nil {
-		log.Warnf("failed to read pg_prepared_xacts: %s; skip", err)
+		log.Warnf("query pg_prepared_xacts failed: %s; skip", err)
 	} else {
 		stats.prepared = float64(count)
 	}
@@ -146,7 +146,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if labels := strings.Split(k, "/"); len(labels) >= 2 {
 			ch <- c.waitEvents.mustNewConstMetric(v, labels[0], labels[1])
 		} else {
-			log.Warnf("failed to create wait_event activity: incomplete string %s; skip", k)
+			log.Warnf("create wait_event activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -168,7 +168,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "user")
 		} else {
-			log.Warnf("failed to create max idlexact user activity: incomplete string %s; skip", k)
+			log.Warnf("create max idlexact user activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -177,7 +177,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "maintenance")
 		} else {
-			log.Warnf("failed to create max idlexact maintenance activity: incomplete string %s; skip", k)
+			log.Warnf("create max idlexact maintenance activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -186,7 +186,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "user")
 		} else {
-			log.Warnf("failed to create max running user activity: incomplete string %s; skip", k)
+			log.Warnf("create max running user activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -195,7 +195,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "maintenance")
 		} else {
-			log.Warnf("failed to create max running maintenance activity: incomplete string %s; skip", k)
+			log.Warnf("create max running maintenance activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -204,7 +204,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "user")
 		} else {
-			log.Warnf("failed to create max waiting user activity: incomplete string %s; skip", k)
+			log.Warnf("create max waiting user activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -213,7 +213,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "maintenance")
 		} else {
-			log.Warnf("failed to create max waiting maintenance activity: incomplete string %s; skip", k)
+			log.Warnf("create max waiting maintenance activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
@@ -318,6 +318,8 @@ func newPostgresActivityStat(re queryRegexp) postgresActivityStat {
 }
 
 func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActivityStat {
+	log.Debug("parse postgres activity stats")
+
 	var stats = newPostgresActivityStat(re)
 
 	// Depending on Postgres version, waiting backends are observed using different column: 'waiting' used in 9.5 and older
@@ -339,8 +341,7 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 	for _, row := range r.Rows {
 		for i, colname := range r.Colnames {
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
@@ -454,7 +455,7 @@ func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname
 
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		log.Errorf("skip collecting max idle time duration metric: %s", err)
+		log.Errorf("invalid input, parse '%s' failed: %s; skip", value, err.Error())
 		return
 	}
 
@@ -488,7 +489,7 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value, usename, datname,
 
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		log.Errorf("skip collecting max run time duration metric: %s", err)
+		log.Errorf("invalid input, parse '%s' failed: %s; skip", value, err.Error())
 		return
 	}
 
@@ -521,7 +522,7 @@ func (s *postgresActivityStat) updateMaxWaittimeDuration(value, usename, datname
 
 	v, err := strconv.ParseFloat(value, 64)
 	if err != nil {
-		log.Errorf("skip collecting max wait time duration metric: %s", err)
+		log.Errorf("invalid input, parse '%s' failed: %s; skip", value, err.Error())
 		return
 	}
 

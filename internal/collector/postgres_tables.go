@@ -217,7 +217,7 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 		res, err := conn.Query(userTablesQuery)
 		conn.Close()
 		if err != nil {
-			log.Warnf("get tables stat of database %s failed: %s", d, err)
+			log.Warnf("get tables stat of database '%s' failed: %s; skip", d, err)
 			continue
 		}
 
@@ -329,6 +329,8 @@ type postgresTableStat struct {
 
 // parsePostgresTableStats parses PGResult and returns structs with stats values.
 func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]postgresTableStat {
+	log.Debug("parse postgres tables stats")
+
 	var stats = make(map[string]postgresTableStat)
 
 	var tablename string
@@ -352,132 +354,132 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 		stats[tablename] = table
 
 		for i, colname := range r.Colnames {
-			// Column's values act as metric values or as labels values.
-			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
-			// is in the labelNames, skip that column.
-			if !stringsContains(labelNames, string(colname.Name)) {
-				// Skip empty (NULL) values.
-				if row[i].String == "" {
-					log.Debug("got empty (NULL) value, skip")
-					continue
-				}
+			// skip columns if its value used as a label
+			if stringsContains(labelNames, string(colname.Name)) {
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
+				continue
+			}
 
-				// Get data value and convert it to float64 used by Prometheus.
-				v, err := strconv.ParseFloat(row[i].String, 64)
-				if err != nil {
-					log.Errorf("skip collecting metric: %s", err)
-					continue
-				}
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
 
-				switch string(colname.Name) {
-				case "seq_scan":
-					s := stats[tablename]
-					s.seqscan = v
-					stats[tablename] = s
-				case "seq_tup_read":
-					s := stats[tablename]
-					s.seqtupread = v
-					stats[tablename] = s
-				case "idx_scan":
-					s := stats[tablename]
-					s.idxscan = v
-					stats[tablename] = s
-				case "idx_tup_fetch":
-					s := stats[tablename]
-					s.idxtupfetch = v
-					stats[tablename] = s
-				case "n_tup_ins":
-					s := stats[tablename]
-					s.inserted = v
-					stats[tablename] = s
-				case "n_tup_upd":
-					s := stats[tablename]
-					s.updated = v
-					stats[tablename] = s
-				case "n_tup_del":
-					s := stats[tablename]
-					s.deleted = v
-					stats[tablename] = s
-				case "n_tup_hot_upd":
-					s := stats[tablename]
-					s.hotUpdated = v
-					stats[tablename] = s
-				case "n_live_tup":
-					s := stats[tablename]
-					s.live = v
-					stats[tablename] = s
-				case "n_dead_tup":
-					s := stats[tablename]
-					s.dead = v
-					stats[tablename] = s
-				case "n_mod_since_analyze":
-					s := stats[tablename]
-					s.modified = v
-					stats[tablename] = s
-				case "last_vacuum_seconds":
-					s := stats[tablename]
-					s.lastvacuum = v
-					stats[tablename] = s
-				case "last_analyze_seconds":
-					s := stats[tablename]
-					s.lastanalyze = v
-					stats[tablename] = s
-				case "vacuum_count":
-					s := stats[tablename]
-					s.vacuum = v
-					stats[tablename] = s
-				case "autovacuum_count":
-					s := stats[tablename]
-					s.autovacuum = v
-					stats[tablename] = s
-				case "analyze_count":
-					s := stats[tablename]
-					s.analyze = v
-					stats[tablename] = s
-				case "autoanalyze_count":
-					s := stats[tablename]
-					s.autoanalyze = v
-					stats[tablename] = s
-				case "heap_blks_read":
-					s := stats[tablename]
-					s.heapread = v
-					stats[tablename] = s
-				case "heap_blks_hit":
-					s := stats[tablename]
-					s.heaphit = v
-					stats[tablename] = s
-				case "idx_blks_read":
-					s := stats[tablename]
-					s.idxread = v
-					stats[tablename] = s
-				case "idx_blks_hit":
-					s := stats[tablename]
-					s.idxhit = v
-					stats[tablename] = s
-				case "toast_blks_read":
-					s := stats[tablename]
-					s.toastread = v
-					stats[tablename] = s
-				case "toast_blks_hit":
-					s := stats[tablename]
-					s.toasthit = v
-					stats[tablename] = s
-				case "tidx_blks_read":
-					s := stats[tablename]
-					s.tidxread = v
-					stats[tablename] = s
-				case "tidx_blks_hit":
-					s := stats[tablename]
-					s.tidxhit = v
-					stats[tablename] = s
-				case "size_bytes":
-					s := stats[tablename]
-					s.sizebytes = v
-					stats[tablename] = s
-				default:
-					log.Debugf("unsupported pg_stat_user_tables (or pg_statio_user_tables) stat column: %s, skip", string(colname.Name))
-					continue
-				}
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+				continue
+			}
+
+			switch string(colname.Name) {
+			case "seq_scan":
+				s := stats[tablename]
+				s.seqscan = v
+				stats[tablename] = s
+			case "seq_tup_read":
+				s := stats[tablename]
+				s.seqtupread = v
+				stats[tablename] = s
+			case "idx_scan":
+				s := stats[tablename]
+				s.idxscan = v
+				stats[tablename] = s
+			case "idx_tup_fetch":
+				s := stats[tablename]
+				s.idxtupfetch = v
+				stats[tablename] = s
+			case "n_tup_ins":
+				s := stats[tablename]
+				s.inserted = v
+				stats[tablename] = s
+			case "n_tup_upd":
+				s := stats[tablename]
+				s.updated = v
+				stats[tablename] = s
+			case "n_tup_del":
+				s := stats[tablename]
+				s.deleted = v
+				stats[tablename] = s
+			case "n_tup_hot_upd":
+				s := stats[tablename]
+				s.hotUpdated = v
+				stats[tablename] = s
+			case "n_live_tup":
+				s := stats[tablename]
+				s.live = v
+				stats[tablename] = s
+			case "n_dead_tup":
+				s := stats[tablename]
+				s.dead = v
+				stats[tablename] = s
+			case "n_mod_since_analyze":
+				s := stats[tablename]
+				s.modified = v
+				stats[tablename] = s
+			case "last_vacuum_seconds":
+				s := stats[tablename]
+				s.lastvacuum = v
+				stats[tablename] = s
+			case "last_analyze_seconds":
+				s := stats[tablename]
+				s.lastanalyze = v
+				stats[tablename] = s
+			case "vacuum_count":
+				s := stats[tablename]
+				s.vacuum = v
+				stats[tablename] = s
+			case "autovacuum_count":
+				s := stats[tablename]
+				s.autovacuum = v
+				stats[tablename] = s
+			case "analyze_count":
+				s := stats[tablename]
+				s.analyze = v
+				stats[tablename] = s
+			case "autoanalyze_count":
+				s := stats[tablename]
+				s.autoanalyze = v
+				stats[tablename] = s
+			case "heap_blks_read":
+				s := stats[tablename]
+				s.heapread = v
+				stats[tablename] = s
+			case "heap_blks_hit":
+				s := stats[tablename]
+				s.heaphit = v
+				stats[tablename] = s
+			case "idx_blks_read":
+				s := stats[tablename]
+				s.idxread = v
+				stats[tablename] = s
+			case "idx_blks_hit":
+				s := stats[tablename]
+				s.idxhit = v
+				stats[tablename] = s
+			case "toast_blks_read":
+				s := stats[tablename]
+				s.toastread = v
+				stats[tablename] = s
+			case "toast_blks_hit":
+				s := stats[tablename]
+				s.toasthit = v
+				stats[tablename] = s
+			case "tidx_blks_read":
+				s := stats[tablename]
+				s.tidxread = v
+				stats[tablename] = s
+			case "tidx_blks_hit":
+				s := stats[tablename]
+				s.tidxhit = v
+				stats[tablename] = s
+			case "size_bytes":
+				s := stats[tablename]
+				s.sizebytes = v
+				stats[tablename] = s
+			default:
+				log.Debugf("unsupported pg_stat_user_tables (or pg_statio_user_tables) stat column: %s, skip", string(colname.Name))
+				continue
 			}
 		}
 	}

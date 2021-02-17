@@ -79,6 +79,8 @@ func getMeminfoStats() (map[string]float64, error) {
 
 // parseMeminfoStats accepts file descriptor, reads file content and produces stats.
 func parseMeminfoStats(r io.Reader) (map[string]float64, error) {
+	log.Debug("parse memory stats")
+
 	var (
 		scanner = bufio.NewScanner(r)
 		stats   = map[string]float64{}
@@ -89,7 +91,7 @@ func parseMeminfoStats(r io.Reader) (map[string]float64, error) {
 		parts := strings.Fields(scanner.Text())
 
 		if len(parts) < 2 || len(parts) > 3 {
-			return nil, fmt.Errorf("/proc/meminfo invalid line: %s; skip", scanner.Text())
+			return nil, fmt.Errorf("invalid input, '%s': wrong number of values", scanner.Text())
 		}
 
 		var param = strings.TrimRight(parts[0], ":")
@@ -97,7 +99,7 @@ func parseMeminfoStats(r io.Reader) (map[string]float64, error) {
 
 		v, err := strconv.ParseFloat(value, 64)
 		if err != nil {
-			log.Errorf("convert string to float64 failed: %s; skip", err)
+			log.Errorf("invalid input, parse '%s' failed: %s, skip", value, err.Error())
 			continue
 		}
 

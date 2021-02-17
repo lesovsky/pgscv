@@ -95,6 +95,8 @@ func getNetdevStats(filter filter.Filter) (map[string][]float64, error) {
 
 // parseNetdevStats accepts file descriptor, reads file content and produces stats.
 func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
+	log.Debug("parse network devices stats")
+
 	scanner := bufio.NewScanner(r)
 
 	// Stats file /proc/net/dev has header consisting of two lines. Read the header and check content to make sure this is proper file.
@@ -102,7 +104,7 @@ func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, 
 		scanner.Scan()
 		parts := strings.Split(scanner.Text(), "|")
 		if len(parts) != 3 {
-			return nil, fmt.Errorf("invalid header line in /proc/net/dev: %s", scanner.Text())
+			return nil, fmt.Errorf("invalid input, '%s': wrong number of values", scanner.Text())
 		}
 	}
 
@@ -113,16 +115,17 @@ func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, 
 
 		device := strings.TrimRight(values[0], ":")
 		if !filter.Pass(device) {
-			log.Debugln("ignore device ", device)
+			log.Debugf("ignore device %s", device)
 			continue
 		}
+		log.Debugf("pass device %s", device)
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-1)
 		for i := range stat {
 			value, err := strconv.ParseFloat(values[i+1], 64)
 			if err != nil {
-				log.Errorf("convert string to float64 failed: %s; skip", err)
+				log.Errorf("invalid input, parse '%s' failed: %s, skip", values[i+1], err.Error())
 				continue
 			}
 			stat[i] = value

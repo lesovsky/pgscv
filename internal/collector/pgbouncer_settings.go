@@ -95,7 +95,7 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 			ch <- c.dbSettings.mustNewConstMetric(1, p.name, p.mode, p.size)
 
 			if f, err := strconv.ParseFloat(p.size, 64); err != nil {
-				log.Warnf("failed to parse pool_size: '%s'; skip", p.size)
+				log.Warnf("invalid input, parse '%s' failed: %s; skip", p.size, err)
 				continue
 			} else {
 				ch <- c.poolSize.mustNewConstMetric(f, p.name)
@@ -108,11 +108,13 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 
 // parsePgbouncerSettings parses content of 'SHOW CONFIG' and return map with parsed settings.
 func parsePgbouncerSettings(r *model.PGResult) map[string]string {
+	log.Debug("parse load pgbouncer settings")
+
 	settings := make(map[string]string)
 
 	for _, row := range r.Rows {
 		if len(row) < 2 {
-			log.Warnln("invalid number of columns, skip")
+			log.Warnln("invalid input: too few values; skip")
 			continue
 		}
 
@@ -192,11 +194,13 @@ func getPerDatabaseSettings(filename string, defaults map[string]string) ([]dbSe
 
 // parseDatabaseSettingsLine parses line with database settings and return dbSettings struct.
 func parseDatabaseSettingsLine(line string) (dbSettings, error) {
+	log.Debug("parse pgbouncer database settings")
+
 	var s dbSettings
 
 	parts := strings.SplitN(line, "=", 2)
 	if len(parts) < 2 {
-		return s, fmt.Errorf("parse [databases] section warning, bad content: '%s', skip", line)
+		return s, fmt.Errorf("invalid input, '%s': too few values", line)
 	}
 
 	s.name = strings.TrimSpace(parts[0])
@@ -206,7 +210,7 @@ func parseDatabaseSettingsLine(line string) (dbSettings, error) {
 	for _, p := range subparts {
 		values := strings.Split(p, "=")
 		if len(values) < 2 {
-			log.Warnf("parse database settings warning, bad content: '%s', skip", p)
+			log.Warnf("invalid input, '%s': too few values; skip", p)
 			continue
 		}
 

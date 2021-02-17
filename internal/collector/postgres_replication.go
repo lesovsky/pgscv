@@ -182,6 +182,8 @@ type postgresReplicationStat struct {
 
 // parsePostgresReplicationStats parses PGResult and returns struct with stats values.
 func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[string]postgresReplicationStat {
+	log.Debug("parse postgres replication stats")
+
 	var stats = make(map[string]postgresReplicationStat)
 
 	for _, row := range r.Rows {
@@ -213,20 +215,19 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 		for i, colname := range r.Colnames {
 			// skip columns if its value used as a label
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debug("skip label mapped column")
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
 			// Skip empty (NULL) values.
-			if row[i].String == "" {
-				log.Debug("got empty (NULL) value, skip")
+			if !row[i].Valid {
 				continue
 			}
 
 			// Get data value and convert it to float64 used by Prometheus.
 			v, err := strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
-				log.Errorf("skip collecting metric: %s", err)
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 
