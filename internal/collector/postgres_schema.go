@@ -193,11 +193,10 @@ func collectSchemaNonPKTables(conn *store.DB, ch chan<- prometheus.Metric, desc 
 
 // getSchemaNonPKTables searches tables with no PRIMARY or UNIQUE keys in the database and return its names.
 func getSchemaNonPKTables(conn *store.DB) ([]string, error) {
-	var query = `SELECT n.nspname AS schemaname, c.relname AS relname
-FROM pg_class c
-JOIN pg_namespace n ON c.relnamespace = n.oid
-WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE c.oid = i.indrelid AND (i.indisprimary OR i.indisunique))
-AND c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')`
+	var query = "SELECT n.nspname AS schemaname, c.relname AS relname " +
+		"FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid " +
+		"WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE c.oid = i.indrelid AND (i.indisprimary OR i.indisunique)) " +
+		"AND c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
 
 	rows, err := conn.Conn().Query(context.Background(), query)
 	if err != nil {
@@ -251,9 +250,9 @@ func collectSchemaInvalidIndexes(conn *store.DB, ch chan<- prometheus.Metric, de
 
 // getSchemaInvalidIndexes searches invalid indexes in the database and return its names if such indexes have been found.
 func getSchemaInvalidIndexes(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = `SELECT c1.relnamespace::regnamespace::text AS schemaname, c2.relname AS relname, c1.relname AS indexrelname,
-    pg_relation_size(c1.relname::regclass) AS bytes
-FROM pg_index i JOIN pg_class c1 ON i.indexrelid = c1.oid JOIN pg_class c2 ON i.indrelid = c2.oid WHERE NOT i.indisvalid`
+	var query = "SELECT c1.relnamespace::regnamespace::text AS schemaname, c2.relname AS relname, c1.relname AS indexrelname, " +
+		"pg_relation_size(c1.relname::regclass) AS bytes " +
+		"FROM pg_index i JOIN pg_class c1 ON i.indexrelid = c1.oid JOIN pg_class c2 ON i.indrelid = c2.oid WHERE NOT i.indisvalid"
 	res, err := conn.Query(query)
 	if err != nil {
 		return nil, err
@@ -291,16 +290,15 @@ func collectSchemaNonIndexedFK(conn *store.DB, ch chan<- prometheus.Metric, desc
 
 // getSchemaNonIndexedFK searches non indexes foreign key constraints and return its names.
 func getSchemaNonIndexedFK(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = `SELECT
-    c.connamespace::regnamespace::text AS schemaname, s.relname AS relname,
-    string_agg(a.attname, ',' ORDER BY x.n) AS colnames, c.conname AS constraint,
-    c.confrelid::regclass::text AS referenced
-FROM pg_constraint c CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS x(attnum, n)
-JOIN pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid
-JOIN pg_class s ON c.conrelid = s.oid
-WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND (i.indkey::integer[])[0:cardinality(c.conkey)-1] @> c.conkey::integer[])
-  AND c.contype = 'f'
-GROUP BY c.connamespace,s.relname,c.conname,c.confrelid`
+	var query = "SELECT c.connamespace::regnamespace::text AS schemaname, s.relname AS relname, " +
+		"string_agg(a.attname, ',' ORDER BY x.n) AS colnames, c.conname AS constraint, " +
+		"c.confrelid::regclass::text AS referenced " +
+		"FROM pg_constraint c CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS x(attnum, n) " +
+		"JOIN pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid " +
+		"JOIN pg_class s ON c.conrelid = s.oid " +
+		"WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE i.indrelid = c.conrelid AND (i.indkey::integer[])[0:cardinality(c.conkey)-1] @> c.conkey::integer[]) " +
+		"AND c.contype = 'f' " +
+		"GROUP BY c.connamespace,s.relname,c.conname,c.confrelid"
 
 	res, err := conn.Query(query)
 	if err != nil {
@@ -340,25 +338,18 @@ func collectSchemaRedundantIndexes(conn *store.DB, ch chan<- prometheus.Metric, 
 
 // getSchemaRedundantIndexes searches redundant indexes and returns its sizes
 func getSchemaRedundantIndexes(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = `WITH index_data AS (
-SELECT *, string_to_array(indkey::text,' ') AS key_array, array_length(string_to_array(indkey::text,' '),1) AS nkeys FROM pg_index
-) SELECT
-  c1.relnamespace::regnamespace::text AS schemaname,
-  c1.relname AS relname,
-  c2.relname AS indexrelname,
-  pg_get_indexdef(i1.indexrelid) AS indexdef,
-  pg_get_indexdef(i2.indexrelid) AS redundantdef,
-  pg_relation_size(i2.indexrelid) AS bytes
-FROM index_data AS i1 JOIN index_data AS i2 ON i1.indrelid = i2.indrelid AND i1.indexrelid<>i2.indexrelid
-JOIN pg_class c1 ON i1.indrelid = c1.oid
-JOIN pg_class c2 ON i2.indexrelid = c2.oid
-WHERE (regexp_replace(i1.indpred, 'location \d+', 'location', 'g') IS NOT DISTINCT FROM regexp_replace(i2.indpred, 'location \d+', 'location', 'g'))
-  AND (regexp_replace(i1.indexprs, 'location \d+', 'location', 'g') IS NOT DISTINCT FROM regexp_replace(i2.indexprs, 'location \d+', 'location', 'g'))
-  AND ((i1.nkeys > i2.nkeys AND NOT i2.indisunique)
-    OR (i1.nkeys = i2.nkeys AND ((i1.indisunique AND i2.indisunique AND (i1.indexrelid>i2.indexrelid))
-    OR (NOT i1.indisunique AND NOT i2.indisunique AND (i1.indexrelid>i2.indexrelid))
-    OR (i1.indisunique AND NOT i2.indisunique))))
-  AND i1.key_array[1:i2.nkeys]=i2.key_array`
+	var query = "WITH index_data AS (SELECT *, string_to_array(indkey::text,' ') AS key_array, array_length(string_to_array(indkey::text,' '),1) AS nkeys FROM pg_index) " +
+		"SELECT c1.relnamespace::regnamespace::text AS schemaname, c1.relname AS relname, c2.relname AS indexrelname, " +
+		"pg_get_indexdef(i1.indexrelid) AS indexdef, pg_get_indexdef(i2.indexrelid) AS redundantdef, " +
+		"pg_relation_size(i2.indexrelid) AS bytes " +
+		"FROM index_data AS i1 JOIN index_data AS i2 ON i1.indrelid = i2.indrelid AND i1.indexrelid<>i2.indexrelid " +
+		"JOIN pg_class c1 ON i1.indrelid = c1.oid " +
+		"JOIN pg_class c2 ON i2.indexrelid = c2.oid " +
+		`WHERE (regexp_replace(i1.indpred, 'location \\d+', 'location', 'g') IS NOT DISTINCT FROM regexp_replace(i2.indpred, 'location \\d+', 'location', 'g')) ` +
+		`AND (regexp_replace(i1.indexprs, 'location \\d+', 'location', 'g') IS NOT DISTINCT FROM regexp_replace(i2.indexprs, 'location \\d+', 'location', 'g')) ` +
+		"AND ((i1.nkeys > i2.nkeys AND NOT i2.indisunique) OR (i1.nkeys = i2.nkeys AND ((i1.indisunique AND i2.indisunique AND (i1.indexrelid>i2.indexrelid)) " +
+		"OR (NOT i1.indisunique AND NOT i2.indisunique AND (i1.indexrelid>i2.indexrelid)) " +
+		"OR (i1.indisunique AND NOT i2.indisunique)))) AND i1.key_array[1:i2.nkeys]=i2.key_array"
 
 	res, err := conn.Query(query)
 	if err != nil {
@@ -435,21 +426,14 @@ func collectSchemaFKDatatypeMismatch(conn *store.DB, ch chan<- prometheus.Metric
 
 // getSchemaFKDatatypeMismatch searches foreign key constraints with different data types.
 func getSchemaFKDatatypeMismatch(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = `SELECT
-    c1.relnamespace::regnamespace::text AS schemaname,
-    c1.relname AS relname,
-    a1.attname||'::'||t1.typname AS colname,
-    c2.relnamespace::regnamespace::text AS refschemaname,
-    c2.relname AS refrelname,
-    a2.attname||'::'||t2.typname AS refcolname
-FROM pg_constraint
-JOIN pg_class c1 ON c1.oid = conrelid
-JOIN pg_class c2 ON c2.oid = confrelid
-JOIN pg_attribute a1 ON a1.attnum = conkey[1] AND a1.attrelid = conrelid
-JOIN pg_attribute a2 ON a2.attnum = confkey[1] AND a2.attrelid = confrelid
-JOIN pg_type t1 ON t1.oid = a1.atttypid
-JOIN pg_type t2 ON t2.oid = a2.atttypid
-WHERE a1.atttypid <> a2.atttypid AND contype = 'f'`
+	var query = "SELECT c1.relnamespace::regnamespace::text AS schemaname, c1.relname AS relname, a1.attname||'::'||t1.typname AS colname, " +
+		"c2.relnamespace::regnamespace::text AS refschemaname, c2.relname AS refrelname, a2.attname||'::'||t2.typname AS refcolname " +
+		"FROM pg_constraint JOIN pg_class c1 ON c1.oid = conrelid JOIN pg_class c2 ON c2.oid = confrelid " +
+		"JOIN pg_attribute a1 ON a1.attnum = conkey[1] AND a1.attrelid = conrelid " +
+		"JOIN pg_attribute a2 ON a2.attnum = confkey[1] AND a2.attrelid = confrelid " +
+		"JOIN pg_type t1 ON t1.oid = a1.atttypid " +
+		"JOIN pg_type t2 ON t2.oid = a2.atttypid " +
+		"WHERE a1.atttypid <> a2.atttypid AND contype = 'f'"
 
 	res, err := conn.Query(query)
 	if err != nil {

@@ -14,11 +14,9 @@ import (
 )
 
 const (
-	postgresTempFilesInflightQuery = `SELECT spcname AS tablespace,
-    count(*) AS files_total,
-    coalesce(sum(size), 0) AS bytes_total,
-    coalesce(extract(epoch from clock_timestamp() - min(modification)), 0) AS max_age_seconds
-FROM (SELECT spcname,(pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces GROUP BY spcname`
+	postgresTempFilesInflightQuery = "SELECT spcname AS tablespace, count(*) AS files_total, coalesce(sum(size), 0) AS bytes_total, " +
+		"coalesce(extract(epoch from clock_timestamp() - min(modification)), 0) AS max_age_seconds " +
+		"FROM (SELECT spcname,(pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces GROUP BY spcname"
 )
 
 type postgresStorageCollector struct {

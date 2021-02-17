@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const postgresFunctionsQuery = `SELECT current_database() AS datname, schemaname, funcname, calls, total_time, self_time FROM pg_stat_user_functions`
+const postgresFunctionsQuery = "SELECT current_database() AS datname, schemaname, funcname, calls, total_time, self_time FROM pg_stat_user_functions"
 
 type postgresFunctionsCollector struct {
 	calls      typedDesc

@@ -11,10 +11,10 @@ import (
 
 const (
 	// Query for Postgres version 9.6 and older.
-	postgresReplicationSlotQuery96 = `SELECT database, slot_name, slot_type, active, pg_current_xlog_location() - restart_lsn AS since_restart_bytes FROM pg_replication_slots`
+	postgresReplicationSlotQuery96 = "SELECT database, slot_name, slot_type, active, pg_current_xlog_location() - restart_lsn AS since_restart_bytes FROM pg_replication_slots"
 
 	// Query for Postgres versions from 10 and newer.
-	postgresReplicationSlotQueryLatest = `SELECT database, slot_name, slot_type, active, pg_current_wal_lsn() - restart_lsn AS since_restart_bytes FROM pg_replication_slots`
+	postgresReplicationSlotQueryLatest = "SELECT database, slot_name, slot_type, active, pg_current_wal_lsn() - restart_lsn AS since_restart_bytes FROM pg_replication_slots"
 )
 
 //

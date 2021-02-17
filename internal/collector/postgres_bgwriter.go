@@ -9,13 +9,12 @@ import (
 )
 
 const (
-	postgresBgwriterQuery = `SELECT
-  checkpoints_timed, checkpoints_req,
-  checkpoint_write_time, checkpoint_sync_time,
-  buffers_checkpoint, buffers_clean, maxwritten_clean,
-  buffers_backend, buffers_backend_fsync, buffers_alloc,
-  coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds
-FROM pg_stat_bgwriter`
+	postgresBgwriterQuery = "SELECT " +
+		"checkpoints_timed, checkpoints_req, checkpoint_write_time, checkpoint_sync_time, " +
+		"buffers_checkpoint, buffers_clean, maxwritten_clean, " +
+		"buffers_backend, buffers_backend_fsync, buffers_alloc, " +
+		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
+		"FROM pg_stat_bgwriter"
 )
 
 type postgresBgwriterCollector struct {

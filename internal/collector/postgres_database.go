@@ -8,16 +8,12 @@ import (
 	"strconv"
 )
 
-const databaseQuery = `SELECT
-  COALESCE(datname, '__shared__') AS datname,
-  xact_commit, xact_rollback,
-  blks_read, blks_hit,
-  tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted,
-  conflicts, temp_files, temp_bytes, deadlocks,
-  blk_read_time, blk_write_time,
-  pg_database_size(datname) as size_bytes,
-  coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds
-FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)`
+const databaseQuery = "SELECT " +
+	"COALESCE(datname, '__shared__') AS datname, " +
+	"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
+	"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
+	"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
+	"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)"
 
 type postgresDatabasesCollector struct {
 	commits    typedDesc

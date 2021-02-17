@@ -12,21 +12,21 @@ import (
 )
 
 const (
-	postgresActivityQuery95 = `SELECT
-    coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, waiting,
-    extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
-    extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
-    left(query, 32) as query
-FROM pg_stat_activity`
+	postgresActivityQuery95 = "SELECT " +
+		"coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, waiting, " +
+		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
+		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
+		"left(query, 32) as query " +
+		"FROM pg_stat_activity"
 
-	postgresActivityQueryLatest = `SELECT
-    coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, wait_event_type, wait_event,
-    extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds,
-    extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds,
-    left(query, 32) as query
-FROM pg_stat_activity`
+	postgresActivityQueryLatest = "SELECT " +
+		"coalesce(usename, 'NULL') AS usename, coalesce(datname, 'NULL') AS datname, state, wait_event_type, wait_event, " +
+		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
+		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
+		"left(query, 32) as query " +
+		"FROM pg_stat_activity"
 
-	postgresPreparedXactQuery = `SELECT count(*) AS total FROM pg_prepared_xacts`
+	postgresPreparedXactQuery = "SELECT count(*) AS total FROM pg_prepared_xacts"
 
 	// Backend states accordingly to pg_stat_activity.state
 	stActive          = "active"

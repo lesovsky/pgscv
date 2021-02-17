@@ -9,13 +9,13 @@ import (
 )
 
 const (
-	postgresDatabaseConflictsQuery = `SELECT datname,
-    nullif(confl_tablespace, 0) AS confl_tablespace,
-    nullif(confl_lock, 0) AS confl_lock,
-    nullif(confl_snapshot, 0) AS confl_snapshot,
-    nullif(confl_bufferpin, 0) AS confl_bufferpin,
-    nullif(confl_deadlock, 0) AS confl_deadlock
-FROM pg_stat_database_conflicts`
+	postgresDatabaseConflictsQuery = "SELECT datname," +
+		"nullif(confl_tablespace, 0) AS confl_tablespace," +
+		"nullif(confl_lock, 0) AS confl_lock," +
+		"nullif(confl_snapshot, 0) AS confl_snapshot," +
+		"nullif(confl_bufferpin, 0) AS confl_bufferpin," +
+		"nullif(confl_deadlock, 0) AS confl_deadlock " +
+		"FROM pg_stat_database_conflicts"
 )
 
 type postgresConflictsCollector struct {

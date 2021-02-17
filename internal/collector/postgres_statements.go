@@ -15,34 +15,28 @@ import (
 
 const (
 	// postgresStatementsQuery12 defines query for querying statements metrics for PG12 and older.
-	postgresStatementsQuery12 = `SELECT
-    d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    p.queryid, regexp_replace(p.query,E'\\s+', ' ', 'g') AS query,
-    p.calls, p.rows,
-    p.total_time, p.blk_read_time, p.blk_write_time,
-    nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
-    nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written,
-    nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read,
-    nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written,
-    nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written
-FROM pg_stat_statements p
-JOIN pg_database d ON d.oid=p.dbid`
+	postgresStatementsQuery12 = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
+		`regexp_replace(p.query,E'\\\\s+', ' ', 'g') AS query, ` +
+		"p.calls, p.rows, p.total_time, p.blk_read_time, p.blk_write_time, " +
+		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
+		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
+		"nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read, " +
+		"nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written, " +
+		"nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written " +
+		"FROM pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
 
 	// postgresStatementsQueryLatest defines query for querying statements metrics.
 	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
-	postgresStatementsQueryLatest = `SELECT
-    d.datname AS datname, pg_get_userbyid(p.userid) AS usename,
-    p.queryid, regexp_replace(p.query,E'\\s+', ' ', 'g') AS query,
-    p.calls, p.rows,
-    p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time,
-    nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read,
-    nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written,
-    nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read,
-    nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written,
-    nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written,
-	nullif(p.wal_records, 0) AS wal_records, nullif(p.wal_fpi, 0) AS wal_fpi, nullif(p.wal_bytes, 0) AS wal_bytes
-FROM pg_stat_statements p
-JOIN pg_database d ON d.oid=p.dbid`
+	postgresStatementsQueryLatest = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
+		`regexp_replace(p.query,E'\\\\s+', ' ', 'g') AS query, ` +
+		"p.calls, p.rows, p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time, " +
+		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
+		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
+		"nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read, " +
+		"nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written, " +
+		"nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written, " +
+		"nullif(p.wal_records, 0) AS wal_records, nullif(p.wal_fpi, 0) AS wal_fpi, nullif(p.wal_bytes, 0) AS wal_bytes " +
+		"FROM pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
 )
 
 // postgresStatementsCollector ...

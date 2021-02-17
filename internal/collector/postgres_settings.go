@@ -51,7 +51,8 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 	defer conn.Close()
 
 	// For complete list of displayable names of GUC's sources types check guc.c (see GucSource_Names[]).
-	query := `SELECT name, setting, unit, vartype FROM pg_show_all_settings() WHERE source IN ('default','configuration file','override','environment variable','command line','global')`
+	query := "SELECT name, setting, unit, vartype FROM pg_show_all_settings() " +
+		"WHERE source IN ('default','configuration file','override','environment variable','command line','global')"
 	res, err := conn.Query(query)
 	if err != nil {
 		return err
