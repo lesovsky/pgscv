@@ -251,9 +251,7 @@ func Test_normalizeStatement(t *testing.T) {
 	}
 
 	// manual test
-	in = ``
-	want = ``
-	assert.Equal(t, want, normalizeStatement(in))
+	assert.Equal(t, ``, normalizeStatement(``))
 }
 
 func Test_selectStatementsQuery(t *testing.T) {

@@ -491,8 +491,8 @@ func normalizeStatement(stmt string) string {
 	re = regexp.MustCompile(`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`) // looking for 'IN ($1, $2, ..., $123)' sequences.
 	stmt = re.ReplaceAllString(stmt, " IN (?)")
 
-	re = regexp.MustCompile(`\(([$\d,\s]+)\)`) // looking for standalone digits.
-	stmt = re.ReplaceAllString(stmt, "?")
+	re = regexp.MustCompile(`\(([$\d,\s]+)\)`) // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.
+	stmt = re.ReplaceAllString(stmt, "(?)")
 
 	re = regexp.MustCompile(`'.+?'`) // looking for standalone quoted values, like 'whatever'.
 	stmt = re.ReplaceAllString(stmt, "'?'")
