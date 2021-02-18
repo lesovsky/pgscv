@@ -16,8 +16,7 @@ import (
 const (
 	// postgresStatementsQuery12 defines query for querying statements metrics for PG12 and older.
 	postgresStatementsQuery12 = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
-		`regexp_replace(p.query,E'\\\\s+', ' ', 'g') AS query, ` +
-		"p.calls, p.rows, p.total_time, p.blk_read_time, p.blk_write_time, " +
+		"p.query, p.calls, p.rows, p.total_time, p.blk_read_time, p.blk_write_time, " +
 		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
 		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
 		"nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read, " +
@@ -28,8 +27,7 @@ const (
 	// postgresStatementsQueryLatest defines query for querying statements metrics.
 	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
 	postgresStatementsQueryLatest = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
-		`regexp_replace(p.query,E'\\\\s+', ' ', 'g') AS query, ` +
-		"p.calls, p.rows, p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time, " +
+		"p.query, p.calls, p.rows, p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time, " +
 		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
 		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
 		"nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read, " +
@@ -498,7 +496,8 @@ type normalizationChain []normalizationPair
 // newNormalizationChain compiles normalizationChain from rules.
 func newNormalizationChain() normalizationChain {
 	patterns := [][2]string{
-		{`(//.*$|/\*.*?\*/)`, ""},                                 // looking for comment sequences, like '/* ... */ or starting from //.
+		{`[\n\r\t]+`, " "},        // looking for newline, carriage return, tabular characters.
+		{`(//.*$|/\*.*?\*/)`, ""}, // looking for comment sequences, like '/* ... */ or starting from //.
 		{`(?i)\s+VALUES\s*\(((.\S+),\s?)+(.+?)\)`, " VALUES (?)"}, // looking for 'VALUES ($1, $2, ..., $123)' sequences.
 		{`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`, " IN (?)"},         // looking for 'IN ($1, $2, ..., $123)' sequences.
 		{`\(([$\d,\s]+)\)`, "(?)"},                                // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.

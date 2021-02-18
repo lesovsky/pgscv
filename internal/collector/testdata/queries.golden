@@ -42,7 +42,9 @@ SELECT COUNT(users.id) AS _cnt FROM users WHERE NOT EXISTS(SELECT id FROM user_n
 SELECT COUNT(users.id) AS _cnt FROM users WHERE NOT EXISTS(SELECT id FROM user_notifications WHERE user_id = users.id AND notification_type = ?)
 SELECT COUNT(users.id) AS _cnt FROM users /* comment1 */ WHERE NOT EXISTS(SELECT id FROM user_notifications WHERE /* comment2 */ user_id = users.id AND notification_type = $1)
 SELECT COUNT(users.id) AS _cnt FROM users WHERE NOT EXISTS(SELECT id FROM user_notifications WHERE user_id = users.id AND notification_type = ?)
-SELECT count(1) as cnt FROM table WHERE mtime > now() - interval '1 day'"
-SELECT count(?) as cnt FROM table WHERE mtime > now() - interval '?'"
+SELECT count(1) as cnt FROM table WHERE mtime > now() - interval '1 day'
+SELECT count(?) as cnt FROM table WHERE mtime > now() - interval '?'
 SELECT example_function(1, 2,3, 4)
 SELECT example_function(?)
+SELECT col1,  col2,  col3 FROM table
+SELECT col1, col2, col3 FROM table

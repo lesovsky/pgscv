@@ -249,10 +249,11 @@ func Test_normalizationChain_normalize(t *testing.T) {
 		}
 
 		if counter%2 == 0 {
-			//assert.Equal(t, want, normalizeStatement(in))
 			assert.Equal(t, want, chain.normalize(in))
 		}
 	}
+
+	assert.Equal(t, "SELECT col1 FROM t1", chain.normalize("SELECT \ncol1 \nFROM t1"))
 
 	// manual test
 	assert.Equal(t, ``, chain.normalize(``))
