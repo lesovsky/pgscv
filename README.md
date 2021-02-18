@@ -11,10 +11,14 @@
     2. in combined listening-and-sending mode for sending collected metrics to Weaponry SaaS.
 - can run on Linux only, but [can connect](doc/usage-en.md) to remote services running on other OS. 
 
+### Support
+If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/weaponry/pgscv/issues)
+
 ### Development and contribution
-- pgSCV is open-source software.
-- All features implemented are focused for Weaponry needs.
-- All contributions should be proposed with detailed explanation and with tests.
+To help development you are encouraged to:
+- provide suggestion/feedback/issue
+- pull requests for new features
+- star the project
 
 ### License
 BSD-3. See [LICENSE](./LICENSE) for more details.
