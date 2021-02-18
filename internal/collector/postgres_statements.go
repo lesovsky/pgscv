@@ -59,6 +59,7 @@ type postgresStatementsCollector struct {
 	walRecords    typedDesc
 	walFPI        typedDesc
 	walBytes      typedDesc
+	chain         normalizationChain
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
@@ -207,6 +208,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels) (Collector, e
 			),
 			valueType: prometheus.CounterValue,
 		},
+		chain: newNormalizationChain(),
 	}, nil
 }
 
@@ -232,7 +234,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	conn.Close()
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresStatementsStats(res, []string{"usename", "datname", "queryid", "query"})
+	stats := parsePostgresStatementsStats(res, c.chain, []string{"usename", "datname", "queryid", "query"})
 
 	blockSize := float64(config.BlockSize)
 
@@ -339,7 +341,7 @@ type postgresStatementStat struct {
 }
 
 // parsePostgresStatementsStats parses PGResult and return structs with stats values.
-func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[string]postgresStatementStat {
+func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, labelNames []string) map[string]postgresStatementStat {
 	log.Debug("parse postgres statements stats")
 
 	var stats = make(map[string]postgresStatementStat)
@@ -359,7 +361,7 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 			case "queryid":
 				queryid = row[i].String
 			case "query":
-				query = normalizeStatement(row[i].String)
+				query = c.normalize(row[i].String)
 				md5hash = fmt.Sprintf("%x", md5.Sum([]byte(query))) // #nosec G401
 			}
 		}
@@ -480,34 +482,49 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 	return stats
 }
 
-// normalizeStatement used for normalize queries and truncates redundant elements like params and values.
-func normalizeStatement(stmt string) string {
-	re := regexp.MustCompile(`(//.*$|/\*.*?\*/)`) // looking for comment sequences, like '/* ... */ or starting from //.
-	stmt = re.ReplaceAllString(stmt, "")
+// The goal of normalization chain is avoid regexp compilation at processing every query.
+// Instead of this normalization regexps are compiled at once when collector is created and compiled regexps are used
+// when necessary.
 
-	re = regexp.MustCompile(`(?i)\s+VALUES\s*\(((.\S+),\s?)+(.+?)\)`) // looking for 'VALUES ($1, $2, ..., $123)' sequences.
-	stmt = re.ReplaceAllString(stmt, " VALUES (?)")
+// normalizationPair defines single normalization rule.
+type normalizationPair struct {
+	re          *regexp.Regexp
+	replacement string
+}
 
-	re = regexp.MustCompile(`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`) // looking for 'IN ($1, $2, ..., $123)' sequences.
-	stmt = re.ReplaceAllString(stmt, " IN (?)")
+// normalizationChain defines full chain of normalization which processes queries.
+type normalizationChain []normalizationPair
 
-	re = regexp.MustCompile(`\(([$\d,\s]+)\)`) // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.
-	stmt = re.ReplaceAllString(stmt, "(?)")
+// newNormalizationChain compiles normalizationChain from rules.
+func newNormalizationChain() normalizationChain {
+	patterns := [][2]string{
+		{`(//.*$|/\*.*?\*/)`, ""},                                 // looking for comment sequences, like '/* ... */ or starting from //.
+		{`(?i)\s+VALUES\s*\(((.\S+),\s?)+(.+?)\)`, " VALUES (?)"}, // looking for 'VALUES ($1, $2, ..., $123)' sequences.
+		{`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`, " IN (?)"},         // looking for 'IN ($1, $2, ..., $123)' sequences.
+		{`\(([$\d,\s]+)\)`, "(?)"},                                // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.
+		{`'.+?'`, "'?'"},                                          // looking for standalone quoted values, like 'whatever'.
+		{`(?i)(^SET .+(=|TO))(.+)`, "SET ? TO ?"},                 // looking for SET commands.
+		{`_(\d|_)+`, "_?"},                                        // looking for digits starting with underscore, like '_2020' or '_2020_10'.
+		{`\$?\b\d+\b`, "?"},                                       // looking for standalone digits, like '10'.
+		{`\s{2,}`, " "},                                           // looking for repeating spaces.
+	}
 
-	re = regexp.MustCompile(`'.+?'`) // looking for standalone quoted values, like 'whatever'.
-	stmt = re.ReplaceAllString(stmt, "'?'")
+	var chain []normalizationPair
 
-	re = regexp.MustCompile(`(?i)(^SET .+(=|TO))(.+)`) // looking for SET commands.
-	stmt = re.ReplaceAllString(stmt, "SET ? TO ?")
+	for _, v := range patterns {
+		re := regexp.MustCompile(v[0])
+		chain = append(chain, normalizationPair{re: re, replacement: v[1]})
+	}
 
-	re = regexp.MustCompile(`_(\d|_)+`) // looking for digits starting with underscore, like '_2020' or '_2020_10'.
-	stmt = re.ReplaceAllString(stmt, "_?")
+	return chain
+}
 
-	re = regexp.MustCompile(`\$?\b\d+\b`) // looking for standalone digits, like '10'.
-	stmt = re.ReplaceAllString(stmt, "?")
-
-	re = regexp.MustCompile(`\s{2,}`) // looking for repeating spaces.
-	stmt = re.ReplaceAllString(stmt, " ")
+// normalize pass query through normalization chain and returns normalized query.
+func (c normalizationChain) normalize(query string) string {
+	stmt := query
+	for _, v := range c {
+		stmt = v.re.ReplaceAllString(stmt, v.replacement)
+	}
 
 	if len(stmt) > 1000 {
 		stmt = stmt[0:1000] + "..."

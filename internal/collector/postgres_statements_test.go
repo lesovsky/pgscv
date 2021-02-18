@@ -218,15 +218,18 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 		},
 	}
 
+	c := newNormalizationChain()
+
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parsePostgresStatementsStats(tc.res, []string{"usename", "datname", "queryid", "query"})
+			got := parsePostgresStatementsStats(tc.res, c, []string{"usename", "datname", "queryid", "query"})
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
 }
 
-func Test_normalizeStatement(t *testing.T) {
+func Test_normalizationChain_normalize(t *testing.T) {
+	chain := newNormalizationChain()
 	f, err := os.Open("testdata/queries.golden")
 	assert.NoError(t, err)
 
@@ -246,12 +249,13 @@ func Test_normalizeStatement(t *testing.T) {
 		}
 
 		if counter%2 == 0 {
-			assert.Equal(t, want, normalizeStatement(in))
+			//assert.Equal(t, want, normalizeStatement(in))
+			assert.Equal(t, want, chain.normalize(in))
 		}
 	}
 
 	// manual test
-	assert.Equal(t, ``, normalizeStatement(``))
+	assert.Equal(t, ``, chain.normalize(``))
 }
 
 func Test_selectStatementsQuery(t *testing.T) {
