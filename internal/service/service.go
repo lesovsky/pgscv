@@ -14,7 +14,6 @@ import (
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -498,7 +497,7 @@ func parsePostgresProcessCmdline(cmdline []string) (string, error) {
 // newPostgresConnectionParams reads connection parameters from postmaster.pid
 func newPostgresConnectionParams(pidFilePath string) (connectionParams, error) {
 	p := connectionParams{}
-	content, err := ioutil.ReadFile(filepath.Clean(pidFilePath))
+	content, err := os.ReadFile(filepath.Clean(pidFilePath))
 	if err != nil {
 		return p, err
 	}

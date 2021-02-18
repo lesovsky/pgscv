@@ -7,7 +7,7 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/service"
 	"gopkg.in/yaml.v2"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"time"
 )
@@ -45,7 +45,7 @@ func NewConfig(configFilePath string) (*Config, error) {
 		return &Config{Defaults: map[string]string{}}, nil
 	}
 
-	content, err := ioutil.ReadFile(filepath.Clean(configFilePath))
+	content, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
 	}

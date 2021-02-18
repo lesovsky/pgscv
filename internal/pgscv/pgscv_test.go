@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/service"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
@@ -17,7 +17,7 @@ import (
 func TestStart(t *testing.T) {
 	// Mock HTTP server which handles incoming requests.
 	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Greater(t, len(body), 0)
 		assert.NoError(t, r.Body.Close())
@@ -62,7 +62,7 @@ func Test_runMetricsListener(t *testing.T) {
 	resp, err := http.Get("http://127.0.0.1:5003/")
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "pgSCV / Weaponry metric collector, for more info visit https://weaponry.io")
 	assert.NoError(t, resp.Body.Close())
@@ -72,7 +72,7 @@ func Test_runMetricsListener(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err = io.ReadAll(resp.Body)
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), "go_gc_duration_seconds")
 	assert.Contains(t, string(body), "process_cpu_seconds_total")
@@ -98,7 +98,7 @@ func Test_runSendMetricsLoop(t *testing.T) {
 	defer readServer.Close()
 
 	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
 		assert.Greater(t, len(body), 0)
 		assert.NoError(t, r.Body.Close())

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
-	"io/ioutil"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -58,7 +58,7 @@ func (c *loadaverageCollector) Update(_ Config, ch chan<- prometheus.Metric) err
 
 // getLoadAverageStats reads /proc/loadavg and return load stats.
 func getLoadAverageStats() ([]float64, error) {
-	data, err := ioutil.ReadFile("/proc/loadavg")
+	data, err := os.ReadFile("/proc/loadavg")
 	if err != nil {
 		return nil, err
 	}

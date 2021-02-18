@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
 	"path/filepath"
@@ -148,7 +147,7 @@ func (c *systemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 func readSysctls(list []string) map[string]float64 {
 	var sysctls = map[string]float64{}
 	for _, item := range list {
-		data, err := ioutil.ReadFile(path.Join("/proc/sys", strings.Replace(item, ".", "/", -1)))
+		data, err := os.ReadFile(path.Join("/proc/sys", strings.Replace(item, ".", "/", -1)))
 		if err != nil {
 			log.Warnf("read '%s' failed: %s; skip", item, err)
 			continue
@@ -186,7 +185,7 @@ func countCPUCores(path string) (float64, float64, error) {
 
 		file := d + "/online"
 		if re.MatchString(d) {
-			content, err := ioutil.ReadFile(filepath.Clean(file))
+			content, err := os.ReadFile(filepath.Clean(file))
 			if err != nil {
 				return 0, 0, err
 			}
@@ -238,7 +237,7 @@ func countScalingGovernors(path string) (map[string]float64, error) {
 		}
 
 		file := d + "/cpufreq" + "/scaling_governor"
-		content, err := ioutil.ReadFile(filepath.Clean(file))
+		content, err := os.ReadFile(filepath.Clean(file))
 		if err != nil {
 			return nil, err
 		}

@@ -8,7 +8,6 @@ import (
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -302,7 +301,7 @@ func getStorageProperties(path string, filter filter.Filter) ([]storageDevicePro
 func getDeviceRotational(devpath string) (string, error) {
 	rotationalFile := devpath + "/queue/rotational"
 
-	content, err := ioutil.ReadFile(filepath.Clean(rotationalFile))
+	content, err := os.ReadFile(filepath.Clean(rotationalFile))
 	if err != nil {
 		return "", err
 	}
@@ -329,7 +328,7 @@ func getDeviceScheduler(devpath string) (string, error) {
 
 	schedulerFile := devpath + "/queue/scheduler"
 
-	content, err := ioutil.ReadFile(filepath.Clean(schedulerFile))
+	content, err := os.ReadFile(filepath.Clean(schedulerFile))
 	if err != nil {
 		return "", err
 	}

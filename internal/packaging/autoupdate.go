@@ -11,7 +11,6 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"golang.org/x/sys/unix"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -124,7 +123,7 @@ func getDistributionVersion(baseURL string) (string, error) {
 		return "", fmt.Errorf("get failed, %d", resp.StatusCode)
 	}
 
-	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	bodyBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return "", err
 	}
@@ -166,7 +165,7 @@ func checkDistributionChecksum() error {
 		return err
 	}
 
-	content, err := ioutil.ReadFile(distSumFilename)
+	content, err := os.ReadFile(distSumFilename)
 	if err != nil {
 		return err
 	}

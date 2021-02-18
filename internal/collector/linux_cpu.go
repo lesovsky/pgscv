@@ -7,7 +7,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"io"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -201,7 +200,7 @@ func parseCPUStat(line string, systicks float64) (cpuStat, error) {
 
 // getProcUptime parses uptime file (e.g. /proc/uptime) and return uptime and idletime values.
 func getProcUptime(procfile string) (float64, float64, error) {
-	content, err := ioutil.ReadFile(filepath.Clean(procfile))
+	content, err := os.ReadFile(filepath.Clean(procfile))
 	if err != nil {
 		return 0, 0, err
 	}

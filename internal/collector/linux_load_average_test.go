@@ -2,7 +2,7 @@ package collector
 
 import (
 	"github.com/stretchr/testify/assert"
-	"io/ioutil"
+	"os"
 	"testing"
 )
 
@@ -26,7 +26,7 @@ func Test_getLoadAverageStats(t *testing.T) {
 }
 
 func Test_parseLoadAverageStats(t *testing.T) {
-	data, err := ioutil.ReadFile("./testdata/proc/loadavg.golden")
+	data, err := os.ReadFile("./testdata/proc/loadavg.golden")
 	assert.NoError(t, err)
 
 	loads, err := parseLoadAverageStats(string(data))
