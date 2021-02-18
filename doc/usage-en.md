@@ -45,7 +45,7 @@ pgSCV configuration settings are defined in YAML configuration file. Location of
 at startup using `--config-file` option. pgSCV can run without configuration file, in this case default values will be
 used.
 
-- **listen_address**: network address and port where the application should listen on. Default value: `127.0.0.1:10090`.
+- **listen_address**: network address and port where the application should listen on. Default value: `127.0.0.1:9890`.
 
 
 - **autoupdate_url**: URL used for tracking pgSCV updates. Default value: "".
@@ -94,7 +94,7 @@ auto-discovery. Empty by default, looking for services using auto-discovery.
 
 YAML configuration file example:
 ```
-listen_address: 127.0.0.1:10090
+listen_address: 127.0.0.1:9890
 autoupdate_url: https://github.com/weaponry/pgscv/releases
 no_track_mode: false
 send_metrics_url: https://push.weaponry.io
@@ -192,12 +192,12 @@ postgres 2469573  1.3  0.1 721044 41524 ?        Ssl  feb15  10:26 /usr/bin/pgsc
 - Check port is opened by pgSCV - port specified in YAML configuration should be opened (or default one)
 ```
 # ss -luntp|grep pgscv
-tcp    LISTEN  0       4096              127.0.0.1:10090          0.0.0.0:*      users:(("pgscv",pid=2469573,fd=7))
+tcp    LISTEN  0       4096              127.0.0.1:9890          0.0.0.0:*      users:(("pgscv",pid=2469573,fd=7))
 ```
 
 - Try to request `/metrics` HTTP endpoint - 200 OK should be returned.
 ```
-# curl -I http://127.0.0.1:10090/metrics
+# curl -I http://127.0.0.1:9890/metrics
 HTTP/1.1 200 OK
 Content-Type: text/plain; version=0.0.4; charset=utf-8
 Date: Tue, 16 Feb 2021 05:45:22 GMT
@@ -205,7 +205,7 @@ Date: Tue, 16 Feb 2021 05:45:22 GMT
 
 - Try to request particular metrics, count or filter using `grep`.
 ```
-# curl -s http://127.0.0.1:10090/metrics |grep -c '^postgres_'
+# curl -s http://127.0.0.1:9890/metrics |grep -c '^postgres_'
 7386
 ```
 

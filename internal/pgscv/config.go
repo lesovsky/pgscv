@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	defaultListenAddress     = "127.0.0.1:10090"
+	defaultListenAddress     = "127.0.0.1:9890"
 	defaultPostgresUsername  = "pgscv"
 	defaultPostgresDbname    = "postgres"
 	defaultPgbouncerUsername = "pgscv"
