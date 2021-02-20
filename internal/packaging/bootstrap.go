@@ -14,7 +14,6 @@ import (
 
 const confFileTemplate = `autoupdate_url: "{{ .AutoUpdateURL}}"
 api_key: "{{ .APIKey }}"
-project_id: {{ .ProjectID }}
 send_metrics_url: "{{ .SendMetricsURL }}"
 defaults:
     postgres_username: "pgscv"
@@ -61,7 +60,6 @@ type BootstrapConfig struct {
 	SendMetricsURL           string
 	AutoUpdateURL            string
 	APIKey                   string
-	ProjectID                string
 	DefaultPostgresPassword  string
 	DefaultPgbouncerPassword string
 	//
@@ -89,9 +87,6 @@ func (c *BootstrapConfig) Validate() error {
 	}
 	if c.APIKey == "" {
 		return fmt.Errorf("PGSCV_API_KEY is not defined")
-	}
-	if c.ProjectID == "" {
-		return fmt.Errorf("PGSCV_PROJECT_ID is not defined")
 	}
 
 	c.ExecutableName = defaultExecutableName

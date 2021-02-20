@@ -60,9 +60,6 @@ used.
 - **api_key**: API key for accessing to Weaponry service. Default value: "". *Needed only for Weaponry clients.*
 
 
-- **project_id**: Project ID of the Weaponry project which host is associated. Default: 0 (disabled). *Needed only for Weaponry clients.*
-
-
 - **services**: list of services to which pgSCV should connect and monitor. Defining `services` automatically disables 
 auto-discovery. Empty by default, looking for services using auto-discovery.
   - **service_type**: type of the service, must be one of `postgres`, `pgbouncer`.
@@ -99,7 +96,6 @@ autoupdate_url: https://github.com/weaponry/pgscv/releases
 no_track_mode: false
 send_metrics_url: https://push.weaponry.io
 api_key: 12345678-abcd-1234-abcd-123456789012
-project_id: 12345678
 services:
   - service_type: "postgres"
     conninfo: "postgres://postgres@127.0.0.1:5432/postgres"
@@ -139,7 +135,6 @@ For configuring YAML configuration during bootstrap, the following environment v
 - PGSCV_SEND_METRICS_URL - value for **send_metrics_url** YAML setting
 - PGSCV_AUTOUPDATE_URL - value for **autoupdate_url** YAML setting
 - PGSCV_API_KEY - value for **api_key** YAML setting
-- PGSCV_PROJECT_ID - value for **project_id** YAML setting
 - PGSCV_PG_PASSWORD - value for **defaults.postgres_password** YAML setting
 - PGSCV_PGB_PASSWORD - value for **defaults.pgbouncer_password** YAML setting
 

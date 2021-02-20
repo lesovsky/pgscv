@@ -29,7 +29,6 @@ func TestRepository_getService(t *testing.T) {
 
 	got := r.getService(s.ServiceID)
 	assert.Equal(t, s.ServiceID, got.ServiceID)
-	assert.Equal(t, s.ProjectID, got.ProjectID)
 	assert.Equal(t, s.ConnSettings, got.ConnSettings)
 }
 

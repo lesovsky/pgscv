@@ -31,10 +31,9 @@ type Config struct {
 	ListenAddress        string                `yaml:"listen_address"`   // Network address and port where the application should listen on
 	SendMetricsURL       string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
 	SendMetricsInterval  time.Duration         // Metric send interval
-	APIKey               string                `yaml:"api_key"`    // API key for accessing to Weaponry
-	ProjectID            int                   `yaml:"project_id"` // ProjectID specifies project_id label value
-	ServicesConnSettings []service.ConnSetting `yaml:"services"`   // Slice of connection settings for exact services
-	Defaults             map[string]string     `yaml:"defaults"`   // Defaults
+	APIKey               string                `yaml:"api_key"`  // API key for accessing to Weaponry
+	ServicesConnSettings []service.ConnSetting `yaml:"services"` // Slice of connection settings for exact services
+	Defaults             map[string]string     `yaml:"defaults"` // Defaults
 	Filters              filter.Filters        `yaml:"filters"`
 	DisableCollectors    []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
 }
@@ -62,10 +61,6 @@ func NewConfig(configFilePath string) (*Config, error) {
 
 // Validate checks configuration for stupid values and set defaults
 func (c *Config) Validate() error {
-	if (c.APIKey != "" && c.ProjectID == 0) || (c.APIKey == "" && c.ProjectID != 0) {
-		return fmt.Errorf("API key and Project ID should be specified both")
-	}
-
 	c.SendMetricsInterval = defaultSendMetricsInterval
 
 	// API key is necessary when Metric Service is specified

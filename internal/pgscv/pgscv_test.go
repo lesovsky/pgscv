@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -28,8 +27,8 @@ func TestStart(t *testing.T) {
 
 	// Create app config.
 	config := &Config{
-		ListenAddress: "127.0.0.1:5002",
-		APIKey:        "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+		ListenAddress:  "127.0.0.1:5002",
+		APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
 		SendMetricsURL: writeServer.URL, SendMetricsInterval: 1 * time.Second,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -109,13 +108,12 @@ func Test_runSendMetricsLoop(t *testing.T) {
 
 	// Prepare stuff, create repo with default 'system' service.
 	config := &Config{
-		ListenAddress: strings.TrimPrefix(readServer.URL, "http://"),
-		APIKey:        "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1,
+		ListenAddress:  strings.TrimPrefix(readServer.URL, "http://"),
+		APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
 		SendMetricsURL: writeServer.URL, SendMetricsInterval: 600 * time.Millisecond,
 	}
 	repo := service.NewRepository()
 	repo.AddServicesFromConfig(service.Config{
-		ProjectID:    strconv.Itoa(config.ProjectID),
 		ConnSettings: nil,
 		ConnDefaults: nil,
 	})

@@ -121,14 +121,14 @@ type PgscvCollector struct {
 }
 
 // NewPgscvCollector accepts Factories and creates per-service instance of Collector.
-func NewPgscvCollector(projectID string, serviceID string, factories Factories, config Config) (*PgscvCollector, error) {
+func NewPgscvCollector(serviceID string, factories Factories, config Config) (*PgscvCollector, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, err
 	}
 
 	collectors := make(map[string]Collector)
-	constLabels := prometheus.Labels{"instance": hostname, "project_id": projectID, "service_id": serviceID}
+	constLabels := prometheus.Labels{"instance": hostname, "service_id": serviceID}
 
 	for key := range factories {
 		collector, err := factories[key](constLabels)

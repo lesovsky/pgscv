@@ -39,12 +39,6 @@ type Service struct {
 	// metric_xact_commits{database="test", sid="postgres:5432"} -- metric from the first postgres running on 5432 port
 	// metric_xact_commits{database="test", sid="postgres:5433"} -- metric from the second postgres running on 5433 port
 	ServiceID string
-	// Project identifier is unique key across all projects (project may have several instances). ProjectID also is attached
-	// as a label and unions metrics collected from the several hosts. See example below, there are two metrics from different
-	// hosts but these hosts belong to the same "project" with ID = 1.
-	// metric_xact_rollbacks{db_instance="host-1" sid="postgres:5432", database="test", project_id="1"}
-	// metric_xact_rollbacks{db_instance="host-2" sid="postgres:5432", database="test", project_id="1"}
-	ProjectID string
 	// Connection settings required for connecting to the service.
 	ConnSettings ConnSetting
 	// Prometheus-based metrics collector associated with the service. Each 'service' has its own dedicated collector instance
@@ -59,7 +53,6 @@ type Service struct {
 type Config struct {
 	RuntimeMode        int
 	NoTrackMode        bool
-	ProjectID          string
 	ConnDefaults       map[string]string `yaml:"defaults"` // Defaults
 	ConnSettings       []ConnSetting
 	Filters            map[string]filter.Filter
@@ -360,8 +353,6 @@ func (repo *Repository) setupServices(config Config) error {
 	for _, id := range repo.getServiceIDs() {
 		var service = repo.getService(id)
 		if service.Collector == nil {
-			service.ProjectID = config.ProjectID
-
 			factories := collector.Factories{}
 			collectorConfig := collector.Config{
 				NoTrackMode: config.NoTrackMode,
@@ -387,7 +378,7 @@ func (repo *Repository) setupServices(config Config) error {
 				continue
 			}
 
-			mc, err := collector.NewPgscvCollector(service.ProjectID, service.ServiceID, factories, collectorConfig)
+			mc, err := collector.NewPgscvCollector(service.ServiceID, factories, collectorConfig)
 			if err != nil {
 				return err
 			}
@@ -475,7 +466,6 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 
 	s := Service{
 		ServiceID:    model.ServiceTypePostgresql + ":" + strconv.Itoa(connParams.listenPort),
-		ProjectID:    config.ProjectID,
 		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePostgresql, Conninfo: connString},
 		Collector:    nil,
 	}
@@ -610,7 +600,6 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 
 	s := Service{
 		ServiceID:    model.ServiceTypePgbouncer + ":" + strconv.Itoa(connParams.listenPort),
-		ProjectID:    config.ProjectID,
 		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePgbouncer, Conninfo: connString},
 		Collector:    nil,
 	}

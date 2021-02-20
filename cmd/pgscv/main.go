@@ -48,7 +48,6 @@ func main() {
 			SendMetricsURL:           os.Getenv("PGSCV_SEND_METRICS_URL"),
 			AutoUpdateURL:            os.Getenv("PGSCV_AUTOUPDATE_URL"),
 			APIKey:                   os.Getenv("PGSCV_API_KEY"),
-			ProjectID:                os.Getenv("PGSCV_PROJECT_ID"),
 			DefaultPostgresPassword:  os.Getenv("PGSCV_PG_PASSWORD"),
 			DefaultPgbouncerPassword: os.Getenv("PGSCV_PGB_PASSWORD"),
 		}

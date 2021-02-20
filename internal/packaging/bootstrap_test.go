@@ -22,7 +22,7 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 			in: BootstrapConfig{
 				RunAsUser:      user,
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
-				APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
@@ -30,7 +30,7 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 			valid: true,
 			in: BootstrapConfig{
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
-				APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
@@ -39,35 +39,28 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 			in: BootstrapConfig{
 				RunAsUser:      "unknown",
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
-				APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
 			name:  "invalid config: empty MetricServiceBaseURL",
 			valid: false,
 			in: BootstrapConfig{
-				RunAsUser: user, AutoUpdateURL: "http://127.0.0.1:1081", APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				RunAsUser: user, AutoUpdateURL: "http://127.0.0.1:1081", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
 			name:  "invalid config: empty AutoUpdateURL",
 			valid: false,
 			in: BootstrapConfig{
-				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
 			name:  "invalid config: empty APIKey",
 			valid: false,
 			in: BootstrapConfig{
-				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081", ProjectID: "1",
-			},
-		},
-		{
-			name:  "invalid config: zero ProjectID",
-			valid: false,
-			in: BootstrapConfig{
-				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
+				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 			},
 		},
 	}
@@ -99,7 +92,7 @@ func Test_createConfigFile(t *testing.T) {
 			valid: true,
 			in: BootstrapConfig{
 				ExecutableName: "testexec", configPathPrefix: "/tmp",
-				RunAsUser: user, APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: "1",
+				RunAsUser: user, APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 			},
 		},

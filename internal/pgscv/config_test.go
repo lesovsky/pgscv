@@ -30,7 +30,6 @@ func TestNewConfig(t *testing.T) {
 			file:  "testdata/pgscv-push-example.yaml",
 			want: &Config{
 				APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
-				ProjectID:      1,
 				SendMetricsURL: "http://127.0.0.1:9091",
 				Defaults:       map[string]string{},
 			},
@@ -118,17 +117,12 @@ func TestConfig_Validate(t *testing.T) {
 		{
 			name:  "valid config for PUSH Mode",
 			valid: true,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234", ProjectID: 1},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
 		},
 		{
 			name:  "invalid config for PUSH Mode: no api key present",
 			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", ProjectID: 1},
-		},
-		{
-			name:  "invalid config for PUSH Mode: no project id present",
-			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
+			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091"},
 		},
 		{
 			name:  "invalid config for PUSH Mode: empty api key",

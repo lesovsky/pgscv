@@ -14,7 +14,6 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
-	"strconv"
 	"time"
 )
 
@@ -25,7 +24,6 @@ func Start(ctx context.Context, config *Config) error {
 
 	serviceConfig := service.Config{
 		NoTrackMode:        config.NoTrackMode,
-		ProjectID:          strconv.Itoa(config.ProjectID),
 		ConnDefaults:       config.Defaults,
 		ConnSettings:       config.ServicesConnSettings,
 		Filters:            config.Filters,
