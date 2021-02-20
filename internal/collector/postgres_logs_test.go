@@ -32,7 +32,7 @@ func Test_runTailLoop(t *testing.T) {
 
 	// tail first file from the beginning
 	lc.updateLogfile <- fname1
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// write line to first file
 	f, err := os.OpenFile(fname1, os.O_RDWR|os.O_APPEND, 0644)
@@ -41,7 +41,7 @@ func Test_runTailLoop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// check store content -- should be log:1, error:0
 	lc.totals.mu.RLock()
@@ -51,7 +51,7 @@ func Test_runTailLoop(t *testing.T) {
 
 	// tail second file
 	lc.updateLogfile <- fname2
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// write line to second file
 	f, err = os.OpenFile(fname2, os.O_RDWR|os.O_APPEND, 0644)
@@ -60,7 +60,7 @@ func Test_runTailLoop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// check store content -- should be log:1, error:1
 	lc.totals.mu.RLock()
@@ -70,7 +70,7 @@ func Test_runTailLoop(t *testing.T) {
 
 	// tail first file again (tail will start from the beginning, read all existing lines)
 	lc.updateLogfile <- fname1
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// append one more line to first file
 	f, err = os.OpenFile(fname1, os.O_RDWR|os.O_APPEND, 0644)
@@ -79,7 +79,7 @@ func Test_runTailLoop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// check store content -- should be log:3, error:1 (3 because, 1 line in first reading and 2 lines in second reading.)
 	lc.totals.mu.RLock()
@@ -95,7 +95,7 @@ func Test_runTailLoop(t *testing.T) {
 
 	// tail second (truncated) file again
 	lc.updateLogfile <- fname2
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// add line to second file
 	f, err = os.OpenFile(fname2, os.O_RDWR|os.O_APPEND, 0644)
@@ -104,7 +104,7 @@ func Test_runTailLoop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NoError(t, f.Sync())
 	assert.NoError(t, f.Close())
-	time.Sleep(20 * time.Millisecond)
+	time.Sleep(200 * time.Millisecond)
 
 	// check store content -- should be log:3, error:2
 	lc.totals.mu.RLock()
