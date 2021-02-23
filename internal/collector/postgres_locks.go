@@ -58,7 +58,16 @@ func (c *postgresLocksCollector) Update(config Config, ch chan<- prometheus.Metr
 func parsePostgresLocksStats(r *model.PGResult) map[string]float64 {
 	log.Debug("parse postgres locks stats")
 
-	stats := make(map[string]float64)
+	stats := map[string]float64{
+		"AccessShareLock":          0,
+		"RowShareLock":             0,
+		"RowExclusiveLock":         0,
+		"ShareUpdateExclusiveLock": 0,
+		"ShareLock":                0,
+		"ShareRowExclusiveLock":    0,
+		"ExclusiveLock":            0,
+		"AccessExclusiveLock":      0,
+	}
 
 	for _, row := range r.Rows {
 		if len(row) != 2 {

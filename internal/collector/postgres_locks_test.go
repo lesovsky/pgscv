@@ -40,10 +40,14 @@ func Test_parsePostgresLocksStats(t *testing.T) {
 				},
 			},
 			want: map[string]float64{
-				"RowExclusiveLock": 150,
-				"RowShareLock":     100,
-				"ExclusiveLock":    50,
-				"AccessShareLock":  2000,
+				"AccessShareLock":          2000,
+				"RowShareLock":             100,
+				"RowExclusiveLock":         150,
+				"ShareUpdateExclusiveLock": 0,
+				"ShareLock":                0,
+				"ShareRowExclusiveLock":    0,
+				"ExclusiveLock":            50,
+				"AccessExclusiveLock":      0,
 			},
 		},
 	}
