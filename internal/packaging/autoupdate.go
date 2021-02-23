@@ -7,6 +7,7 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"github.com/weaponry/pgscv/internal/log"
 	"golang.org/x/sys/unix"
@@ -34,6 +35,118 @@ const (
 
 	defaultAutoUpdateInterval = 5 * time.Minute
 )
+
+// githubAPI defines HTTP communication channel with Github API.
+type githubAPI struct {
+	baseURL string
+	client  *http.Client
+}
+
+// newGithubAPI creates new Github API communication instance.
+func newGithubAPI(baseURL string) *githubAPI {
+	return &githubAPI{
+		baseURL: baseURL,
+		client: &http.Client{
+			Transport: &http.Transport{
+				MaxIdleConns:    5,
+				IdleConnTimeout: 60 * time.Second,
+			},
+			Timeout: 10 * time.Second,
+		},
+	}
+}
+
+// request requests passed URL and returns raw response if request was successful.
+func (api *githubAPI) request(url string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, api.baseURL+url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	response, err := api.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("bad HTTP response code: %d", response.StatusCode)
+	}
+
+	buf, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	err = response.Body.Close()
+	if err != nil {
+		log.Warnf("failed to close response body: %s; ignore it", err)
+	}
+
+	return buf, nil
+}
+
+// getLatestRelease returns string with pgSCV latest release on Github.
+func (api *githubAPI) getLatestRelease() (string, error) {
+	buf, err := api.request("/weaponry/pgscv/releases/latest")
+	if err != nil {
+		return "", err
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(buf, &data)
+	if err != nil {
+		return "", err
+	}
+
+	// Looking for 'tag_name' property.
+	if _, ok := data["tag_name"]; !ok {
+		return "", fmt.Errorf("tag_name not found in response")
+	}
+
+	return data["tag_name"].(string), nil
+}
+
+// getLatestReleaseDownloadURL returns asset's download URL of the latest release.
+func (api *githubAPI) getLatestReleaseDownloadURL(tag string) (string, error) {
+	url := fmt.Sprintf("/weaponry/pgscv/releases/tags/%s", tag)
+
+	buf, err := api.request(url)
+	if err != nil {
+		return "", err
+	}
+
+	var data map[string]interface{}
+	err = json.Unmarshal(buf, &data)
+	if err != nil {
+		return "", err
+	}
+
+	// Response should have array of assets.
+	if _, ok := data["assets"]; !ok {
+		return "", fmt.Errorf("assets not found in response")
+	}
+
+	assets := data["assets"].([]interface{})
+	var downloadURL string
+
+	// Looking the 'browser_download_url' property which point to .tar.gz asset.
+	for _, asset := range assets {
+		if props, ok := asset.(map[string]interface{}); ok {
+			if assetURL, propsOK := props["browser_download_url"].(string); propsOK {
+				if strings.HasSuffix(assetURL, ".tar.gz") {
+					downloadURL = assetURL
+					break
+				}
+			}
+		}
+	}
+
+	if downloadURL == "" {
+		return "", fmt.Errorf(".tar.gz asset not found in response")
+	}
+
+	return downloadURL, nil
+}
 
 // StartBackgroundAutoUpdate is the background process which updates agent periodically
 func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
