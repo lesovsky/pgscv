@@ -1,0 +1,30 @@
+before:
+  hooks:
+    - make dep
+
+builds:
+  - binary: pgscv
+    main: ./cmd
+    goarch:
+      - amd64
+    goos:
+      - linux
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -a -installsuffix cgo
+      - -X main.appName=pgscv -X main.gitTag={{.Tag}} -X main.gitCommit={{.Commit}} -X main.gitBranch={{.Branch}}
+
+archives:
+  - builds: [pgscv]
+
+changelog:
+  sort: asc
+
+nfpms:
+  - vendor: pgscv
+    homepage: https://github.com/weaponry/pgscv
+    maintainer: Weaponry
+    description: pgSCV is a multi-purpose monitoring agent and metrics exporter
+    license: BSD-3
+    formats: [ deb, rpm ]

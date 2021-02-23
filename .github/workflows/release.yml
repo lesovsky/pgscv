@@ -18,21 +18,33 @@ jobs:
         run: make lint
       - name: Run test
         run: make test
-
-  deploy_production:
-    runs-on: [self-hosted, production]
-    container: weaponry/ansible:2.9.5-alpine
-    needs: [ test ]
+  build:
+    runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Build image
+        run: make docker-build
+      - name: Log in to Docker Hub
+        run: docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }} ${{ secrets.DOCKER_REGISTRY }}
+      - name: Push image to Docker Hub
+        run: make docker-push
+
+  goreleaser:
+    runs-on: ubuntu-latest
+    needs: [ test, build ]
+    steps:
+      - uses: actions/checkout@v2
         with:
           fetch-depth: 0
-      - name: Deploy on production
+      - uses: actions/setup-go@v2
+        with:
+          go-version: 1.16
+      - uses: goreleaser/goreleaser-action@v2
+        with:
+          version: latest
+          args: release --rm-dist
         env:
-          KUBECONFIG: /root/.kubeconfig
-          KUBECONFIG_DATA: ${{ secrets.PRODUCTION_KUBECONFIG_DATA }}
-        run: |
-          echo "$KUBECONFIG_DATA" > /root/.kubeconfig
-          chmod 600 /root/.kubeconfig
-          make deploy -e ENV=production
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

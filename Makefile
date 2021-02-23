@@ -1,6 +1,5 @@
 DOCKER_ACCOUNT = weaponry
 APPNAME = pgscv
-IMAGENAME = ${APPNAME}-distribution
 
 TAG=$(shell git describe --tags --abbrev=0)
 COMMIT=$(shell git rev-parse --short HEAD)
@@ -39,32 +38,21 @@ race: dep ## Run data race detector
 
 build: dep ## Build
 	mkdir -p ./bin
-	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${APPNAME} ./cmd/pgscv
-	cd bin; \
-		tar czf ${APPNAME}.tar.gz ${APPNAME} && \
-		sha256sum ${APPNAME}.tar.gz > ${APPNAME}.sha256 && \
-		echo "${TAG} ${COMMIT}-${BRANCH}" > ${APPNAME}.version
+	CGO_ENABLED=0 GOOS=linux GOARCH=${GOARCH} go build ${LDFLAGS} -o bin/${APPNAME} ./cmd
 
 docker-build: ## Build docker image
-	mkdir -p ./bin
-	./extras/genscript.sh ${ENV} > ./bin/install.sh
-	docker build -t ${DOCKER_ACCOUNT}/${IMAGENAME}:${TAG}-${ENV} .
+	docker build -t ${DOCKER_ACCOUNT}/${APPNAME}:${TAG} .
 	docker image prune --force --filter label=stage=intermediate
-	rm ./bin/install.sh
-	rmdir ./bin
 
 docker-push: ## Push docker image
-	docker push ${DOCKER_ACCOUNT}/${IMAGENAME}:${TAG}-${ENV}
+	docker push ${DOCKER_ACCOUNT}/${APPNAME}:${TAG}
 
-deploy: ## Deploy
-	ansible-playbook deployment/ansible/deploy.yml -e env=${ENV}
-
-docker-build-test-runner: ## Build environmental docker image for CI tests
-	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
-	cd ./deployment/docker-test-runner; \
+docker-build-test-runner: ## Build docker image with testing environment for CI
+	$(eval VERSION := $(shell grep -E 'LABEL version' testing/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
+	cd ./testing/docker-test-runner; \
 		docker build -t ${DOCKER_ACCOUNT}/pgscv-test-runner:${VERSION} .
 
-docker-push-test-runner: ## Build environmental docker image for CI tests
-	$(eval VERSION := $(shell grep -E 'LABEL version' deployment/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
-	cd ./deployment/docker-test-runner; \
+docker-push-test-runner: ## Push testing docker image to registry
+	$(eval VERSION := $(shell grep -E 'LABEL version' testing/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
+	cd ./testing/docker-test-runner; \
 		docker push ${DOCKER_ACCOUNT}/pgscv-test-runner:${VERSION}
