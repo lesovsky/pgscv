@@ -1,17 +1,9 @@
-package packaging
+package bootstrap
 
 import (
 	"fmt"
 	"github.com/weaponry/pgscv/internal/log"
 	"os"
-)
-
-const (
-	defaultExecutableName = "pgscv"
-	systemdServiceName    = "pgscv.service"
-
-	defaultConfigPathPrefix  = "/etc"
-	defaultSystemdPathPrefix = "/etc/systemd/system"
 )
 
 // run pre-bootstrap checks

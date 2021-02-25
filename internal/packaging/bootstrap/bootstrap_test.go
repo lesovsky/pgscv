@@ -1,4 +1,4 @@
-package packaging
+package bootstrap
 
 import (
 	"github.com/stretchr/testify/assert"
@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestBootstrapConfig_Validate(t *testing.T) {
+func TestConfig_Validate(t *testing.T) {
 	var user string
 	if user = os.Getenv("USER"); user == "" {
 		user = "root"
@@ -14,12 +14,12 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 	var testcases = []struct {
 		name  string
 		valid bool
-		in    BootstrapConfig
+		in    Config
 	}{
 		{
 			name:  "valid config",
 			valid: true,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser:      user,
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
@@ -28,7 +28,7 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 		{
 			name:  "valid config: empty RunAsUser",
 			valid: true,
-			in: BootstrapConfig{
+			in: Config{
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
@@ -36,7 +36,7 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 		{
 			name:  "invalid config: unknown user",
 			valid: false,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser:      "unknown",
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
@@ -45,21 +45,21 @@ func TestBootstrapConfig_Validate(t *testing.T) {
 		{
 			name:  "invalid config: empty MetricServiceBaseURL",
 			valid: false,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser: user, AutoUpdateURL: "http://127.0.0.1:1081", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
 			name:  "invalid config: empty AutoUpdateURL",
 			valid: false,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
 			name:  "invalid config: empty APIKey",
 			valid: false,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
 			},
 		},
@@ -85,12 +85,12 @@ func Test_createConfigFile(t *testing.T) {
 	var testcases = []struct {
 		name  string
 		valid bool
-		in    BootstrapConfig
+		in    Config
 	}{
 		{
 			name:  "valid",
 			valid: true,
-			in: BootstrapConfig{
+			in: Config{
 				ExecutableName: "testexec", configPathPrefix: "/tmp",
 				RunAsUser: user, APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
@@ -99,12 +99,12 @@ func Test_createConfigFile(t *testing.T) {
 		{
 			name:  "invalid: unknown user",
 			valid: false,
-			in:    BootstrapConfig{RunAsUser: "unknown"},
+			in:    Config{RunAsUser: "unknown"},
 		},
 		{
 			name:  "invalid: invalid configPathPrefix",
 			valid: false,
-			in: BootstrapConfig{
+			in: Config{
 				RunAsUser: user, configPathPrefix: "/invalid",
 			},
 		},
@@ -132,17 +132,17 @@ func Test_createSystemdUnit(t *testing.T) {
 	var testcases = []struct {
 		name  string
 		valid bool
-		in    BootstrapConfig
+		in    Config
 	}{
 		{
 			name:  "valid",
 			valid: true,
-			in:    BootstrapConfig{ExecutableName: "pgscv", systemdPathPrefix: "/tmp", RunAsUser: user},
+			in:    Config{ExecutableName: "pgscv", systemdPathPrefix: "/tmp", RunAsUser: user},
 		},
 		{
 			name:  "invalid: invalid systemdPathPrefix",
 			valid: false,
-			in:    BootstrapConfig{ExecutableName: "pgscv", systemdPathPrefix: "/invalid", RunAsUser: user},
+			in:    Config{ExecutableName: "pgscv", systemdPathPrefix: "/invalid", RunAsUser: user},
 		},
 	}
 

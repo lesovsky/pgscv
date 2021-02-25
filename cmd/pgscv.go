@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/packaging"
+	"github.com/weaponry/pgscv/internal/packaging/bootstrap"
 	"github.com/weaponry/pgscv/internal/pgscv"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
@@ -39,11 +39,11 @@ func main() {
 	}
 
 	if *doUninstall {
-		os.Exit(packaging.RunUninstall())
+		os.Exit(bootstrap.RunUninstall())
 	}
 
 	if *doBootstrap {
-		bc := &packaging.BootstrapConfig{
+		bc := &bootstrap.Config{
 			RunAsUser:                os.Getenv("PGSCV_RUN_AS_USER"),
 			SendMetricsURL:           os.Getenv("PGSCV_SEND_METRICS_URL"),
 			AutoUpdateURL:            os.Getenv("PGSCV_AUTOUPDATE_URL"),
@@ -51,7 +51,7 @@ func main() {
 			DefaultPostgresPassword:  os.Getenv("PGSCV_PG_PASSWORD"),
 			DefaultPgbouncerPassword: os.Getenv("PGSCV_PGB_PASSWORD"),
 		}
-		os.Exit(packaging.RunBootstrap(bc))
+		os.Exit(bootstrap.RunBootstrap(bc))
 	}
 
 	config, err := pgscv.NewConfig(*configFile)

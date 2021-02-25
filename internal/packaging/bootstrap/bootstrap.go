@@ -1,4 +1,4 @@
-package packaging
+package bootstrap
 
 import (
 	"fmt"
@@ -10,6 +10,14 @@ import (
 	"path/filepath"
 	"strconv"
 	"text/template"
+)
+
+const (
+	defaultExecutableName = "pgscv"
+	systemdServiceName    = "pgscv.service"
+
+	defaultConfigPathPrefix  = "/etc"
+	defaultSystemdPathPrefix = "/etc/systemd/system"
 )
 
 const confFileTemplate = `autoupdate_url: "{{ .AutoUpdateURL}}"
@@ -53,7 +61,7 @@ OOMScoreAdjust=1000
 WantedBy=multi-user.target
 `
 
-type BootstrapConfig struct {
+type Config struct {
 	ExecutableName           string
 	AutoStart                bool
 	RunAsUser                string
@@ -67,7 +75,7 @@ type BootstrapConfig struct {
 	systemdPathPrefix string // path prefix for systemd units
 }
 
-func (c *BootstrapConfig) Validate() error {
+func (c *Config) Validate() error {
 	log.Infoln("Validate bootstrap configuration")
 
 	if c.RunAsUser == "" {
@@ -97,7 +105,7 @@ func (c *BootstrapConfig) Validate() error {
 }
 
 // RunBootstrap is the main bootstrap entry point
-func RunBootstrap(config *BootstrapConfig) int {
+func RunBootstrap(config *Config) int {
 	log.Info("Running bootstrap")
 	if err := preCheck(); err != nil {
 		return bootstrapFailed(err)
@@ -173,7 +181,7 @@ func installBin() error {
 }
 
 // createConfigFile creates config file
-func createConfigFile(config *BootstrapConfig) error {
+func createConfigFile(config *Config) error {
 	log.Info("Create config file")
 
 	uid, gid, err := getUserIDs(config.RunAsUser)
@@ -214,7 +222,7 @@ func createConfigFile(config *BootstrapConfig) error {
 }
 
 // creates systemd unit in system path
-func createSystemdUnit(config *BootstrapConfig) error {
+func createSystemdUnit(config *Config) error {
 	log.Info("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
