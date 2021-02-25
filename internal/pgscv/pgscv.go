@@ -52,7 +52,6 @@ func Start(ctx context.Context, config *Config) error {
 			ac := &packaging.AutoupdateConfig{
 				BinaryPath:    config.BinaryPath,
 				BinaryVersion: config.BinaryVersion,
-				DistBaseURL:   config.AutoUpdateURL,
 			}
 			packaging.StartBackgroundAutoUpdate(ctx, ac)
 		}()
