@@ -1,4 +1,4 @@
-package packaging
+package autoupdate
 
 import (
 	"encoding/json"

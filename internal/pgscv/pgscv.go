@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/packaging"
+	"github.com/weaponry/pgscv/internal/packaging/autoupdate"
 	"github.com/weaponry/pgscv/internal/service"
 	"io"
 	"math"
@@ -49,11 +49,11 @@ func Start(ctx context.Context, config *Config) error {
 	// Start auto-update loop if source URL is specified.
 	if config.AutoUpdateURL != "" {
 		go func() {
-			ac := &packaging.AutoupdateConfig{
+			ac := &autoupdate.Config{
 				BinaryPath:    config.BinaryPath,
 				BinaryVersion: config.BinaryVersion,
 			}
-			packaging.StartBackgroundAutoUpdate(ctx, ac)
+			autoupdate.StartAutoupdateLoop(ctx, ac)
 		}()
 	}
 

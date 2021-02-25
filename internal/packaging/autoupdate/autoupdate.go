@@ -1,4 +1,4 @@
-package packaging
+package autoupdate
 
 import (
 	"archive/tar"
@@ -19,8 +19,8 @@ import (
 	"time"
 )
 
-// AutoupdateConfig define configuration for pgSCV auto-update procedure.
-type AutoupdateConfig struct {
+// Config define configuration for pgSCV auto-update procedure.
+type Config struct {
 	BinaryPath    string
 	BinaryVersion string
 }
@@ -29,8 +29,8 @@ const (
 	defaultAutoUpdateInterval = 5 * time.Minute
 )
 
-// StartBackgroundAutoUpdate is the background process which updates agent periodically
-func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
+// StartAutoupdateLoop is the background process which updates agent periodically
+func StartAutoupdateLoop(ctx context.Context, c *Config) {
 	// Check directory with program executable is writable.
 	if err := checkExecutablePath(c.BinaryPath); err != nil {
 		log.Errorf("auto-update cannot start: %s", err)
@@ -55,7 +55,7 @@ func StartBackgroundAutoUpdate(ctx context.Context, c *AutoupdateConfig) {
 }
 
 // runUpdate defines the whole step-by-step procedure for updating agent.
-func runUpdate(c *AutoupdateConfig) error {
+func runUpdate(c *Config) error {
 	log.Debug("run update")
 
 	api := newGithubAPI("https://api.github.com/repos")
