@@ -26,7 +26,7 @@ const (
 type Config struct {
 	BinaryPath           string                // full path of the program, required for auto-update procedure
 	BinaryVersion        string                // version of the program, required for auto-update procedure
-	AutoUpdateURL        string                `yaml:"autoupdate_url"`   // URL used for auto-update
+	AutoUpdate           bool                  `yaml:"autoupdate"`       // control auto-update enabled or not
 	NoTrackMode          bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
 	ListenAddress        string                `yaml:"listen_address"`   // Network address and port where the application should listen on
 	SendMetricsURL       string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway

@@ -20,9 +20,9 @@ const (
 	defaultSystemdPathPrefix = "/etc/systemd/system"
 )
 
-const confFileTemplate = `autoupdate_url: "{{ .AutoUpdateURL}}"
-api_key: "{{ .APIKey }}"
+const confFileTemplate = `api_key: "{{ .APIKey }}"
 send_metrics_url: "{{ .SendMetricsURL }}"
+autoupdate: {{ .AutoUpdate }}
 defaults:
     postgres_username: "pgscv"
     postgres_password: "{{ .DefaultPostgresPassword }}"
@@ -66,7 +66,8 @@ type Config struct {
 	AutoStart                bool
 	RunAsUser                string
 	SendMetricsURL           string
-	AutoUpdateURL            string
+	AutoUpdateEnv            string
+	AutoUpdate               bool
 	APIKey                   string
 	DefaultPostgresPassword  string
 	DefaultPgbouncerPassword string
@@ -90,9 +91,16 @@ func (c *Config) Validate() error {
 	if c.SendMetricsURL == "" {
 		return fmt.Errorf("PGSCV_SEND_METRICS_URL is not defined")
 	}
-	if c.AutoUpdateURL == "" {
-		return fmt.Errorf("PGSCV_AUTOUPDATE_URL is not defined")
+
+	switch c.AutoUpdateEnv {
+	case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1":
+		c.AutoUpdate = true
+	case "n", "no", "No", "NO", "f", "false", "False", "FALSE", "0":
+		c.AutoUpdate = false
+	default:
+		return fmt.Errorf("PGSCV_AUTOUPDATE is not defined, use 'true' or 'false'")
 	}
+
 	if c.APIKey == "" {
 		return fmt.Errorf("PGSCV_API_KEY is not defined")
 	}

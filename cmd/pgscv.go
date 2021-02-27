@@ -46,7 +46,7 @@ func main() {
 		bc := &bootstrap.Config{
 			RunAsUser:                os.Getenv("PGSCV_RUN_AS_USER"),
 			SendMetricsURL:           os.Getenv("PGSCV_SEND_METRICS_URL"),
-			AutoUpdateURL:            os.Getenv("PGSCV_AUTOUPDATE_URL"),
+			AutoUpdateEnv:            os.Getenv("PGSCV_AUTOUPDATE"),
 			APIKey:                   os.Getenv("PGSCV_API_KEY"),
 			DefaultPostgresPassword:  os.Getenv("PGSCV_PG_PASSWORD"),
 			DefaultPgbouncerPassword: os.Getenv("PGSCV_PGB_PASSWORD"),

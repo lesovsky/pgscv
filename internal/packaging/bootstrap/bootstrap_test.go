@@ -21,7 +21,7 @@ func TestConfig_Validate(t *testing.T) {
 			valid: true,
 			in: Config{
 				RunAsUser:      user,
-				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
+				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "true",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
@@ -29,7 +29,7 @@ func TestConfig_Validate(t *testing.T) {
 			name:  "valid config: empty RunAsUser",
 			valid: true,
 			in: Config{
-				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
+				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "false",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
@@ -38,7 +38,7 @@ func TestConfig_Validate(t *testing.T) {
 			valid: false,
 			in: Config{
 				RunAsUser:      "unknown",
-				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
+				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "true",
 				APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
@@ -46,21 +46,28 @@ func TestConfig_Validate(t *testing.T) {
 			name:  "invalid config: empty MetricServiceBaseURL",
 			valid: false,
 			in: Config{
-				RunAsUser: user, AutoUpdateURL: "http://127.0.0.1:1081", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
+				RunAsUser: user, AutoUpdateEnv: "true", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
-			name:  "invalid config: empty AutoUpdateURL",
+			name:  "invalid config: empty AutoUpdateEnv",
 			valid: false,
 			in: Config{
 				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 			},
 		},
 		{
+			name:  "invalid config: invalid AutoUpdateEnv",
+			valid: false,
+			in: Config{
+				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "invalid", APIKey: "TEST1234TEST-TEST-1234-TEST1234",
+			},
+		},
+		{
 			name:  "invalid config: empty APIKey",
 			valid: false,
 			in: Config{
-				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
+				RunAsUser: user, SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "true",
 			},
 		},
 	}
@@ -93,7 +100,7 @@ func Test_createConfigFile(t *testing.T) {
 			in: Config{
 				ExecutableName: "testexec", configPathPrefix: "/tmp",
 				RunAsUser: user, APIKey: "TEST1234TEST-TEST-1234-TEST1234",
-				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateURL: "http://127.0.0.1:1081",
+				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "true",
 			},
 		},
 		{

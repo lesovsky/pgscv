@@ -46,8 +46,8 @@ func Start(ctx context.Context, config *Config) error {
 		}
 	}
 
-	// Start auto-update loop if source URL is specified.
-	if config.AutoUpdateURL != "" {
+	// Start auto-update loop if it is enabled.
+	if config.AutoUpdate {
 		go func() {
 			ac := &autoupdate.Config{
 				BinaryPath:    config.BinaryPath,
