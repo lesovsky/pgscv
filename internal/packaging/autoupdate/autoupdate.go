@@ -26,7 +26,7 @@ type Config struct {
 }
 
 const (
-	defaultAutoUpdateInterval = 5 * time.Minute
+	defaultAutoUpdateInterval = 60 * time.Minute
 )
 
 // StartAutoupdateLoop is the background process which updates agent periodically
@@ -72,6 +72,8 @@ func runUpdate(c *Config) error {
 		return nil
 	}
 
+	log.Infof("starting auto-update from '%s' to '%s'", c.BinaryVersion, distVersion)
+
 	// If versions different, get assets download URLs and download assets.
 	downloadURL, checksumURL, err := api.getLatestReleaseDownloadURL(distVersion)
 	if err != nil {
@@ -81,10 +83,10 @@ func runUpdate(c *Config) error {
 	workDir := "/tmp/pgscv_" + distVersion
 	err = os.Mkdir(workDir, 0750)
 	if err != nil {
-		return fmt.Errorf("mkdir '%s' failed: %s", workDir, err)
+		return err
 	}
 
-	// Do cleanup in the end.
+	// Do cleanup in the end (in case of further error).
 	defer doCleanup(workDir)
 
 	// Download distribution and checksums file and store it in temporary directory.
@@ -113,12 +115,17 @@ func runUpdate(c *Config) error {
 		return fmt.Errorf("update binary failed: %s", err)
 	}
 
+	// Explicit cleanup, because after restart execution of the code will interrupted.
+	doCleanup(workDir)
+
+	log.Infof("auto-update from '%s' to '%s' has been successful", c.BinaryVersion, distVersion)
+
+	// Restart the service.
 	err = restartSystemdService()
 	if err != nil {
 		return fmt.Errorf("update successful, but restarting systemd service has been failed: %s", err)
 	}
 
-	log.Infof("update from %s to %s has been successful", c.BinaryVersion, distVersion)
 	return nil
 }
 
@@ -396,8 +403,8 @@ func updateBinary(sourceFile string, destFile string) error {
 
 // restartSystemdService restart pgscv service.
 func restartSystemdService() error {
-	log.Debug("restarting the service")
-	cmd := exec.Command("systemctl", "restart", "pgscv")
+	log.Info("LESSQQ! restarting the service")
+	cmd := exec.Command("systemctl", "restart", "pgscv.service")
 	// after cmd.Start execution of this code could be interrupted, end even err might not be handled.
 	err := cmd.Start()
 	if err != nil {
@@ -415,7 +422,7 @@ func restartSystemdService() error {
 
 // doCleanup removes agent distribution files from tmp directory
 func doCleanup(path string) {
-	log.Debug("cleanup agent distribution files")
+	log.Infoln("LESSQQ: cleanup agent distribution files ", path)
 
 	if path == "" || path == "/" {
 		log.Warnf("invalid input, bad path: '%s', skip", path)

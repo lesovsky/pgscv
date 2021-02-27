@@ -66,7 +66,7 @@ func main() {
 	}
 
 	config.BinaryPath = os.Args[0]
-	config.BinaryVersion = fmt.Sprintf("%s %s-%s", gitTag, gitCommit, gitBranch)
+	config.BinaryVersion = gitTag
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
