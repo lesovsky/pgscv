@@ -28,4 +28,9 @@ List of available features. List of available collectors available [here](./coll
 
 - Auto-update. pgSCV can track Github Releases page for new releases and automatically update itself. Mainly this feature
   exists for [Weaponry](https://weaponry.io) users for automatic pgSCV updates and allow delivering new Weaponry features
-  quickly.   
+  quickly.
+
+
+- Disable tracking of sensitive information. Normally pgSCV tracks information like queries texts, but sometimes it might
+be unacceptable due to security reasons. In such cases tracking could be disabled - instead of queries there will be dummy
+text.

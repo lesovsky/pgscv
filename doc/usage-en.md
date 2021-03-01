@@ -133,7 +133,7 @@ Executing bootstrap or uninstall requires root privileges or sudo for accessing 
 For configuring YAML configuration during bootstrap, the following environment variables are available:
 - PGSCV_RUN_AS_USER - which user should be used for running `pgscv` systemd service
 - PGSCV_SEND_METRICS_URL - value for **send_metrics_url** YAML setting
-- PGSCV_AUTOUPDATE_URL - value for **autoupdate_url** YAML setting
+- PGSCV_AUTOUPDATE - value for **autoupdate** YAML setting
 - PGSCV_API_KEY - value for **api_key** YAML setting
 - PGSCV_PG_PASSWORD - value for **defaults.postgres_password** YAML setting
 - PGSCV_PGB_PASSWORD - value for **defaults.pgbouncer_password** YAML setting
