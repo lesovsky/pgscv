@@ -1,6 +1,5 @@
 ## pgSCV usage
 
----
 Index of content:
 - [Features](#features)
 - [Requirements](#requirements)
@@ -32,13 +31,15 @@ Index of content:
 For more details see security considerations.
 
 ### Quick start
-Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgscv under `postgres` user.
+Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-$ wget ...
-$ tar xvzf pgscv.tar.gz
-$ sudo -u postgres ./pgscv 
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.15/pgscv_0.4.15_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.15_linux_amd64.tar.gz
+sudo -u postgres ./pgscv 
 ```
+
+When pgSCV has been started it is ready to accept HTTP requests at `http://127.0.0.1:9890/metrics`.
 
 ### YAML Configuration settings
 pgSCV configuration settings are defined in YAML configuration file. Location of the configuration file could be specified 

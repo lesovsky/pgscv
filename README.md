@@ -1,7 +1,5 @@
 # pgSCV - PostgreSQL ecosystem metric collector.
 
----
-
 ### pgSCV
 - [collects](./doc/collectors.md) a lot of stats about system, PostgreSQL, Pgbouncers, etc.
 - provides all metrics through well-known /metrics endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).

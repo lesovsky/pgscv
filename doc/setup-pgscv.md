@@ -82,10 +82,11 @@ psql -h 127.0.0.1 -p 6432 -U pgscv -d pgbouncer
 
 ### Setup Pgscv
 
-Download the latest release of pgSCV from releases page, unpack it, and copy to system path.
+Download the latest release of pgSCV from [releases](https://github.com/weaponry/pgscv/releases/) page, unpack it, and copy
+to system path. In example below, version 0.4.15 is used. 
 ```
-wget https://github.com/weaponry/pgscv/releases/...
-tar xvzf pgscv.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.15/pgscv_0.4.15_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.15_linux_amd64.tar.gz
 cp pgscv /usr/bin/
 ```
 
