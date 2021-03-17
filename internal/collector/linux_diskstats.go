@@ -142,14 +142,14 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 			mergedTotal = stat[1] + stat[5]
 			bytesTotal = stat[2] + stat[6]
 			secondsTotal = stat[3] + stat[7]
-			ch <- c.completed.mustNewConstMetric(stat[0], dev, "reads")
-			ch <- c.merged.mustNewConstMetric(stat[1], dev, "reads")
-			ch <- c.bytes.mustNewConstMetric(stat[2], dev, "reads")
-			ch <- c.times.mustNewConstMetric(stat[3], dev, "reads")
-			ch <- c.completed.mustNewConstMetric(stat[4], dev, "writes")
-			ch <- c.merged.mustNewConstMetric(stat[5], dev, "writes")
-			ch <- c.bytes.mustNewConstMetric(stat[6], dev, "writes")
-			ch <- c.times.mustNewConstMetric(stat[7], dev, "writes")
+			ch <- c.completed.mustNewConstMetric(stat[0], dev, "read")
+			ch <- c.merged.mustNewConstMetric(stat[1], dev, "read")
+			ch <- c.bytes.mustNewConstMetric(stat[2], dev, "read")
+			ch <- c.times.mustNewConstMetric(stat[3], dev, "read")
+			ch <- c.completed.mustNewConstMetric(stat[4], dev, "write")
+			ch <- c.merged.mustNewConstMetric(stat[5], dev, "write")
+			ch <- c.bytes.mustNewConstMetric(stat[6], dev, "write")
+			ch <- c.times.mustNewConstMetric(stat[7], dev, "write")
 			ch <- c.ionow.mustNewConstMetric(stat[8], dev)
 			ch <- c.iotime.mustNewConstMetric(stat[9], dev)
 			ch <- c.iotimeweighted.mustNewConstMetric(stat[10], dev)
@@ -161,10 +161,10 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 			mergedTotal += stat[12]
 			bytesTotal += stat[13]
 			secondsTotal += stat[14]
-			ch <- c.completed.mustNewConstMetric(stat[11], dev, "discards")
-			ch <- c.merged.mustNewConstMetric(stat[12], dev, "discards")
-			ch <- c.bytes.mustNewConstMetric(stat[13], dev, "discards")
-			ch <- c.times.mustNewConstMetric(stat[14], dev, "discards")
+			ch <- c.completed.mustNewConstMetric(stat[11], dev, "discard")
+			ch <- c.merged.mustNewConstMetric(stat[12], dev, "discard")
+			ch <- c.bytes.mustNewConstMetric(stat[13], dev, "discard")
+			ch <- c.times.mustNewConstMetric(stat[14], dev, "discard")
 		}
 
 		// for kernels 5.5+
