@@ -208,16 +208,16 @@ func Test_parseVmstatStats(t *testing.T) {
 	// test with wrong number of fields
 	file, err = os.Open(filepath.Clean("testdata/proc/vmstat.invalid.2"))
 	assert.NoError(t, err)
-	stats, err = parseVmstatStats(file)
+	_, err = parseVmstatStats(file)
 	assert.Error(t, err)
 	assert.NoError(t, file.Close())
 
 	// test with wrong format file
 	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
-	defer func() { _ = file.Close() }()
 
 	stats, err = parseVmstatStats(file)
 	assert.Error(t, err)
 	assert.Nil(t, stats)
+	assert.NoError(t, file.Close())
 }
