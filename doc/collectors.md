@@ -17,7 +17,7 @@ Index of content:
 - system/filesystems: filesystem stats from `/proc/mounts`
 - system/netdev: network interfaces stats from `/proc/net/dev`
 - system/network: network settings information
-- system/memory: memory stats from `/proc/meminfo`
+- system/memory: memory stats from `/proc/meminfo`, `/proc/vmstat`
 - system/sysconfig: system config from `/proc/sys`, `/sys/devices/system`
 
 ### PostgreSQL collectors
