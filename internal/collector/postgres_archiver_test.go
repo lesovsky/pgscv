@@ -86,12 +86,14 @@ func Test_countWalArchivingLag(t *testing.T) {
 		segsz        uint64
 		want         float64
 	}{
+		{valid: true, lastModified: "0000000100000052000000E9", lastArchived: "0000000100000052000000E9", segsz: 16 * 1024 * 1024, want: 0},
 		{valid: true, lastModified: "0000000100000052000000E9", lastArchived: "0000000100000052000000E8", segsz: 16 * 1024 * 1024, want: 0},
 		{valid: true, lastModified: "0000000100000052000000E9", lastArchived: "0000000100000052000000E7", segsz: 16 * 1024 * 1024, want: 16777216},
 		{valid: true, lastModified: "0000000100000052000000E9", lastArchived: "000000010000005200000042", segsz: 16 * 1024 * 1024, want: 2785017856},
 		{valid: true, lastModified: "000000010000003200000029", lastArchived: "000000010000003200000028", segsz: 64 * 1024 * 1024, want: 0},
 		{valid: true, lastModified: "000000010000003200000029", lastArchived: "000000010000003200000027", segsz: 64 * 1024 * 1024, want: 67108864},
 		{valid: true, lastModified: "000000010000003200000029", lastArchived: "000000010000003100000011", segsz: 64 * 1024 * 1024, want: 5838471168},
+		{valid: false, lastModified: "0000000100000052000000E8", lastArchived: "0000000100000052000000E9", segsz: 16 * 1024 * 1024, want: 0},
 		{valid: false, lastModified: "", lastArchived: "000000010000003100000011"},
 		{valid: false, lastModified: "000000010000003100000011", lastArchived: "", segsz: 16 * 1024 * 1024},
 	}

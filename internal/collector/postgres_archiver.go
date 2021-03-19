@@ -156,7 +156,11 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 
 // countWalArchivingLag counts archiving lag between two WAL segments.
 func countWalArchivingLag(segLastModified string, segLastArchived string, walSegSize uint64) (float64, error) {
-	currentSegNo, err := parseWalFileName(segLastModified, walSegSize)
+	if segLastModified == segLastArchived {
+		return 0, nil
+	}
+
+	modifiedSegNo, err := parseWalFileName(segLastModified, walSegSize)
 	if err != nil {
 		return 0, err
 	}
@@ -166,7 +170,12 @@ func countWalArchivingLag(segLastModified string, segLastArchived string, walSeg
 		return 0, err
 	}
 
-	lag := (currentSegNo - (archivedSegNo + 1)) * walSegSize
+	// Should be impossible but who knows...
+	if archivedSegNo > modifiedSegNo {
+		return 0, fmt.Errorf("segment '%s' archived, but '%s' still modified", segLastArchived, segLastModified)
+	}
+
+	lag := (modifiedSegNo - (archivedSegNo + 1)) * walSegSize
 
 	return float64(lag), nil
 }
