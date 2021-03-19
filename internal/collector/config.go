@@ -27,9 +27,8 @@ type Config struct {
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
 type PostgresServiceConfig struct {
-	// TODO: cast type to unsigned
 	// BlockSize defines size of data block Postgres operates.
-	BlockSize int
+	BlockSize uint64
 	// WalSegmentSize defines size of WAL segment Postgres operates.
 	WalSegmentSize uint64
 	// ServerVersionNum defines version of Postgres in XXYYZZ format.
@@ -66,7 +65,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	if err != nil {
 		return config, err
 	}
-	bsize, err := strconv.Atoi(setting)
+	bsize, err := strconv.ParseUint(setting, 10, 64)
 	if err != nil {
 		return config, err
 	}
