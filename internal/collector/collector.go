@@ -50,6 +50,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 	funcs := map[string]func(prometheus.Labels) (Collector, error){
 		"postgres/pgscv":             NewPgscvServicesCollector,
 		"postgres/activity":          NewPostgresActivityCollector,
+		"postgres/archiver":          NewPostgresWalArchivingCollector,
 		"postgres/bgwriter":          NewPostgresBgwriterCollector,
 		"postgres/conflicts":         NewPostgresConflictsCollector,
 		"postgres/databases":         NewPostgresDatabasesCollector,

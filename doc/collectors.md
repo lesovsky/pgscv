@@ -22,6 +22,7 @@ Index of content:
 
 ### PostgreSQL collectors
 - postgres/activity: activity stats from `pg_stat_activity`
+- postgres/archiver: WAL archiver stats from `pg_stat_archiver`
 - postgres/bgwriter: background writer and checkpointer stats from `pg_stat_bgwriter`
 - postgres/conflicts: recovery conflicts during replication, from `pg_stat_database_conflicts`
 - postgres/databases: databases stats from `pg_stat_databases`

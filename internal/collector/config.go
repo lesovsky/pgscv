@@ -27,8 +27,11 @@ type Config struct {
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
 type PostgresServiceConfig struct {
+	// TODO: cast type to unsigned
 	// BlockSize defines size of data block Postgres operates.
 	BlockSize int
+	// WalSegmentSize defines size of WAL segment Postgres operates.
+	WalSegmentSize uint64
 	// ServerVersionNum defines version of Postgres in XXYYZZ format.
 	ServerVersionNum int
 	// DataDirectory defines filesystem path where Postgres' data files and directories resides.
@@ -69,6 +72,18 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	}
 
 	config.BlockSize = bsize
+
+	// Get Postgres WAL segment size.
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'wal_segment_size'").Scan(&setting)
+	if err != nil {
+		return config, err
+	}
+	segSize, err := strconv.ParseUint(setting, 10, 64)
+	if err != nil {
+		return config, err
+	}
+
+	config.WalSegmentSize = segSize
 
 	// Get Postgres server version
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
