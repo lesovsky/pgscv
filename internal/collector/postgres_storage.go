@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	postgresTempFilesInflightQuery = "SELECT spcname AS tablespace, count(*) AS files_total, coalesce(sum(size), 0) AS bytes_total, " +
+	postgresTempFilesInflightQuery = "SELECT spcname AS tablespace, coalesce(count(*), 0) AS files_total, coalesce(sum(size), 0) AS bytes_total, " +
 		"coalesce(extract(epoch from clock_timestamp() - min(modification)), 0) AS max_age_seconds " +
 		"FROM (SELECT spcname,(pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces GROUP BY spcname"
 )
@@ -23,7 +23,12 @@ type postgresStorageCollector struct {
 	tempFiles       typedDesc
 	tempBytes       typedDesc
 	tempFilesMaxAge typedDesc
-	dirstats        typedDesc
+	datadirBytes    typedDesc
+	waldirBytes     typedDesc
+	waldirFiles     typedDesc
+	logdirBytes     typedDesc
+	logdirFiles     typedDesc
+	tmpfilesBytes   typedDesc
 }
 
 // NewPostgresStorageCollector returns a new Collector exposing various stats related to Postgres storage layer.
@@ -51,11 +56,46 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 				[]string{"tablespace"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
-		dirstats: typedDesc{
+		datadirBytes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "directory_size", "bytes"),
-				"The size of Postgres server directories of each type, in bytes.",
-				[]string{"device", "mountpoint", "path", "type"}, constLabels,
+				prometheus.BuildFQName("postgres", "data_directory", "bytes"),
+				"The size of Postgres server data directory, in bytes.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		waldirBytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "wal_directory", "bytes"),
+				"The size of Postgres server WAL directory, in bytes.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		waldirFiles: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "wal_directory", "files"),
+				"The number of files in Postgres server WAL directory.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		logdirBytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "log_directory", "bytes"),
+				"The size of Postgres server LOG directory, in bytes.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		logdirFiles: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "log_directory", "files"),
+				"The number of files in Postgres server LOG directory.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		tmpfilesBytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "temp_files_all", "bytes"),
+				"The size of all Postgres temp directories, in bytes.",
+				[]string{"device", "mountpoint", "path"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -99,12 +139,20 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 		return err
 	}
 
-	ch <- c.dirstats.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath, "data")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath, "wal")
-	ch <- c.dirstats.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath, "log")
+	// Data directory
+	ch <- c.datadirBytes.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath)
 
+	// WAL directory
+	ch <- c.waldirBytes.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
+	ch <- c.waldirFiles.mustNewConstMetric(dirstats.waldirFilesCount, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
+
+	// Log directory
+	ch <- c.logdirBytes.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+	ch <- c.logdirFiles.mustNewConstMetric(dirstats.logdirFilesCount, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+
+	// Temp directory
 	if config.ServerVersionNum >= PostgresV12 {
-		ch <- c.dirstats.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp", "temp")
+		ch <- c.tmpfilesBytes.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp")
 	}
 
 	return nil
@@ -196,11 +244,14 @@ type postgresDirStat struct {
 	waldirMountpoint  string
 	waldirDevice      string
 	waldirSizeBytes   float64
+	waldirFilesCount  float64
 	logdirPath        string
 	logdirMountpoint  string
 	logdirDevice      string
 	logdirSizeBytes   float64
+	logdirFilesCount  float64
 	tmpfilesSizeBytes float64
+	tmpfilesCount     float64
 }
 
 // newPostgresDirStat returns sizes of Postgres server directories.
@@ -218,19 +269,19 @@ func newPostgresDirStat(conn *store.DB, datadir string, logcollector bool, versi
 	}
 
 	// Get WALDIR properties.
-	waldirDevice, waldirPath, waldirMountpoint, waldirSize, err := getWaldirStat(conn, mounts)
+	waldirDevice, waldirPath, waldirMountpoint, waldirSize, waldirFilesCount, err := getWaldirStat(conn, mounts)
 	if err != nil {
 		log.Errorln(err)
 	}
 
 	// Get LOGDIR properties.
-	logdirDevice, logdirPath, logdirMountpoint, logdirSize, err := getLogdirStat(conn, logcollector, datadir, mounts)
+	logdirDevice, logdirPath, logdirMountpoint, logdirSize, logdirFilesCount, err := getLogdirStat(conn, logcollector, datadir, mounts)
 	if err != nil {
 		log.Errorln(err)
 	}
 
 	// Get temp files and directories properties.
-	tmpfilesSize, err := getTempfilesStat(conn, version)
+	tmpfilesSize, tmpfilesCount, err := getTempfilesStat(conn, version)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -245,11 +296,14 @@ func newPostgresDirStat(conn *store.DB, datadir string, logcollector bool, versi
 		waldirMountpoint:  waldirMountpoint,
 		waldirDevice:      waldirDevice,
 		waldirSizeBytes:   float64(waldirSize),
+		waldirFilesCount:  float64(waldirFilesCount),
 		logdirPath:        logdirPath,
 		logdirMountpoint:  logdirMountpoint,
 		logdirDevice:      logdirDevice,
 		logdirSizeBytes:   float64(logdirSize),
+		logdirFilesCount:  float64(logdirFilesCount),
 		tmpfilesSizeBytes: float64(tmpfilesSize),
+		tmpfilesCount:     float64(tmpfilesCount),
 	}, nil
 }
 
@@ -272,41 +326,41 @@ func getDatadirStat(datadir string, mounts []mount) (string, string, int64, erro
 }
 
 // getWaldirStat returns filesystem info related to WALDIR.
-func getWaldirStat(conn *store.DB, mounts []mount) (string, string, string, int64, error) {
+func getWaldirStat(conn *store.DB, mounts []mount) (string, string, string, int64, int64, error) {
 	var path string
-	var size int64
+	var size, count int64
 	err := conn.Conn().
-		QueryRow(context.Background(), "SELECT current_setting('data_directory')||'/pg_wal' AS path, sum(size) AS bytes FROM pg_ls_waldir()").
-		Scan(&path, &size)
+		QueryRow(context.Background(), "SELECT current_setting('data_directory')||'/pg_wal' AS path, sum(size) AS bytes, count(name) AS count FROM pg_ls_waldir()").
+		Scan(&path, &size, &count)
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("get WAL directory size failed: %s", err)
+		return "", "", "", 0, 0, fmt.Errorf("get WAL directory size failed: %s", err)
 	}
 
 	mountpoint, device, err := findMountpoint(mounts, path)
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("find WAL directory mountpoint failed: %s", err)
+		return "", "", "", 0, 0, fmt.Errorf("find WAL directory mountpoint failed: %s", err)
 	}
 
 	device = truncateDeviceName(device)
 
-	return device, path, mountpoint, size, nil
+	return device, path, mountpoint, size, count, nil
 }
 
 // getLogdirStat returns filesystem info related to LOGDIR.
-func getLogdirStat(conn *store.DB, logcollector bool, datadir string, mounts []mount) (string, string, string, int64, error) {
+func getLogdirStat(conn *store.DB, logcollector bool, datadir string, mounts []mount) (string, string, string, int64, int64, error) {
 	if !logcollector {
 		// Disabled logging_collector means all logs are written to stdout.
 		// There is no reliable way to understand file location of stdout (it can be a symlink from /proc/pid/fd/1 -> somewhere)
-		return "", "", "", 0, nil
+		return "", "", "", 0, 0, nil
 	}
 
-	var size int64
+	var size, count int64
 	var path string
 	err := conn.Conn().
-		QueryRow(context.Background(), "SELECT current_setting('log_directory') AS path, coalesce(sum(size), 0) AS bytes FROM pg_ls_logdir()").
-		Scan(&path, &size)
+		QueryRow(context.Background(), "SELECT current_setting('log_directory') AS path, coalesce(sum(size), 0) AS bytes, coalesce(count(name), 0) AS count FROM pg_ls_logdir()").
+		Scan(&path, &size, &count)
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("get log directory size failed: %s", err)
+		return "", "", "", 0, 0, fmt.Errorf("get log directory size failed: %s", err)
 	}
 
 	// Append path to DATADIR if it is not an absolute.
@@ -317,29 +371,29 @@ func getLogdirStat(conn *store.DB, logcollector bool, datadir string, mounts []m
 	// Find mountpoint and device for LOG directory.
 	mountpoint, device, err := findMountpoint(mounts, path)
 	if err != nil {
-		return "", "", "", 0, fmt.Errorf("find log directory mountpoint failed: %s", err)
+		return "", "", "", 0, 0, fmt.Errorf("find log directory mountpoint failed: %s", err)
 	}
 
 	device = truncateDeviceName(device)
 
-	return device, path, mountpoint, size, nil
+	return device, path, mountpoint, size, count, nil
 }
 
 // getTempfilesStat returns filesystem info related to temp files and directories.
-func getTempfilesStat(conn *store.DB, version int) (int64, error) {
+func getTempfilesStat(conn *store.DB, version int) (int64, int64, error) {
 	if version < PostgresV12 {
-		return 0, nil
+		return 0, 0, nil
 	}
 
-	var size int64
+	var size, count int64
 	err := conn.Conn().
-		QueryRow(context.Background(), "SELECT coalesce(sum(size), 0) AS total_bytes FROM (SELECT (pg_ls_tmpdir(oid)).size FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces").
-		Scan(&size)
+		QueryRow(context.Background(), "SELECT coalesce(sum(size), 0) AS bytes, coalesce(count(name), 0) AS count FROM (SELECT (pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces").
+		Scan(&size, &count)
 	if err != nil {
-		return 0, fmt.Errorf("get total size of temp files failed: %s", err)
+		return 0, 0, fmt.Errorf("get total size of temp files failed: %s", err)
 	}
 
-	return size, nil
+	return size, count, nil
 }
 
 // getDirectorySize walk through directory tree, calculate sizes and return total size of the directory.

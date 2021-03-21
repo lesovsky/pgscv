@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
 	"os"
 	"testing"
 )
@@ -15,7 +16,12 @@ func TestPostgresStorageCollector_Update(t *testing.T) {
 	}
 
 	var input = pipelineInput{
-		required: []string{"postgres_directory_size_bytes"},
+		required: []string{
+			"postgres_data_directory_bytes",
+			"postgres_wal_directory_bytes", "postgres_wal_directory_files",
+			"postgres_log_directory_bytes", "postgres_log_directory_files",
+			"postgres_temp_files_all_bytes",
+		},
 		// temp files related metrics might not be generated on idle systems.
 		optional: []string{
 			"postgres_temp_files_in_flight",
@@ -63,6 +69,68 @@ func Test_parsePostgresTempFileInflght(t *testing.T) {
 	}
 }
 
+func Test_getDatadirStat(t *testing.T) {
+	if uid := os.Geteuid(); uid != 0 {
+		t.Skipf("root privileges required, skip")
+	}
+
+	mounts, err := getMountpoints()
+	assert.NoError(t, err)
+
+	s1, s2, i1, err := getDatadirStat("/tmp", mounts)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", s1)
+	assert.NotEqual(t, "", s2)
+	assert.NotEqual(t, 0, i1)
+}
+
+func Test_getWaldirStat(t *testing.T) {
+	if uid := os.Geteuid(); uid != 0 {
+		t.Skipf("root privileges required, skip")
+	}
+
+	mounts, err := getMountpoints()
+	assert.NoError(t, err)
+
+	conn := store.NewTest(t)
+
+	s1, s2, s3, i1, i2, err := getWaldirStat(conn, mounts)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", s1)
+	assert.NotEqual(t, "", s2)
+	assert.NotEqual(t, "", s3)
+	assert.NotEqual(t, 0, i1)
+	assert.NotEqual(t, 0, i2)
+
+	conn.Close()
+}
+
+func Test_getLogdirStat(t *testing.T) {
+	mounts, err := getMountpoints()
+	assert.NoError(t, err)
+
+	conn := store.NewTest(t)
+
+	s1, s2, s3, i1, i2, err := getLogdirStat(conn, true, "/tmp", mounts)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", s1)
+	assert.NotEqual(t, "", s2)
+	assert.NotEqual(t, "", s3)
+	assert.NotEqual(t, 0, i1)
+	assert.NotEqual(t, 0, i2)
+
+	conn.Close()
+}
+
+func Test_getTempfilesStat(t *testing.T) {
+	conn := store.NewTest(t)
+
+	_, _, err := getTempfilesStat(conn, 120000)
+	assert.NoError(t, err)
+
+	conn.Close()
+}
+
 func Test_getDirectorySize(t *testing.T) {
 	size, err := getDirectorySize("testdata")
 	assert.NoError(t, err)
@@ -80,7 +148,7 @@ func Test_findMountpoint(t *testing.T) {
 	assert.Equal(t, "sda", device)
 }
 
-func Test_getAllMountpoints(t *testing.T) {
+func Test_getMountpoints(t *testing.T) {
 	res, err := getMountpoints()
 	assert.NoError(t, err)
 	assert.Greater(t, len(res), 0)
