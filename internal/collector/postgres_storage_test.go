@@ -18,7 +18,7 @@ func TestPostgresStorageCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"postgres_temp_files_in_flight", "postgres_temp_bytes_in_flight", "postgres_temp_files_max_age_seconds",
-			"postgres_data_directory_bytes",
+			"postgres_data_directory_bytes", "postgres_tablespace_directory_bytes",
 			"postgres_wal_directory_bytes", "postgres_wal_directory_files",
 			"postgres_log_directory_bytes", "postgres_log_directory_files",
 			"postgres_temp_files_all_bytes",
