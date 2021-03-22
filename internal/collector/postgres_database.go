@@ -102,7 +102,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 		},
 		sizes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "database", "size_bytes_total"),
+				prometheus.BuildFQName("postgres", "database", "size_bytes"),
 				"Total size of the database, in bytes.",
 				databaseLabelNames, constLabels,
 			), valueType: prometheus.GaugeValue,

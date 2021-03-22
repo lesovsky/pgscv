@@ -20,7 +20,7 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 			"postgres_database_temp_bytes_total",
 			"postgres_database_temp_files_total",
 			"postgres_database_blk_time_seconds",
-			"postgres_database_size_bytes_total",
+			"postgres_database_size_bytes",
 			"postgres_database_stats_age_seconds",
 		},
 		collector: NewPostgresDatabasesCollector,
