@@ -17,16 +17,11 @@ func TestPostgresStorageCollector_Update(t *testing.T) {
 
 	var input = pipelineInput{
 		required: []string{
+			"postgres_temp_files_in_flight", "postgres_temp_bytes_in_flight", "postgres_temp_files_max_age_seconds",
 			"postgres_data_directory_bytes",
 			"postgres_wal_directory_bytes", "postgres_wal_directory_files",
 			"postgres_log_directory_bytes", "postgres_log_directory_files",
 			"postgres_temp_files_all_bytes",
-		},
-		// temp files related metrics might not be generated on idle systems.
-		optional: []string{
-			"postgres_temp_files_in_flight",
-			"postgres_temp_bytes_in_flight",
-			"postgres_temp_files_max_age_seconds",
 		},
 		collector: NewPostgresStorageCollector,
 		service:   model.ServiceTypePostgresql,
@@ -82,6 +77,19 @@ func Test_getDatadirStat(t *testing.T) {
 	assert.NotEqual(t, "", s1)
 	assert.NotEqual(t, "", s2)
 	assert.NotEqual(t, 0, i1)
+}
+
+func Test_getTablespacesStat(t *testing.T) {
+	mounts, err := getMountpoints()
+	assert.NoError(t, err)
+
+	conn := store.NewTest(t)
+
+	ts, err := getTablespacesStat(conn, mounts)
+	assert.NoError(t, err)
+	assert.NotEqual(t, 0, ts)
+
+	conn.Close()
 }
 
 func Test_getWaldirStat(t *testing.T) {

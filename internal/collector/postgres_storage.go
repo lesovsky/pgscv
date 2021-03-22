@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	postgresTempFilesInflightQuery = "SELECT spcname AS tablespace, coalesce(count(*), 0) AS files_total, coalesce(sum(size), 0) AS bytes_total, " +
+	postgresTempFilesInflightQuery = "SELECT ts.spcname AS tablespace, coalesce(count(size), 0) AS files_total, coalesce(sum(size), 0) AS bytes_total, " +
 		"coalesce(extract(epoch from clock_timestamp() - min(modification)), 0) AS max_age_seconds " +
-		"FROM (SELECT spcname,(pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') tablespaces GROUP BY spcname"
+		"FROM pg_tablespace ts LEFT JOIN (SELECT spcname,(pg_ls_tmpdir(oid)).* FROM pg_tablespace WHERE spcname != 'pg_global') ls ON ls.spcname = ts.spcname " +
+		"WHERE ts.spcname != 'pg_global' GROUP BY ts.spcname"
 )
 
 type postgresStorageCollector struct {
@@ -24,6 +25,7 @@ type postgresStorageCollector struct {
 	tempBytes       typedDesc
 	tempFilesMaxAge typedDesc
 	datadirBytes    typedDesc
+	tblspcBytes     typedDesc
 	waldirBytes     typedDesc
 	waldirFiles     typedDesc
 	logdirBytes     typedDesc
@@ -45,7 +47,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 		tempBytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "temp_bytes", "in_flight"),
-				"Number bytes occupied by temporary files processed in flight.",
+				"Number of bytes occupied by temporary files processed in flight.",
 				[]string{"tablespace"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
@@ -61,6 +63,13 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels) (Collector, erro
 				prometheus.BuildFQName("postgres", "data_directory", "bytes"),
 				"The size of Postgres server data directory, in bytes.",
 				[]string{"device", "mountpoint", "path"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		tblspcBytes: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "tablespace_directory", "bytes"),
+				"The size of Postgres tablespace directory, in bytes.",
+				[]string{"tblspc", "device", "mountpoint", "path"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		waldirBytes: typedDesc{
@@ -120,27 +129,31 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	// Collecting in-flight temp only since Postgres 12.
 	if config.ServerVersionNum >= PostgresV12 {
 		res, err := conn.Query(postgresTempFilesInflightQuery)
-		if err == nil {
-			stats := parsePostgresTempFileInflght(res)
+		if err != nil {
+			log.Warnf("get in-flight temp files failed: %s; skip", err)
+		}
 
-			for _, stat := range stats {
-				ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
-				ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
-				ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
-			}
-		} else {
-			log.Infof("get in-flight temp files failed: %s; skip", err)
+		stats := parsePostgresTempFileInflght(res)
+
+		for _, stat := range stats {
+			ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
+			ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
+			ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
 		}
 	}
 
-	// Collecting other server-directories stats (DATADIR, WALDIR, LOGDIR, TEMPDIR).
-	dirstats, err := newPostgresDirStat(conn, config.DataDirectory, config.LoggingCollector, config.ServerVersionNum)
+	// Collecting other server-directories stats (DATADIR and tablespaces, WALDIR, LOGDIR, TEMPDIR).
+	dirstats, tblspcStats, err := newPostgresDirStat(conn, config.DataDirectory, config.LoggingCollector, config.ServerVersionNum)
 	if err != nil {
 		return err
 	}
 
 	// Data directory
 	ch <- c.datadirBytes.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath)
+
+	for _, ts := range tblspcStats {
+		ch <- c.tblspcBytes.mustNewConstMetric(ts.size, ts.name, ts.device, ts.mountpoint, ts.path)
+	}
 
 	// WAL directory
 	ch <- c.waldirBytes.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
@@ -255,15 +268,21 @@ type postgresDirStat struct {
 }
 
 // newPostgresDirStat returns sizes of Postgres server directories.
-func newPostgresDirStat(conn *store.DB, datadir string, logcollector bool, version int) (*postgresDirStat, error) {
+func newPostgresDirStat(conn *store.DB, datadir string, logcollector bool, version int) (*postgresDirStat, []tablespaceStat, error) {
 	// Get directories mountpoints.
 	mounts, err := getMountpoints()
 	if err != nil {
-		return nil, fmt.Errorf("get mountpoints failed: %s", err)
+		return nil, nil, fmt.Errorf("get mountpoints failed: %s", err)
 	}
 
 	// Get DATADIR properties.
 	datadirDevice, datadirMount, datadirSize, err := getDatadirStat(datadir, mounts)
+	if err != nil {
+		log.Errorln(err)
+	}
+
+	// Get tablespaces stats.
+	tblspcStat, err := getTablespacesStat(conn, mounts)
 	if err != nil {
 		log.Errorln(err)
 	}
@@ -304,7 +323,7 @@ func newPostgresDirStat(conn *store.DB, datadir string, logcollector bool, versi
 		logdirFilesCount:  float64(logdirFilesCount),
 		tmpfilesSizeBytes: float64(tmpfilesSize),
 		tmpfilesCount:     float64(tmpfilesCount),
-	}, nil
+	}, tblspcStat, nil
 }
 
 // getDatadirStat returns filesystem info related to DATADIR.
@@ -323,6 +342,53 @@ func getDatadirStat(datadir string, mounts []mount) (string, string, int64, erro
 	device = truncateDeviceName(device)
 
 	return device, mountpoint, size, nil
+}
+
+// tablespaceStat describes single Postgres tablespace.
+type tablespaceStat struct {
+	name       string
+	device     string
+	mountpoint string
+	path       string
+	size       float64
+}
+
+// getTablespacesStat returns filesystem info related to WALDIR.
+func getTablespacesStat(conn *store.DB, mounts []mount) ([]tablespaceStat, error) {
+	rows, err := conn.Conn().
+		Query(context.Background(), "select spcname, coalesce(nullif(pg_tablespace_location(oid), ''), current_setting('data_directory')) as path, pg_tablespace_size(oid) as size from pg_tablespace")
+	if err != nil {
+		return nil, fmt.Errorf("get tablespaces stats failed: %s", err)
+	}
+
+	var stats []tablespaceStat
+
+	for rows.Next() {
+		var name, path string
+		var size int64
+
+		err := rows.Scan(&name, &path, &size)
+		if err != nil {
+			return nil, fmt.Errorf("scan tablespaces row data failed: %s", err)
+		}
+
+		mountpoint, device, err := findMountpoint(mounts, path)
+		if err != nil {
+			return nil, fmt.Errorf("find tablespaces mountpoint failed: %s", err)
+		}
+
+		device = truncateDeviceName(device)
+
+		stats = append(stats, tablespaceStat{
+			name:       name,
+			device:     device,
+			mountpoint: mountpoint,
+			path:       path,
+			size:       float64(size),
+		})
+	}
+
+	return stats, nil
 }
 
 // getWaldirStat returns filesystem info related to WALDIR.
