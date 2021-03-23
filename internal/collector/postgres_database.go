@@ -8,12 +8,18 @@ import (
 	"strconv"
 )
 
-const databaseQuery = "SELECT " +
-	"COALESCE(datname, '__shared__') AS datname, " +
-	"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
-	"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
-	"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
-	"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)"
+const (
+	databaseQuery = "SELECT " +
+		"COALESCE(datname, '__shared__') AS datname, " +
+		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
+		"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
+		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
+		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)"
+
+	xidLimitQuery = "SELECT 'database' AS src, 2147483647 - greatest(max(age(datfrozenxid)), max(age(coalesce(nullif(datminmxid, 1), datfrozenxid)))) AS to_limit FROM pg_database " +
+		"UNION SELECT 'prepared_xacts' AS src, 2147483647 - coalesce(max(age(transaction)), 0) AS to_limit FROM pg_prepared_xacts " +
+		"UNION SELECT 'replication_slots' AS src, 2147483647 - greatest(coalesce(min(age(xmin)), 0), coalesce(min(age(catalog_xmin)), 0)) AS to_limit FROM pg_replication_slots"
+)
 
 type postgresDatabasesCollector struct {
 	commits    typedDesc
@@ -27,6 +33,7 @@ type postgresDatabasesCollector struct {
 	blockstime typedDesc
 	sizes      typedDesc
 	statsage   typedDesc
+	xidlimit   typedDesc
 	labelNames []string
 }
 
@@ -114,6 +121,13 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels) (Collector, er
 				databaseLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
+		xidlimit: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "xacts", "left_before_wraparound"),
+				"The number of transactions left before force shutdown due to XID wraparound.",
+				[]string{"xid"}, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
 	}, nil
 }
 
@@ -131,6 +145,13 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	}
 
 	stats := parsePostgresDatabasesStats(res, c.labelNames)
+
+	res, err = conn.Query(xidLimitQuery)
+	if err != nil {
+		return err
+	}
+
+	xidStats := parsePostgresXidLimitStats(res)
 
 	for _, stat := range stats {
 		ch <- c.commits.mustNewConstMetric(stat.xactcommit, stat.datname)
@@ -152,6 +173,10 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 		ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname)
 		ch <- c.statsage.mustNewConstMetric(stat.statsage, stat.datname)
 	}
+
+	ch <- c.xidlimit.mustNewConstMetric(xidStats.database, "pg_database")
+	ch <- c.xidlimit.mustNewConstMetric(xidStats.prepared, "pg_prepared_xacts")
+	ch <- c.xidlimit.mustNewConstMetric(xidStats.replSlot, "pg_replication_slots")
 
 	return nil
 }
@@ -296,6 +321,41 @@ func parsePostgresDatabasesStats(r *model.PGResult, labelNames []string) map[str
 				log.Debugf("unsupported pg_stat_database stat column: %s, skip", string(colname.Name))
 				continue
 			}
+		}
+	}
+
+	return stats
+}
+
+// xidLimitStats describes how many XIDs left before force database shutdown due to XID wraparound.
+type xidLimitStats struct {
+	database float64 // based on pg_database.datfrozenxid and datminmxid
+	prepared float64 // based on pg_prepared_xacts.transaction
+	replSlot float64 // based on pg_replication_slots.xmin and catalog_xmin
+}
+
+// parsePostgresXidLimitStats parses database response and returns xidLimitStats.
+func parsePostgresXidLimitStats(r *model.PGResult) xidLimitStats {
+	log.Debug("parse postgres xid limit stats")
+
+	var stats xidLimitStats
+
+	// process row by row
+	for _, row := range r.Rows {
+		// Get data value and convert it to float64 used by Prometheus.
+		value, err := strconv.ParseFloat(row[1].String, 64)
+		if err != nil {
+			log.Errorf("invalid input, parse '%s' failed: %s; skip", row[1].String, err)
+			continue
+		}
+
+		switch row[0].String {
+		case "database":
+			stats.database = value
+		case "prepared_xacts":
+			stats.prepared = value
+		case "replication_slots":
+			stats.replSlot = value
 		}
 	}
 

@@ -22,6 +22,7 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 			"postgres_database_blk_time_seconds",
 			"postgres_database_size_bytes",
 			"postgres_database_stats_age_seconds",
+			"postgres_xacts_left_before_wraparound",
 		},
 		collector: NewPostgresDatabasesCollector,
 		service:   model.ServiceTypePostgresql,
@@ -85,6 +86,37 @@ func Test_parsePostgresDatabasesStats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := parsePostgresDatabasesStats(tc.res, []string{"datname"})
+			assert.EqualValues(t, tc.want, got)
+		})
+	}
+}
+
+func Test_parsePostgresXidLimitStats(t *testing.T) {
+	var testCases = []struct {
+		name string
+		res  *model.PGResult
+		want xidLimitStats
+	}{
+		{
+			name: "normal output",
+			res: &model.PGResult{
+				Nrows:    3,
+				Ncols:    2,
+				Colnames: []pgproto3.FieldDescription{{Name: []byte("src")}, {Name: []byte("to_limit")}},
+				Rows: [][]sql.NullString{
+					{{String: "database", Valid: true}, {String: "2145794333", Valid: true}},
+					{{String: "prepared_xacts", Valid: true}, {String: "2147483647", Valid: true}},
+					{{String: "replication_slots", Valid: true}, {String: "1845258812", Valid: true}},
+					{{String: "invalid", Valid: true}, {String: "invalid", Valid: true}}, // this should be ignored, but logged
+				},
+			},
+			want: xidLimitStats{database: 2145794333, prepared: 2147483647, replSlot: 1845258812},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parsePostgresXidLimitStats(tc.res)
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
