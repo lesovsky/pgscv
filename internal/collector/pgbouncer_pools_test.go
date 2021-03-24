@@ -55,10 +55,10 @@ func Test_parsePgbouncerPoolsStats(t *testing.T) {
 				},
 			},
 			want: map[string]pgbouncerPoolStat{
-				"testdb1/testuser1/transaction": {
+				"testuser1/testdb1/transaction": {
 					database: "testdb1", user: "testuser1", clActive: 15, clWaiting: 5, svActive: 10, svIdle: 1, svUsed: 1, svTested: 1, svLogin: 1, maxWait: 1, mode: "transaction",
 				},
-				"testdb2/testuser2/statement": {
+				"testuser2/testdb2/statement": {
 					database: "testdb2", user: "testuser2", clActive: 25, clWaiting: 10, svActive: 25, svIdle: 2, svUsed: 2, svTested: 2, svLogin: 2, maxWait: 2, mode: "statement",
 				},
 			},
