@@ -25,7 +25,7 @@ type pgbouncerPoolsCollector struct {
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
 // For details see https://www.pgbouncer.org/usage.html#show-pools.
 func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error) {
-	var poolsLabelNames = []string{"database", "user", "pool_mode", "state"}
+	var poolsLabelNames = []string{"user", "database", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
 		conns: typedDesc{
@@ -40,7 +40,7 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
 				"Total time the first (oldest) client in the queue has waited, in seconds.",
-				[]string{"database", "user", "pool_mode"}, constLabels,
+				[]string{"user", "database", "pool_mode"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -80,14 +80,14 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 
 	// Process pools stats.
 	for _, stat := range poolsStats {
-		ch <- c.conns.mustNewConstMetric(stat.clActive, stat.database, stat.user, stat.mode, "cl_active")
-		ch <- c.conns.mustNewConstMetric(stat.clWaiting, stat.database, stat.user, stat.mode, "cl_waiting")
-		ch <- c.conns.mustNewConstMetric(stat.svActive, stat.database, stat.user, stat.mode, "sv_active")
-		ch <- c.conns.mustNewConstMetric(stat.svIdle, stat.database, stat.user, stat.mode, "sv_idle")
-		ch <- c.conns.mustNewConstMetric(stat.svUsed, stat.database, stat.user, stat.mode, "sv_used")
-		ch <- c.conns.mustNewConstMetric(stat.svTested, stat.database, stat.user, stat.mode, "sv_tested")
-		ch <- c.conns.mustNewConstMetric(stat.svLogin, stat.database, stat.user, stat.mode, "sv_login")
-		ch <- c.maxwait.mustNewConstMetric(stat.maxWait, stat.database, stat.user, stat.mode)
+		ch <- c.conns.mustNewConstMetric(stat.clActive, stat.user, stat.database, stat.mode, "cl_active")
+		ch <- c.conns.mustNewConstMetric(stat.clWaiting, stat.user, stat.database, stat.mode, "cl_waiting")
+		ch <- c.conns.mustNewConstMetric(stat.svActive, stat.user, stat.database, stat.mode, "sv_active")
+		ch <- c.conns.mustNewConstMetric(stat.svIdle, stat.user, stat.database, stat.mode, "sv_idle")
+		ch <- c.conns.mustNewConstMetric(stat.svUsed, stat.user, stat.database, stat.mode, "sv_used")
+		ch <- c.conns.mustNewConstMetric(stat.svTested, stat.user, stat.database, stat.mode, "sv_tested")
+		ch <- c.conns.mustNewConstMetric(stat.svLogin, stat.user, stat.database, stat.mode, "sv_login")
+		ch <- c.maxwait.mustNewConstMetric(stat.maxWait, stat.user, stat.database, stat.mode)
 	}
 
 	// Process client connections stats.
@@ -141,7 +141,7 @@ func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string
 		}
 
 		// create a pool name consisting of trio database/user/pool_mode
-		poolname := strings.Join([]string{stat.database, stat.user, stat.mode}, "/")
+		poolname := strings.Join([]string{stat.user, stat.database, stat.mode}, "/")
 
 		stats[poolname] = stat
 
