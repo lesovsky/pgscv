@@ -108,7 +108,7 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 
 // parsePgbouncerSettings parses content of 'SHOW CONFIG' and return map with parsed settings.
 func parsePgbouncerSettings(r *model.PGResult) map[string]string {
-	log.Debug("parse load pgbouncer settings")
+	log.Debug("parse pgbouncer settings")
 
 	settings := make(map[string]string)
 

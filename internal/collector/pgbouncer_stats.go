@@ -84,7 +84,8 @@ func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Met
 	return nil
 }
 
-// pgbouncerStatsStat represents general stats provided by 'SHOW STATS' command
+// pgbouncerStatsStat represents general stats provided by 'SHOW STATS' command.
+// See https://www.pgbouncer.org/usage.html for details.
 type pgbouncerStatsStat struct {
 	database  string
 	xacts     float64

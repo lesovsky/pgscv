@@ -10,14 +10,16 @@ import (
 )
 
 const (
-	// admin console query used for retrieving pools stats
-	poolQuery = "SHOW POOLS"
+	// admin console queries used for retrieving stats.
+	poolsQuery   = "SHOW POOLS"
+	clientsQuery = "SHOW CLIENTS"
 )
 
 type pgbouncerPoolsCollector struct {
 	labelNames []string
 	conns      typedDesc
 	maxwait    typedDesc
+	clients    typedDesc
 }
 
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
@@ -42,6 +44,14 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error
 			),
 			valueType: prometheus.GaugeValue,
 		},
+		clients: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("pgbouncer", "client", "connections_in_flight"),
+				"The total number of client connections established by source address.",
+				[]string{"user", "database", "address"}, constLabels,
+			),
+			valueType: prometheus.GaugeValue,
+		},
 		labelNames: poolsLabelNames,
 	}, nil
 }
@@ -54,14 +64,22 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 	}
 	defer conn.Close()
 
-	res, err := conn.Query(poolQuery)
+	res, err := conn.Query(poolsQuery)
 	if err != nil {
 		return err
 	}
 
-	stats := parsePgbouncerPoolsStats(res, c.labelNames)
+	poolsStats := parsePgbouncerPoolsStats(res, c.labelNames)
 
-	for _, stat := range stats {
+	res, err = conn.Query(clientsQuery)
+	if err != nil {
+		return err
+	}
+
+	clientsStats := parsePgbouncerClientsStats(res)
+
+	// Process pools stats.
+	for _, stat := range poolsStats {
 		ch <- c.conns.mustNewConstMetric(stat.clActive, stat.database, stat.user, stat.mode, "cl_active")
 		ch <- c.conns.mustNewConstMetric(stat.clWaiting, stat.database, stat.user, stat.mode, "cl_waiting")
 		ch <- c.conns.mustNewConstMetric(stat.svActive, stat.database, stat.user, stat.mode, "sv_active")
@@ -70,6 +88,19 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 		ch <- c.conns.mustNewConstMetric(stat.svTested, stat.database, stat.user, stat.mode, "sv_tested")
 		ch <- c.conns.mustNewConstMetric(stat.svLogin, stat.database, stat.user, stat.mode, "sv_login")
 		ch <- c.maxwait.mustNewConstMetric(stat.maxWait, stat.database, stat.user, stat.mode)
+	}
+
+	// Process client connections stats.
+	for k, v := range clientsStats {
+		vals := strings.Split(k, "/")
+		if len(vals) != 3 {
+			log.Warnf("invalid number of values in client connections stats: must 3, got %d; skip", len(vals))
+			continue
+		}
+
+		user, database, address := vals[0], vals[1], vals[2]
+
+		ch <- c.clients.mustNewConstMetric(v, user, database, address)
 	}
 
 	return nil
@@ -174,6 +205,36 @@ func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string
 				continue
 			}
 		}
+	}
+
+	return stats
+}
+
+// parsePgbouncerClientsStats parses query result and returns connected clients stats.
+func parsePgbouncerClientsStats(r *model.PGResult) map[string]float64 {
+	log.Debug("parse pgbouncer clients stats")
+
+	var stats = map[string]float64{}
+
+	for _, row := range r.Rows {
+		var user, database, address string
+
+		for i, colname := range r.Colnames {
+			switch string(colname.Name) {
+			case "user":
+				user = row[i].String
+			case "database":
+				database = row[i].String
+			case "addr":
+				address = row[i].String
+			}
+			// skip all other columns
+		}
+
+		// create a client consisting of trio user/database/address
+		client := strings.Join([]string{user, database, address}, "/")
+
+		stats[client]++
 	}
 
 	return stats

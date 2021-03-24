@@ -13,6 +13,7 @@ func TestPgbouncerPoolsCollector_Update(t *testing.T) {
 		required: []string{
 			"pgbouncer_pool_connections_in_flight",
 			"pgbouncer_pool_max_wait_seconds",
+			"pgbouncer_client_connections_in_flight",
 		},
 		collector: NewPgbouncerPoolsCollector,
 		service:   model.ServiceTypePgbouncer,
@@ -67,6 +68,49 @@ func Test_parsePgbouncerPoolsStats(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got := parsePgbouncerPoolsStats(tc.res, []string{"database", "user", "pool_mode"})
+			assert.EqualValues(t, tc.want, got)
+		})
+	}
+}
+
+func Test_parsePgbouncerClientsStats(t *testing.T) {
+	var testCases = []struct {
+		name string
+		res  *model.PGResult
+		want map[string]float64
+	}{
+		{
+			name: "normal output",
+			res: &model.PGResult{
+				Nrows: 10,
+				Ncols: 5,
+				Colnames: []pgproto3.FieldDescription{
+					{Name: []byte("user")}, {Name: []byte("database")}, {Name: []byte("addr")}, {Name: []byte("state")}, {Name: []byte("port")},
+				},
+				Rows: [][]sql.NullString{
+					{{String: "user1", Valid: true}, {String: "db1", Valid: true}, {String: "1.1.1.1", Valid: true}, {String: "active", Valid: true}, {String: "11", Valid: true}},
+					{{String: "user2", Valid: true}, {String: "db2", Valid: true}, {String: "2.2.2.2", Valid: true}, {String: "idle", Valid: true}, {String: "22", Valid: true}},
+					{{String: "user1", Valid: true}, {String: "db1", Valid: true}, {String: "1.1.1.1", Valid: true}, {String: "active", Valid: true}, {String: "12", Valid: true}},
+					{{String: "user3", Valid: true}, {String: "db3", Valid: true}, {String: "unix", Valid: true}, {String: "active", Valid: true}, {String: "unix", Valid: true}},
+					{{String: "user3", Valid: true}, {String: "db3", Valid: true}, {String: "unix", Valid: true}, {String: "idle", Valid: true}, {String: "unix", Valid: true}},
+					{{String: "user2", Valid: true}, {String: "db2", Valid: true}, {String: "2.2.2.2", Valid: true}, {String: "active", Valid: true}, {String: "23", Valid: true}},
+					{{String: "user1", Valid: true}, {String: "db1", Valid: true}, {String: "1.1.1.1", Valid: true}, {String: "active", Valid: true}, {String: "13", Valid: true}},
+					{{String: "user1", Valid: true}, {String: "db1", Valid: true}, {String: "1.1.1.1", Valid: true}, {String: "idle", Valid: true}, {String: "14", Valid: true}},
+					{{String: "user2", Valid: true}, {String: "db2", Valid: true}, {String: "2.2.2.2", Valid: true}, {String: "active", Valid: true}, {String: "24", Valid: true}},
+					{{String: "user1", Valid: true}, {String: "db1", Valid: true}, {String: "1.1.1.1", Valid: true}, {String: "active", Valid: true}, {String: "25", Valid: true}},
+				},
+			},
+			want: map[string]float64{
+				"user1/db1/1.1.1.1": 5,
+				"user2/db2/2.2.2.2": 3,
+				"user3/db3/unix":    2,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parsePgbouncerClientsStats(tc.res)
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
