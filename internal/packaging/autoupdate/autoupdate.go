@@ -48,7 +48,7 @@ func StartAutoupdateLoop(ctx context.Context, c *Config) {
 		case <-time.After(defaultAutoUpdateInterval):
 			continue
 		case <-ctx.Done():
-			log.Info("exit signaled, stop auto-update")
+			log.Info("exit signaled, stop auto-update loop")
 			return
 		}
 	}

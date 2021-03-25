@@ -276,7 +276,7 @@ func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Con
 		case <-time.After(60 * time.Second):
 			continue
 		case <-ctx.Done():
-			log.Info("auto-discovery: exit signaled")
+			log.Info("exit signaled, stop auto-discovery")
 			return
 		}
 	}

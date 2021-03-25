@@ -82,11 +82,11 @@ func main() {
 		cancel()
 	}()
 
-	log.Warnf("shutdown: %s", <-doExit)
+	log.Warnf("received shutdown signal: '%s'", <-doExit)
 }
 
 func listenSignals() error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
-	return fmt.Errorf("got %s", <-c)
+	return fmt.Errorf("%s", <-c)
 }

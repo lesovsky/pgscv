@@ -96,7 +96,7 @@ func runMetricsListener(ctx context.Context, config *Config) error {
 		_, err := w.Write([]byte(`<html>
 			<head><title>pgSCV / Weaponry metric collector</title></head>
 			<body>
-			<h1>pgSCV / Weaponry metric collector, for more info visit https://weaponry.io</h1>
+			<h1>pgSCV / Weaponry metric collector, for more info visit https://github.com/weaponry/pgscv</h1>
 			<p><a href="/metrics">Metrics</a></p>
 			</body>
 			</html>`))
