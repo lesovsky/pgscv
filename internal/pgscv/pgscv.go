@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"sync"
 	"time"
 )
 
@@ -30,10 +31,15 @@ func Start(ctx context.Context, config *Config) error {
 		DisabledCollectors: config.DisableCollectors,
 	}
 
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithCancel(ctx)
+
 	if config.ServicesConnSettings == nil {
 		// run background discovery, the service repo will be fulfilled at first iteration
+		wg.Add(1)
 		go func() {
 			serviceRepo.StartBackgroundDiscovery(ctx, serviceConfig)
+			wg.Done()
 		}()
 	} else {
 		// fulfill service repo using passed services
@@ -42,37 +48,44 @@ func Start(ctx context.Context, config *Config) error {
 		// setup exporters for all services
 		err := serviceRepo.SetupServices(serviceConfig)
 		if err != nil {
+			cancel()
 			return err
 		}
 	}
 
 	// Start auto-update loop if it is enabled.
 	if config.AutoUpdate {
+		wg.Add(1)
 		go func() {
 			ac := &autoupdate.Config{
 				BinaryPath:    config.BinaryPath,
 				BinaryVersion: config.BinaryVersion,
 			}
 			autoupdate.StartAutoupdateLoop(ctx, ac)
+			wg.Done()
 		}()
 	}
 
-	var errCh = make(chan error)
+	errCh := make(chan error)
 	defer close(errCh)
 
 	// Start HTTP metrics listener.
+	wg.Add(1)
 	go func() {
 		if err := runMetricsListener(ctx, config); err != nil {
 			errCh <- err
 		}
+		wg.Done()
 	}()
 
 	// Start metrics sender if necessary.
 	if config.SendMetricsURL != "" {
+		wg.Add(1)
 		go func() {
 			if err := runSendMetricsLoop(ctx, config, serviceRepo); err != nil {
 				errCh <- err
 			}
+			wg.Done()
 		}()
 	}
 
@@ -81,8 +94,12 @@ func Start(ctx context.Context, config *Config) error {
 		select {
 		case <-ctx.Done():
 			log.Info("exit signaled, stop application")
+			cancel()
+			wg.Wait()
 			return nil
 		case err := <-errCh:
+			cancel()
+			wg.Wait()
 			return err
 		}
 	}
@@ -105,7 +122,7 @@ func runMetricsListener(ctx context.Context, config *Config) error {
 		}
 	})
 
-	var errCh = make(chan error)
+	errCh := make(chan error)
 	defer close(errCh)
 
 	// Run listener.
