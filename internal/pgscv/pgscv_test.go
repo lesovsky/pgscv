@@ -63,7 +63,7 @@ func Test_runMetricsListener(t *testing.T) {
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "pgSCV / Weaponry metric collector, for more info visit https://weaponry.io")
+	assert.Contains(t, string(body), "pgSCV / Weaponry metric collector, for more info visit https://github.com/weaponry/pgscv")
 	assert.NoError(t, resp.Body.Close())
 
 	// Make request to '/metrics' and assert response.
