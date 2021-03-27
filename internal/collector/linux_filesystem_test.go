@@ -23,6 +23,17 @@ func TestFilesystemCollector_Update(t *testing.T) {
 	pipeline(t, input)
 }
 
+func Test_getFilesystemStats(t *testing.T) {
+	ff := map[string]filter.Filter{
+		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^(tmpfs|ext)$`)},
+	}
+
+	got, err := getFilesystemStats(ff)
+	assert.NoError(t, err)
+	assert.NotNil(t, got)
+	assert.Greater(t, len(got), 0)
+}
+
 func Test_parseFilesystemStats(t *testing.T) {
 	file, err := os.Open(filepath.Clean("testdata/proc/mounts.golden"))
 	assert.NoError(t, err)
