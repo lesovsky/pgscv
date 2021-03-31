@@ -11,6 +11,7 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"golang.org/x/sys/unix"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"os/exec"
@@ -23,14 +24,8 @@ import (
 type Config struct {
 	BinaryPath    string
 	BinaryVersion string
-	UpdatePolicy  string // controls auto-udpate source
+	UpdatePolicy  string // controls auto-update source
 }
-
-const (
-	// TODO: need to make interval longer and add random jitter.
-	// Let's imagine a fleet of agents installed/started at the same time will try to update
-	defaultAutoUpdateInterval = 60 * time.Minute
-)
 
 // StartAutoupdateLoop is the background process which updates agent periodically
 func StartAutoupdateLoop(ctx context.Context, c *Config) {
@@ -40,6 +35,8 @@ func StartAutoupdateLoop(ctx context.Context, c *Config) {
 		return
 	}
 
+	itv := time.Duration(60+rand.Intn(60)) * time.Minute // #nosec G404
+
 	log.Info("start background auto-update loop")
 	for {
 		err := runUpdate(c)
@@ -48,7 +45,7 @@ func StartAutoupdateLoop(ctx context.Context, c *Config) {
 		}
 
 		select {
-		case <-time.After(defaultAutoUpdateInterval):
+		case <-time.After(itv):
 			continue
 		case <-ctx.Done():
 			log.Info("exit signaled, stop auto-update loop")
