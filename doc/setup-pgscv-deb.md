@@ -81,10 +81,10 @@ In this example we connect to Pgbouncer built-in database and ask its version.
 
 ### Install pgSCV
 
-Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.17 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
+Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.19 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
 ```
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.17/pgscv_0.4.17_linux_amd64.deb
-dpkg -i pgscv_0.4.17_linux_amd64.deb
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.19/pgscv_0.4.19_linux_amd64.deb
+dpkg -i pgscv_0.4.19_linux_amd64.deb
 ```
 
 Create pgSCV default configuration in `/etc/pgscv.yaml` with the credentials created in previous steps.
