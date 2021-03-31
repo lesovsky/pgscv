@@ -26,6 +26,8 @@ type Config struct {
 }
 
 const (
+	// TODO: need to make interval longer and add random jitter.
+	// Let's imagine a fleet of agents installed/started at the same time will try to update
 	defaultAutoUpdateInterval = 60 * time.Minute
 )
 
@@ -403,7 +405,6 @@ func updateBinary(sourceFile string, destFile string) error {
 
 // restartSystemdService restart pgscv service.
 func restartSystemdService() error {
-	log.Info("LESSQQ! restarting the service")
 	cmd := exec.Command("systemctl", "restart", "pgscv.service")
 	// after cmd.Start execution of this code could be interrupted, end even err might not be handled.
 	err := cmd.Start()
@@ -422,8 +423,6 @@ func restartSystemdService() error {
 
 // doCleanup removes agent distribution files from tmp directory
 func doCleanup(path string) {
-	log.Infoln("LESSQQ: cleanup agent distribution files ", path)
-
 	if path == "" || path == "/" {
 		log.Warnf("invalid input, bad path: '%s', skip", path)
 		return
