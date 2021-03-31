@@ -68,7 +68,7 @@ type Config struct {
 	RunAsUser                string // run service using this user
 	SendMetricsURL           string // URL of remote metric service
 	AutoUpdateEnv            string // CLI input flag for control self-update setting
-	AutoUpdate               bool   // should be service do self-update?
+	AutoUpdate               string // should be service do self-update?
 	APIKey                   string // API key of remote metric service
 	DefaultPostgresPassword  string // default password used for connecting to Postgres services
 	DefaultPgbouncerPassword string // default password used for connecting to Pgbouncer services
@@ -93,11 +93,11 @@ func (c *Config) Validate() error {
 
 	switch c.AutoUpdateEnv {
 	case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1":
-		c.AutoUpdate = true
+		c.AutoUpdate = "stable"
 	case "n", "no", "No", "NO", "f", "false", "False", "FALSE", "0":
-		c.AutoUpdate = false
+		c.AutoUpdate = "off"
 	default:
-		return fmt.Errorf("PGSCV_AUTOUPDATE is not defined, use 'true' or 'false'")
+		return fmt.Errorf("PGSCV_AUTOUPDATE is not defined, use 'stable' or 'off'")
 	}
 
 	if c.APIKey == "" {
