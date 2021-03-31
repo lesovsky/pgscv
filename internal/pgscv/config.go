@@ -26,7 +26,7 @@ const (
 type Config struct {
 	BinaryPath           string                // full path of the program, required for auto-update procedure
 	BinaryVersion        string                // version of the program, required for auto-update procedure
-	AutoUpdate           bool                  `yaml:"autoupdate"`       // control auto-update enabled or not
+	AutoUpdate           string                `yaml:"autoupdate"`       // controls auto-update procedure
 	NoTrackMode          bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
 	ListenAddress        string                `yaml:"listen_address"`   // Network address and port where the application should listen on
 	SendMetricsURL       string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
@@ -79,6 +79,14 @@ func (c *Config) Validate() error {
 		log.Infoln("no-track mode disabled")
 	}
 
+	// Process auto-update setting.
+	v, err := toggleAutoupdate(c.AutoUpdate)
+	if err != nil {
+		return err
+	}
+
+	c.AutoUpdate = v
+
 	// setup defaults
 	if c.Defaults == nil {
 		c.Defaults = map[string]string{}
@@ -127,4 +135,20 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// toggleAutoupdate control auto-update setting.
+func toggleAutoupdate(value string) (string, error) {
+	// Empty value explicitly set to 'off'.
+	if value == "" {
+		return "off", nil
+	}
+
+	// Valid values are 'devel', 'stable' and 'off'. All other are invalid.
+	switch value {
+	case "devel", "stable", "off":
+		return value, nil
+	default:
+		return "", fmt.Errorf("invalid value '%s' for 'autoupdate'", value)
+	}
 }

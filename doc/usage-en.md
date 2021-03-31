@@ -50,7 +50,10 @@ used.
 - **listen_address**: network address and port where the application should listen on. Default value: `127.0.0.1:9890`.
 
 
-- **autoupdate**: controls tracking new versions and auto-update procedure. Default value: false (disabled).
+- **autoupdate**: controls tracking new versions and auto-update procedure. Default value: "off" (disabled). Valid values are:
+  - *off* - auto-update is disabled
+  - *devel* - auto-update allowed for release candidates (not recommended)
+  - *stable* - auto-update allowed only for stable releases (recommended)
 
 
 - **no_track_mode**: controls tracking of sensitive information, such as query texts. Default value: false (disabled).
@@ -94,7 +97,7 @@ auto-discovery. Empty by default, looking for services using auto-discovery.
 YAML configuration file example:
 ```
 listen_address: 127.0.0.1:9890
-autoupdate: false
+autoupdate: off
 no_track_mode: false
 send_metrics_url: https://push.weaponry.io
 api_key: 12345678-abcd-1234-abcd-123456789012

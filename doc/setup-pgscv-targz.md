@@ -95,7 +95,7 @@ Specify all necessary environment variables and run pgSCV with `--bootstrap` fla
 ```
 sudo -E PGSCV_RUN_AS_USER=postgres \
 PGSCV_SEND_METRICS_URL="https://push.weaponry.io" \
-PGSCV_AUTOUPDATE=true \
+PGSCV_AUTOUPDATE=stable \
 PGSCV_API_KEY=12345678-0000-1111-2222-1234567890ab \
 PGSCV_PG_PASSWORD=SUPERSECRETPASSWORD PGSCV_PGB_PASSWORD=SUPERSECRETPASSWORD \
 ./pgscv --bootstrap

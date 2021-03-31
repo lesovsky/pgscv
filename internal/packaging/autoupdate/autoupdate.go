@@ -23,6 +23,7 @@ import (
 type Config struct {
 	BinaryPath    string
 	BinaryVersion string
+	UpdatePolicy  string // controls auto-udpate source
 }
 
 const (
@@ -71,6 +72,12 @@ func runUpdate(c *Config) error {
 	// Compare versions, if versions are the same - skip update.
 	if distVersion == c.BinaryVersion {
 		log.Debug("same version, update is not required, try next time")
+		return nil
+	}
+
+	// If new version is release candidate, check the update policy - is -rc are allowed?
+	if strings.Contains(distVersion, "-rc") && c.UpdatePolicy != "devel" {
+		log.Debug("update to release candidate is forbidden, skip")
 		return nil
 	}
 

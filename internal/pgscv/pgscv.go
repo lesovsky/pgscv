@@ -54,12 +54,13 @@ func Start(ctx context.Context, config *Config) error {
 	}
 
 	// Start auto-update loop if it is enabled.
-	if config.AutoUpdate {
+	if config.AutoUpdate != "off" {
 		wg.Add(1)
 		go func() {
 			ac := &autoupdate.Config{
 				BinaryPath:    config.BinaryPath,
 				BinaryVersion: config.BinaryVersion,
+				UpdatePolicy:  config.AutoUpdate,
 			}
 			autoupdate.StartAutoupdateLoop(ctx, ac)
 			wg.Done()

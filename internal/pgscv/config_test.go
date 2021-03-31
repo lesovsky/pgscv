@@ -138,6 +138,16 @@ func TestConfig_Validate(t *testing.T) {
 			}},
 		},
 		{
+			name:  "valid with enabled auto-update",
+			valid: true,
+			in:    &Config{AutoUpdate: "stable"},
+		},
+		{
+			name:  "invalid with wrong auto-update value",
+			valid: false,
+			in:    &Config{AutoUpdate: "invalid"},
+		},
+		{
 			name:  "invalid config with specified services: empty service type",
 			valid: false,
 			in: &Config{ListenAddress: "127.0.0.1:8080", ServicesConnSettings: []service.ConnSetting{
@@ -168,5 +178,29 @@ func TestConfig_Validate(t *testing.T) {
 				assert.Error(t, err)
 			}
 		})
+	}
+}
+
+func Test_toggleAutoupdate(t *testing.T) {
+	testcases := []struct {
+		valid bool
+		in    string
+		want  string
+	}{
+		{valid: true, in: "", want: "off"},
+		{valid: true, in: "off", want: "off"},
+		{valid: true, in: "devel", want: "devel"},
+		{valid: true, in: "stable", want: "stable"},
+		{valid: false, in: "invalid"},
+	}
+
+	for _, tc := range testcases {
+		got, err := toggleAutoupdate(tc.in)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		} else {
+			assert.Error(t, err)
+		}
 	}
 }
