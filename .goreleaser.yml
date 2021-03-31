@@ -28,3 +28,4 @@ nfpms:
     description: pgSCV is a multi-purpose monitoring agent and metrics exporter
     license: BSD-3
     formats: [ deb, rpm ]
+    bindir: /usr/bin
