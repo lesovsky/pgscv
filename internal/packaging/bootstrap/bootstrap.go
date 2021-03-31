@@ -190,6 +190,16 @@ func installBin(config Config) error {
 	if err = to.Close(); err != nil {
 		log.Warnln("close destination file failed, ignore it; ", err)
 	}
+
+	uid, gid, err := getUserIDs(config.RunAsUser)
+	if err != nil {
+		return fmt.Errorf("get user uid/gid failed: %s", err)
+	}
+
+	err = os.Chown(toFilename, uid, gid)
+	if err != nil {
+		return fmt.Errorf("chown failed: %s", err)
+	}
 	err = os.Chmod(toFilename, 0755) // #nosec G302
 	if err != nil {
 		return fmt.Errorf("chmod 0755 failed: %s", err)
