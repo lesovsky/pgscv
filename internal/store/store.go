@@ -28,9 +28,10 @@ func NewWithConfig(config *pgx.ConnConfig) (*DB, error) {
 	// Enable simple protocol for compatibility with Pgbouncer.
 	config.PreferSimpleProtocol = true
 
-	// Explicitly set standard_conforming_strings to 'on' which is required when using simple protocol.
+	// Using simple protocol requires explicit options to be set.
 	config.RuntimeParams = map[string]string{
 		"standard_conforming_strings": "on",
+		"client_encoding":             "UTF8",
 	}
 
 	conn, err := pgx.ConnectConfig(context.Background(), config)
