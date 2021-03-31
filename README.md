@@ -8,10 +8,18 @@
     2. in combined listening-and-sending mode for sending collected metrics to [Weaponry](https://weaponry.io) SaaS.
 - can run on Linux only, but [can connect](doc/usage-en.md) to remote services running on other OS.
 - include features developed for needs of [Weaponry](https://weaponry.io) users, but might be useless for non-Weaponry users.
-- for further info see full list of features.
+- for further info see [full list](doc/features.md) of features.
 
 ### Support
 If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/weaponry/pgscv/issues)
+
+### Setup
+- [on Ubuntu 20 using deb package](doc/setup-pgscv-deb.md)
+- [on CentOS 7 using rpm package](doc/setup-pgscv-rpm.md)
+- [on Ubuntu 20 using bootstrap and .tar.gz acrhive](doc/setup-pgscv-targz.md)
+
+### Documentation
+For further documentation see [usage](doc/usage-en.md).
 
 ### Development and contribution
 To help development you are encouraged to:
@@ -21,6 +29,3 @@ To help development you are encouraged to:
 
 ### License
 BSD-3. See [LICENSE](./LICENSE) for more details.
-
-### Documentation
-For further documentation see [usage](doc/usage-en.md).

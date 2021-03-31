@@ -21,6 +21,7 @@ Index of content:
   But this is not strict and pgSCV could connect and collect metrics from remote services. 
 - **Bootstrap**. pgSCV can bootstrap itself - install itself to system path, create minimal required configuration, 
   install systemd unit and start itself.
+- **Auto-update**. pgSCV can track new releases and update itself. This feature is mostly useful for Weaponry users.
 - **Collectors management**. Collectors could be disabled if necessary.
 - **Collectors filters**. Some collectors could be adjusted to skip collecting metrics about unnecessary stuff, like 
   block devices, network interfaces, filesystems, etc.
@@ -49,7 +50,7 @@ used.
 - **listen_address**: network address and port where the application should listen on. Default value: `127.0.0.1:9890`.
 
 
-- **autoupdate_url**: URL used for tracking pgSCV updates. Default value: "".
+- **autoupdate**: controls tracking new versions and auto-update procedure. Default value: false (disabled).
 
 
 - **no_track_mode**: controls tracking of sensitive information, such as query texts. Default value: false (disabled).
@@ -93,7 +94,7 @@ auto-discovery. Empty by default, looking for services using auto-discovery.
 YAML configuration file example:
 ```
 listen_address: 127.0.0.1:9890
-autoupdate_url: https://github.com/weaponry/pgscv/releases
+autoupdate: false
 no_track_mode: false
 send_metrics_url: https://push.weaponry.io
 api_key: 12345678-abcd-1234-abcd-123456789012
@@ -153,8 +154,7 @@ For collecting metrics and auto-discovery pgSCV requires some kind of privileges
 **System access**
 - regular, unprivileged system user is sufficient to read all necessary stats.
 - this user must have access to Postgres/Pgbouncer log directories
-- when **autoupdate_url** is enabled, pgSCV requires write-access to the directory where `pgscv`
-binary is stored.
+- when **autoupdate** is enabled, pgSCV requires write-access to the directory where `pgscv` binary is stored.
 
 **Postgres access**
 - regular, unprivileged database role is *NOT* sufficient to read all necessary stats
