@@ -84,10 +84,35 @@ func TestConfig_Validate(t *testing.T) {
 	}
 }
 
+func Test_createDirectoryTree(t *testing.T) {
+	var username string
+	if username = os.Getenv("USER"); username == "" {
+		username = "root"
+	}
+
+	testcases := []struct {
+		valid  bool
+		config Config
+	}{
+		{valid: true, config: Config{RunAsUser: username, Prefix: "/tmp", Bindir: "/tmp/pgscv/bin"}},
+		{valid: false, config: Config{RunAsUser: username, Prefix: "tmp"}},
+	}
+
+	for _, tc := range testcases {
+		err := createDirectoryTree(tc.config)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.NoError(t, os.RemoveAll(tc.config.Prefix+"/pgscv"))
+		} else {
+			assert.Error(t, err)
+		}
+	}
+}
+
 func Test_createConfigFile(t *testing.T) {
-	var user string
-	if user = os.Getenv("USER"); user == "" {
-		user = "root"
+	var username string
+	if username = os.Getenv("USER"); username == "" {
+		username = "root"
 	}
 	var testcases = []struct {
 		name  string
@@ -98,8 +123,8 @@ func Test_createConfigFile(t *testing.T) {
 			name:  "valid",
 			valid: true,
 			in: Config{
-				ExecutableName: "testexec", configPathPrefix: "/tmp",
-				RunAsUser: user, APIKey: "TEST1234TEST-TEST-1234-TEST1234",
+				ConfigFile: "/tmp/pgscv.yaml",
+				RunAsUser:  username, APIKey: "TEST1234TEST-TEST-1234-TEST1234",
 				SendMetricsURL: "http://127.0.0.1:9091", AutoUpdateEnv: "true",
 			},
 		},
@@ -108,22 +133,15 @@ func Test_createConfigFile(t *testing.T) {
 			valid: false,
 			in:    Config{RunAsUser: "unknown"},
 		},
-		{
-			name:  "invalid: invalid configPathPrefix",
-			valid: false,
-			in: Config{
-				RunAsUser: user, configPathPrefix: "/invalid",
-			},
-		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := createConfigFile(&tc.in)
+			err := createConfigFile(tc.in)
 			if tc.valid {
 				assert.NoError(t, err)
-				assert.FileExists(t, "/tmp/testexec.yaml")
-				assert.NoError(t, os.Remove("/tmp/testexec.yaml"))
+				assert.FileExists(t, tc.in.ConfigFile)
+				assert.NoError(t, os.Remove(tc.in.ConfigFile))
 			} else {
 				assert.Error(t, err)
 			}
@@ -132,34 +150,30 @@ func Test_createConfigFile(t *testing.T) {
 }
 
 func Test_createSystemdUnit(t *testing.T) {
-	var user string
-	if user = os.Getenv("USER"); user == "" {
-		user = "root"
+	var username string
+	if username = os.Getenv("USER"); username == "" {
+		username = "root"
 	}
+
 	var testcases = []struct {
-		name  string
-		valid bool
-		in    Config
+		name   string
+		valid  bool
+		config Config
 	}{
 		{
-			name:  "valid",
-			valid: true,
-			in:    Config{ExecutableName: "pgscv", systemdPathPrefix: "/tmp", RunAsUser: user},
-		},
-		{
-			name:  "invalid: invalid systemdPathPrefix",
-			valid: false,
-			in:    Config{ExecutableName: "pgscv", systemdPathPrefix: "/invalid", RunAsUser: user},
+			name:   "valid",
+			valid:  true,
+			config: Config{ExecutableName: "pgscv", SystemdUnit: "/tmp/pgscv.service", RunAsUser: username},
 		},
 	}
 
 	for _, tc := range testcases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := createSystemdUnit(&tc.in)
+			err := createSystemdUnit(tc.config)
 			if tc.valid {
 				assert.NoError(t, err)
-				assert.FileExists(t, "/tmp/pgscv.service")
-				assert.NoError(t, os.Remove("/tmp/pgscv.service"))
+				assert.FileExists(t, tc.config.SystemdUnit)
+				assert.NoError(t, os.Remove(tc.config.SystemdUnit))
 			} else {
 				assert.Error(t, err)
 			}
@@ -168,12 +182,12 @@ func Test_createSystemdUnit(t *testing.T) {
 }
 
 func Test_getUserIDs(t *testing.T) {
-	var user string
-	if user = os.Getenv("USER"); user == "" {
-		user = "root"
+	var username string
+	if username = os.Getenv("USER"); username == "" {
+		username = "root"
 	}
 
-	uid, gid, err := getUserIDs(user)
+	uid, gid, err := getUserIDs(username)
 	assert.NoError(t, err)
 	assert.Greater(t, uid, -1)
 	assert.Greater(t, gid, -1)

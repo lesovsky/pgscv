@@ -43,7 +43,7 @@ func main() {
 	}
 
 	if *doBootstrap {
-		bc := &bootstrap.Config{
+		bc := bootstrap.Config{
 			RunAsUser:                os.Getenv("PGSCV_RUN_AS_USER"),
 			SendMetricsURL:           os.Getenv("PGSCV_SEND_METRICS_URL"),
 			AutoUpdateEnv:            os.Getenv("PGSCV_AUTOUPDATE"),

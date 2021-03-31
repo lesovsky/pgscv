@@ -38,7 +38,7 @@ func RunUninstall() int {
 func stopAgent() error {
 	log.Info("Stop agent")
 
-	cmd := exec.Command("systemctl", "stop", systemdServiceName)
+	cmd := exec.Command("systemctl", "stop", "pgscv.service")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("stop agent service failed: %s ", err)
@@ -56,29 +56,28 @@ func stopAgent() error {
 // removeServiceUnit removes systemd unit file
 func removeServiceUnit() error {
 	log.Info("Remove systemd unit")
-	filename := fmt.Sprintf("%s/%s", defaultSystemdPathPrefix, systemdServiceName)
-	return os.Remove(filename)
+	return os.Remove("/etc/systemd/system/pgscv.service")
 }
 
 // removeConfig removes configuration file
 func removeConfig() error {
 	log.Info("Remove config file")
-	return os.Remove(filepath.Clean(fmt.Sprintf("%s/%s.yaml", defaultConfigPathPrefix, defaultExecutableName)))
+	return os.Remove(filepath.Clean("/etc/pgscv.yaml"))
 }
 
-// removeBinary removes binary
+// removeBinary removes pgscv path and all stuff inside
 func removeBinary() error {
 	log.Info("Remove agent")
-	return os.Remove(filepath.Clean(fmt.Sprintf("/usr/bin/%s", defaultExecutableName)))
+	return os.RemoveAll(filepath.Clean("/usr/local/pgscv"))
 }
 
-// uninstallFailed signales uninstall failed with error
+// uninstallFailed reports about uninstall failed with error
 func uninstallFailed(e error) int {
 	log.Errorln("Uninstall failed: ", e)
 	return 1
 }
 
-// uninstallSuccessful signales bootstrap finished successfully
+// uninstallSuccessful reports about bootstrap finished successfully
 func uninstallSuccessful() int {
 	log.Info("Uninstall successful")
 	return 0

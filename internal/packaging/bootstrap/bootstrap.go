@@ -9,15 +9,8 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"text/template"
-)
-
-const (
-	defaultExecutableName = "pgscv"
-	systemdServiceName    = "pgscv.service"
-
-	defaultConfigPathPrefix  = "/etc"
-	defaultSystemdPathPrefix = "/etc/systemd/system"
 )
 
 const confFileTemplate = `api_key: "{{ .APIKey }}"
@@ -38,21 +31,21 @@ After=network-online.target
 
 [Service]
 Type=simple
-
 User={{ .RunAsUser }}
 Group={{ .RunAsUser }}
 
 # Start the agent process
-ExecStart=/usr/bin/{{ .ExecutableName }} --config-file=/etc/{{ .ExecutableName }}.yaml
+ExecStart={{ .Bindir }}/{{ .ExecutableName }} --config-file={{ .ConfigFile }}
 
 # Only kill the agent process
-KillMode=process
+KillMode=control-group
 
 # Wait reasonable amount of time for agent up/down
 TimeoutSec=5
 
 # Restart agent if it crashes
 Restart=on-failure
+RestartSec=10
 
 # if agent leaks during long period of time, let him to be the first person for eviction
 OOMScoreAdjust=1000
@@ -61,26 +54,32 @@ OOMScoreAdjust=1000
 WantedBy=multi-user.target
 `
 
+// Config describes bootstrap configuration
 type Config struct {
-	ExecutableName           string
-	AutoStart                bool
-	RunAsUser                string
-	SendMetricsURL           string
-	AutoUpdateEnv            string
-	AutoUpdate               bool
-	APIKey                   string
-	DefaultPostgresPassword  string
-	DefaultPgbouncerPassword string
-	//
-	configPathPrefix  string // path prefix for configuration file
-	systemdPathPrefix string // path prefix for systemd units
+	// File directories and paths
+	ExecutableName string // Name of the executable
+	Prefix         string // Prefix path where pgscv should be installed
+	Installdir     string // Root directory where pgscv should be installed
+	Bindir         string // Directory for executables
+	ConfigFile     string // Path and filename of config file
+	SystemdUnit    string // Path and name of systemd unit file
+	// Settings of configuration file
+	AutoStart                bool   // should be service auto-started by systemd?
+	RunAsUser                string // run service using this user
+	SendMetricsURL           string // URL of remote metric service
+	AutoUpdateEnv            string // CLI input flag for control self-update setting
+	AutoUpdate               bool   // should be service do self-update?
+	APIKey                   string // API key of remote metric service
+	DefaultPostgresPassword  string // default password used for connecting to Postgres services
+	DefaultPgbouncerPassword string // default password used for connecting to Pgbouncer services
 }
 
+// Validate checks configuration and set default values.
 func (c *Config) Validate() error {
 	log.Infoln("Validate bootstrap configuration")
 
 	if c.RunAsUser == "" {
-		c.RunAsUser = "root"
+		c.RunAsUser = "postgres"
 	}
 
 	_, err := user.Lookup(c.RunAsUser)
@@ -105,15 +104,19 @@ func (c *Config) Validate() error {
 		return fmt.Errorf("PGSCV_API_KEY is not defined")
 	}
 
-	c.ExecutableName = defaultExecutableName
-	c.configPathPrefix = defaultConfigPathPrefix
-	c.systemdPathPrefix = defaultSystemdPathPrefix
+	// Set default install path, filenames, etc.
+	c.ExecutableName = "pgscv"
+	c.Prefix = "/usr/local"
+	c.Installdir = c.Prefix + "/pgscv"
+	c.Bindir = c.Installdir + "/bin"
+	c.ConfigFile = "/etc/pgscv.yaml"
+	c.SystemdUnit = "/etc/systemd/system/pgscv.service"
 
 	return nil
 }
 
 // RunBootstrap is the main bootstrap entry point
-func RunBootstrap(config *Config) int {
+func RunBootstrap(config Config) int {
 	log.Info("Running bootstrap")
 	if err := preCheck(); err != nil {
 		return bootstrapFailed(err)
@@ -123,7 +126,7 @@ func RunBootstrap(config *Config) int {
 		return bootstrapFailed(err)
 	}
 
-	if err := installBin(); err != nil {
+	if err := installBin(config); err != nil {
 		return bootstrapFailed(err)
 	}
 
@@ -157,10 +160,16 @@ func RunBootstrap(config *Config) int {
 }
 
 // installs agent binary
-func installBin() error {
+func installBin(config Config) error {
 	log.Info("Install agent")
-	fromFilename := fmt.Sprintf("./%s", defaultExecutableName)
-	toFilename := fmt.Sprintf("/usr/bin/%s", defaultExecutableName)
+
+	err := createDirectoryTree(config)
+	if err != nil {
+		return err
+	}
+
+	fromFilename := fmt.Sprintf("./%s", config.ExecutableName)
+	toFilename := fmt.Sprintf("%s/%s", config.Bindir, config.ExecutableName)
 
 	from, err := os.Open(filepath.Clean(fromFilename))
 	if err != nil {
@@ -188,9 +197,46 @@ func installBin() error {
 	return nil
 }
 
-// createConfigFile creates config file
-func createConfigFile(config *Config) error {
+// createDirectoryTree creates required directories.
+func createDirectoryTree(config Config) error {
+	if !strings.HasPrefix(config.Prefix, "/") {
+		return fmt.Errorf("root directory is not an absolute path")
+	}
+
+	uid, gid, err := getUserIDs(config.RunAsUser)
+	if err != nil {
+		return err
+	}
+
+	dirs := []string{
+		config.Prefix + "/pgscv",
+		config.Bindir,
+	}
+
+	for _, d := range dirs {
+		err = os.Mkdir(d, 0755) // #nosec G301
+		if err != nil {
+			return err
+		}
+
+		err = os.Chown(d, uid, gid)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// createConfigFile creates config file.
+func createConfigFile(config Config) error {
 	log.Info("Create config file")
+
+	// Compile config file content using template.
+	t, err := template.New("conf").Parse(confFileTemplate)
+	if err != nil {
+		return fmt.Errorf("parse template failed: %s", err)
+	}
 
 	uid, gid, err := getUserIDs(config.RunAsUser)
 	if err != nil {
@@ -198,8 +244,7 @@ func createConfigFile(config *Config) error {
 	}
 
 	// create config-file with proper permissions
-	conffile := fmt.Sprintf("%s/%s.yaml", config.configPathPrefix, config.ExecutableName)
-	f, err := os.Create(conffile)
+	f, err := os.Create(config.ConfigFile)
 	if err != nil {
 		return fmt.Errorf("create config file failed: %s", err)
 	}
@@ -212,11 +257,7 @@ func createConfigFile(config *Config) error {
 		return fmt.Errorf("change file permissions failed: %s", err)
 	}
 
-	// write content using template
-	t, err := template.New("conf").Parse(confFileTemplate)
-	if err != nil {
-		return fmt.Errorf("parse template failed: %s", err)
-	}
+	// Write content to file.
 	err = t.Execute(f, config)
 	if err != nil {
 		return fmt.Errorf("execute template failed: %s", err)
@@ -230,15 +271,14 @@ func createConfigFile(config *Config) error {
 }
 
 // creates systemd unit in system path
-func createSystemdUnit(config *Config) error {
+func createSystemdUnit(config Config) error {
 	log.Info("Create systemd unit")
 	t, err := template.New("unit").Parse(unitTemplate)
 	if err != nil {
 		return fmt.Errorf("parse template failed: %s", err)
 	}
 
-	unitfile := fmt.Sprintf("%s/%s", config.systemdPathPrefix, systemdServiceName)
-	f, err := os.Create(unitfile)
+	f, err := os.Create(config.SystemdUnit)
 	if err != nil {
 		return fmt.Errorf("create file failed: %s ", err)
 	}
@@ -275,7 +315,7 @@ func reloadSystemd() error {
 func enableAutostart() error {
 	log.Info("Enable autostart")
 
-	cmd := exec.Command("systemctl", "enable", systemdServiceName)
+	cmd := exec.Command("systemctl", "enable", "pgscv.service")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("enable agent service failed: %s ", err)
@@ -293,7 +333,7 @@ func enableAutostart() error {
 func runAgent() error {
 	log.Info("Run agent")
 
-	cmd := exec.Command("systemctl", "start", systemdServiceName)
+	cmd := exec.Command("systemctl", "start", "pgscv.service")
 	err := cmd.Start()
 	if err != nil {
 		return fmt.Errorf("start agent service failed: %s ", err)
@@ -311,7 +351,7 @@ func runAgent() error {
 // delete self executable
 func deleteSelf() error {
 	log.Info("Cleanup")
-	return os.Remove(filepath.Clean(fmt.Sprintf("./%s", defaultExecutableName)))
+	return os.Remove(filepath.Clean("./pgscv"))
 }
 
 // bootstrapFailed signales bootstrap failed with error
@@ -341,6 +381,10 @@ func getUserIDs(username string) (int, int, error) {
 	gid, err := strconv.Atoi(u.Gid)
 	if err != nil {
 		return -1, -1, err
+	}
+
+	if uid < 0 || gid < 0 {
+		return -1, -1, fmt.Errorf("negative uid or gid")
 	}
 
 	return uid, gid, nil
