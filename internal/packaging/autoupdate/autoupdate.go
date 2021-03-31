@@ -124,7 +124,7 @@ func runUpdate(c *Config) error {
 	// Explicit cleanup, because after restart execution of the code will interrupted.
 	doCleanup(workDir)
 
-	log.Infof("auto-update from '%s' to '%s' has been successful", c.BinaryVersion, distVersion)
+	log.Infof("auto-update executable from '%s' to '%s' has been successful", c.BinaryVersion, distVersion)
 
 	// Restart the service.
 	err = restartSystemdService()

@@ -91,9 +91,10 @@ wget https://github.com/weaponry/pgscv/releases/download/v0.4.17/pgscv_0.4.17_li
 tar xvzf pgscv_0.4.17_linux_amd64.tar.gz
 ```
 
-Specify all necessary environment variables and run pgSCV with `--bootstrap` flag:
+Specify all necessary environment variables and run pgSCV with `--bootstrap` flag.
+**NOTE**: these settings enable auto-update and run service under `root` user. This is necessary because auto-update restarts service using systemd and root privileges required. You can use `sudo` and allow to restart the service to unprivileged user.
 ```
-sudo -E PGSCV_RUN_AS_USER=postgres \
+sudo -E PGSCV_RUN_AS_USER=root \
 PGSCV_SEND_METRICS_URL="https://push.weaponry.io" \
 PGSCV_AUTOUPDATE=stable \
 PGSCV_API_KEY=12345678-0000-1111-2222-1234567890ab \

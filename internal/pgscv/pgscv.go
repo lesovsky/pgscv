@@ -299,7 +299,7 @@ func (s *sendClient) sendMetrics(buf []byte) error {
 // addDelay increments passed delay to random value between 1 and 10 seconds.
 func addDelay(d time.Duration) time.Duration {
 	sec := int(math.Max(float64(d/time.Second), 1))
-	sec = int(math.Min(float64(sec+rand.New(rand.NewSource(time.Now().Unix())).Intn(9))+1, 60)) // #nosec G404
+	sec = int(math.Min(float64(sec+rand.Intn(9))+1, 60)) // #nosec G404
 
 	return time.Duration(sec) * time.Second
 }

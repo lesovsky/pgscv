@@ -78,7 +78,9 @@ type Config struct {
 func (c *Config) Validate() error {
 	log.Infoln("Validate bootstrap configuration")
 
-	if c.RunAsUser == "" {
+	if c.RunAsUser == "" && c.AutoUpdate != "" {
+		c.RunAsUser = "root"
+	} else if c.RunAsUser == "" {
 		c.RunAsUser = "postgres"
 	}
 
