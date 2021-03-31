@@ -231,6 +231,10 @@ func tailCollect(ctx context.Context, logfile string, init bool, wg *sync.WaitGr
 			}
 			return
 		case line := <-t.Lines:
+			if line == nil {
+				log.Errorf("want string, but got nil")
+				return
+			}
 			parser.updateMessagesStats(line.Text, c)
 		}
 	}
@@ -243,12 +247,16 @@ func queryCurrentLogfile(conninfo string) (string, error) {
 		return "", err
 	}
 
-	var logfile string
-	err = conn.Conn().QueryRow(context.TODO(), "SELECT pg_current_logfile()").Scan(&logfile)
+	var datadir, logfile string
+	err = conn.Conn().QueryRow(context.TODO(), "SELECT current_setting('data_directory'),pg_current_logfile()").Scan(&datadir, &logfile)
 	if err != nil {
 		return "", err
 	}
 	conn.Close()
+
+	if !strings.HasPrefix(logfile, "/") {
+		logfile = datadir + "/" + logfile
+	}
 
 	return logfile, nil
 }
