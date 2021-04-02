@@ -10,7 +10,7 @@ import (
 
 const walArchivingQuery = "SELECT archived_count, failed_count, " +
 	"extract(epoch from now() - last_archived_time) AS since_last_archive_seconds, " +
-	"(SELECT count(*) * (SELECT setting FROM pg_settings WHERE name = 'wal_segment_size')::int FROM pg_ls_waldir() WHERE name ~'.ready') AS lag_bytes " +
+	"(SELECT count(*) * (SELECT setting FROM pg_settings WHERE name = 'wal_segment_size')::int FROM pg_ls_archive_statusdir() WHERE name ~'.ready') AS lag_bytes " +
 	"FROM pg_stat_archiver WHERE archived_count > 0"
 
 type postgresWalArchivingCollector struct {
@@ -63,8 +63,8 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	}
 	defer conn.Close()
 
-	if config.ServerVersionNum < PostgresV10 {
-		log.Warnln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 10 or newer")
+	if config.ServerVersionNum < PostgresV12 {
+		log.Warnln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 12 or newer")
 		return nil
 	}
 
