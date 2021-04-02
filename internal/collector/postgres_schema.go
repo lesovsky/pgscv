@@ -117,29 +117,33 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 		collectSchemaNonPKTables(conn, ch, c.nonpktables)
 
 		// Functions below uses queries with casting to regnamespace data type, which is introduced in Postgres 9.5.
-		if config.ServerVersionNum >= PostgresV95 {
-			log.Debugln("[postgres schema collector]: some system data types are not available, required Postgres 9.5 or newer")
-
-			// 3. collect metrics related to invalid indexes.
-			collectSchemaInvalidIndexes(conn, ch, c.invalididx)
-
-			// 4. collect metrics related to non indexed foreign key constraints.
-			collectSchemaNonIndexedFK(conn, ch, c.nonidxfkey)
-
-			// 5. collect metric related to redundant indexes.
-			collectSchemaRedundantIndexes(conn, ch, c.redundantidx)
-
-			// 6. collect metrics related to foreign key constraints with different data types.
-			collectSchemaFKDatatypeMismatch(conn, ch, c.difftypefkey)
+		if config.ServerVersionNum < PostgresV95 {
+			log.Warnln("[postgres schema collector]: some system data types are not available, required Postgres 9.5 or newer")
+			conn.Close()
+			continue
 		}
+
+		// 3. collect metrics related to invalid indexes.
+		collectSchemaInvalidIndexes(conn, ch, c.invalididx)
+
+		// 4. collect metrics related to non indexed foreign key constraints.
+		collectSchemaNonIndexedFK(conn, ch, c.nonidxfkey)
+
+		// 5. collect metric related to redundant indexes.
+		collectSchemaRedundantIndexes(conn, ch, c.redundantidx)
+
+		// 6. collect metrics related to foreign key constraints with different data types.
+		collectSchemaFKDatatypeMismatch(conn, ch, c.difftypefkey)
 
 		// Function below uses queries pg_sequences which is introduced in Postgres 10.
-		if config.ServerVersionNum >= PostgresV10 {
+		if config.ServerVersionNum < PostgresV10 {
 			log.Debugln("[postgres schema collector]: some system views are not available, required Postgres 10 or newer")
-
-			// 7. collect metrics related to sequences (available since Postgres 10).
-			collectSchemaSequences(conn, ch, c.sequences)
+			conn.Close()
+			continue
 		}
+
+		// 7. collect metrics related to sequences (available since Postgres 10).
+		collectSchemaSequences(conn, ch, c.sequences)
 
 		conn.Close()
 	}
