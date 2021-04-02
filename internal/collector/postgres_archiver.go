@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
@@ -9,9 +8,9 @@ import (
 	"strconv"
 )
 
-const walArchivingQuery = "SELECT " +
-	"archived_count, failed_count, extract(epoch from now() - last_archived_time) AS since_last_archive_seconds, " +
-	"(select name from pg_ls_waldir() order by modification desc limit 1) AS last_modified_wal, last_archived_wal " +
+const walArchivingQuery = "SELECT archived_count, failed_count, " +
+	"extract(epoch from now() - last_archived_time) AS since_last_archive_seconds, " +
+	"(SELECT count(*) * (SELECT setting FROM pg_settings WHERE name = 'wal_segment_size')::int FROM pg_ls_waldir() WHERE name ~'.ready') AS lag_bytes " +
 	"FROM pg_stat_archiver WHERE archived_count > 0"
 
 type postgresWalArchivingCollector struct {
@@ -64,6 +63,11 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	}
 	defer conn.Close()
 
+	if config.ServerVersionNum < PostgresV10 {
+		log.Warnln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 10 or newer")
+		return nil
+	}
+
 	res, err := conn.Query(walArchivingQuery)
 	if err != nil {
 		return err
@@ -79,13 +83,7 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	ch <- c.archived.mustNewConstMetric(stats.archived)
 	ch <- c.failed.mustNewConstMetric(stats.failed)
 	ch <- c.sinceArchivedSeconds.mustNewConstMetric(stats.sinceArchivedSeconds)
-
-	lag, err := countWalArchivingLag(stats.segLastModified, stats.segLastArchived, config.WalSegmentSize)
-	if err != nil {
-		return err
-	}
-
-	ch <- c.archivingLag.mustNewConstMetric(lag)
+	ch <- c.archivingLag.mustNewConstMetric(stats.lagBytes)
 
 	return nil
 }
@@ -95,8 +93,7 @@ type postgresWalArchivingStat struct {
 	archived             float64
 	failed               float64
 	sinceArchivedSeconds float64
-	segLastArchived      string
-	segLastModified      string
+	lagBytes             float64
 }
 
 // parsePostgresWalArchivingStats parses PGResult, extract data and return struct with stats values.
@@ -107,25 +104,9 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 
 	// process row by row
 	for _, row := range r.Rows {
-		// collect non-numeric values
-		for i, colname := range r.Colnames {
-			switch string(colname.Name) {
-			case "last_modified_wal":
-				stats.segLastModified = row[i].String
-			case "last_archived_wal":
-				stats.segLastArchived = row[i].String
-			}
-		}
-
 		for i, colname := range r.Colnames {
 			// Skip empty (NULL) values.
 			if !row[i].Valid {
-				continue
-			}
-
-			// Skip columns with WAL segments names.
-			if stringsContains([]string{"last_modified_wal", "last_archived_wal"}, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
@@ -144,6 +125,8 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 				stats.failed = v
 			case "since_last_archive_seconds":
 				stats.sinceArchivedSeconds = v
+			case "lag_bytes":
+				stats.lagBytes = v
 			default:
 				log.Debugf("unsupported pg_stat_archiver stat column: %s, skip", string(colname.Name))
 				continue
@@ -152,70 +135,4 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 	}
 
 	return stats
-}
-
-// countWalArchivingLag counts archiving lag between two WAL segments.
-func countWalArchivingLag(segLastModified string, segLastArchived string, walSegSize uint64) (float64, error) {
-	if segLastModified == segLastArchived {
-		return 0, nil
-	}
-
-	modifiedSegNo, err := parseWalFileName(segLastModified, walSegSize)
-	if err != nil {
-		return 0, err
-	}
-
-	archivedSegNo, err := parseWalFileName(segLastArchived, walSegSize)
-	if err != nil {
-		return 0, err
-	}
-
-	// Should be impossible but who knows...
-	if archivedSegNo > modifiedSegNo {
-		return 0, fmt.Errorf("segment '%s' archived, but '%s' still modified", segLastArchived, segLastModified)
-	}
-
-	lag := (modifiedSegNo - (archivedSegNo + 1)) * walSegSize
-
-	return float64(lag), nil
-}
-
-// parseWalFileName return the number of segment since DATADIR initialization accordingly to its file name.
-func parseWalFileName(name string, walSegSize uint64) (uint64, error) {
-	if len(name) != 24 {
-		return 0, fmt.Errorf("invalid input: wrong WAL segment name '%s'", name)
-	}
-
-	// WAL segment size can range from 1MB to 1GB. See WalSegMinSize/WalSegMaxSize macros in xlog_internal.h around line 86
-	if walSegSize < 1024*1024 || walSegSize > 1024*1024*1024 {
-		return 0, fmt.Errorf("invalid input: wrong WAL segment size '%s'", name)
-	}
-
-	// Get number using high number of segment
-	logSegNoHi, err := strconv.ParseUint(name[8:16], 0x10, 32)
-	if err != nil {
-		return 0, err
-	}
-
-	logSegNoLo, err := strconv.ParseUint(name[16:24], 0x10, 32)
-	if err != nil {
-		return 0, err
-	}
-
-	// Number of low segments per single high segment depends on used WAL segment size.
-	// For example:
-	//   with 16MB it is 256 segments from 00000000 to 000000FF
-	//   with 64MB it is 16 segments from 00000000 to 0000003F
-	walSegPerHi := 0x100000000 / walSegSize
-
-	// Low number must not exceed the total number of segments per high number.
-	// For details see XLogSegmentsPerXLogId macro in xlog_internal.h around line 98.
-	if logSegNoLo > walSegPerHi {
-		return 0, fmt.Errorf("invalid low number in WAL segment '%s'", name)
-	}
-
-	// Calculate the number of segment since DATADIR initialization.
-	logSegNo := (logSegNoHi * walSegPerHi) + logSegNoLo
-
-	return logSegNo, nil
 }
