@@ -112,12 +112,12 @@ defaults:
     pgbouncer_username: "monitoring"
     pgbouncer_password: "supersecret"
 filters:
-    - diskstats/device:
-      exclude: "^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$"
-    - netdev/device:
-      exclude: "docker|virbr"
-    - filesystem/fstype:
-      include: "^(ext3|ext4|xfs|btrfs)$"
+  - diskstats/device:
+    exclude: "^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$"
+  - netdev/device:
+    exclude: "docker|virbr"
+  - filesystem/fstype:
+    include: "^(ext3|ext4|xfs|btrfs)$"
 ```
 
 ### Bootstrap and Uninstall modes

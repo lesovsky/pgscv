@@ -64,7 +64,7 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	defer conn.Close()
 
 	if config.ServerVersionNum < PostgresV12 {
-		log.Warnln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 12 or newer")
+		log.Debugln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 12 or newer")
 		return nil
 	}
 

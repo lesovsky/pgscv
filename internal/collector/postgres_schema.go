@@ -118,7 +118,7 @@ func (c *postgresSchemaCollector) Update(config Config, ch chan<- prometheus.Met
 
 		// Functions below uses queries with casting to regnamespace data type, which is introduced in Postgres 9.5.
 		if config.ServerVersionNum < PostgresV95 {
-			log.Warnln("[postgres schema collector]: some system data types are not available, required Postgres 9.5 or newer")
+			log.Debugln("[postgres schema collector]: some system data types are not available, required Postgres 9.5 or newer")
 			conn.Close()
 			continue
 		}

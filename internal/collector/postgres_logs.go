@@ -115,7 +115,7 @@ func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metri
 	}
 
 	if config.ServerVersionNum < PostgresV10 {
-		log.Infof("[postgres log collector]: some system functions are not available, required Postgres 10 or newer")
+		log.Debugln("[postgres log collector]: some system functions are not available, required Postgres 10 or newer")
 		return nil
 	}
 
