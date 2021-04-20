@@ -94,12 +94,12 @@ func (c *Config) Validate() error {
 	}
 
 	switch c.AutoUpdateEnv {
-	case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1":
+	case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1", "on", "stable":
 		c.AutoUpdate = "stable"
-	case "n", "no", "No", "NO", "f", "false", "False", "FALSE", "0":
+	case "n", "no", "No", "NO", "f", "false", "False", "FALSE", "0", "off":
 		c.AutoUpdate = "off"
 	default:
-		return fmt.Errorf("PGSCV_AUTOUPDATE is not defined, use 'stable' or 'off'")
+		return fmt.Errorf("PGSCV_AUTOUPDATE is not defined, use 'yes' or 'no'")
 	}
 
 	if c.APIKey == "" {
