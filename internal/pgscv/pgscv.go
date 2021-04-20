@@ -162,7 +162,13 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 		return err
 	}
 
+	// инициализируем lastSuccessfulSendTimestamp
+	// читаем значение из /var/run/pgscv/???.
+
 	ticker := time.NewTicker(config.SendMetricsInterval)
+
+	// если now()-lastSuccessfulSendTimestamp < SendMetricsInterval, то считаем величину задержки (сколько секунд до след. отправки метрик)
+
 	var delay time.Duration
 	for {
 		if delay > 0 {
@@ -186,6 +192,8 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 
 		// Reading and sending successful, reset delay.
 		delay = 0
+
+		// обновляем lastSuccessfulSendTimestamp в /var/run/pgscv/???
 
 		// Sleeping for next iteration.
 		select {

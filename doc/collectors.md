@@ -11,37 +11,46 @@ Index of content:
 - [Miscellaneous collectors](#miscellaneous-collectors)
 
 ### System collectors
-- system/loadaverage: load averages from `/proc/loadavg`
-- system/cpu: cpu usage stats from `/proc/stat`
-- system/diskstats: block devices stats from `/proc/diskstats`
-- system/filesystems: filesystem stats from `/proc/mounts`
-- system/netdev: network interfaces stats from `/proc/net/dev`
-- system/network: network settings information
-- system/memory: memory stats from `/proc/meminfo`, `/proc/vmstat`
-- system/sysconfig: system config from `/proc/sys`, `/sys/devices/system`
+
+| Collector | Datasource | Description |
+| --- | --- | --- |
+| system/loadaverage | `/proc/loadavg` | load averages
+| system/cpu | `/proc/stat` | cpu usage
+| system/diskstats | `/proc/diskstats` | block devices usage
+| system/filesystems | `/proc/mounts` | filesystem usage
+| system/netdev | `/proc/net/dev` | network interfaces usage
+| system/network |  | network settings information
+| system/memory | `/proc/meminfo`, `/proc/vmstat` | memory usage
+| system/sysconfig | `/proc/sys`, `/sys/devices/system` | system config
 
 ### PostgreSQL collectors
-- postgres/activity: activity stats from `pg_stat_activity`
-- postgres/archiver: WAL archiver stats from `pg_stat_archiver`; **required Postgres 12 or newer**
-- postgres/bgwriter: background writer and checkpointer stats from `pg_stat_bgwriter`
-- postgres/conflicts: recovery conflicts during replication, from `pg_stat_database_conflicts`
-- postgres/databases: databases stats from `pg_stat_databases`
-- postgres/indexes: indexes stats from `pg_stat_user_indexes`, `pg_statio_user_indexes`
-- postgres/functions: functions stats from `pg_stat_user_functions`
-- postgres/locks: activity locks from `pg_locks`
-- postgres/logs: log messages from Postgres log files; **required Postgres 10 or newer**
-- postgres/replication: replication stats from `pg_stat_replication`
-- postgres/replication_slots: stats about replication slots from `pg_replication_slots`
-- postgres/statements: statements stats from `pg_stat_statements`
-- postgres/schemas: databases' schemas stats from system catalog; **required Postgres 9.5 or newer**
-- postgres/settings: Postgres settings based on `pg_show_all_settings()`
-- postgres/storage: data files/directories stats; **required Postgres 10 or newer**
-- postgres/tables: tables stats from `pg_stat_user_tables`, `pg_statio_user_tables`
+| Collector | Datasource | Description |
+| --- | --- | --- |
+| postgres/activity | `pg_stat_activity` | current activity stats
+| postgres/archiver | `pg_stat_archiver` | WAL archiving stats; **required Postgres 12 or newer**
+| postgres/bgwriter | `pg_stat_bgwriter` | background writer and checkpointer stats
+| postgres/conflicts | `pg_stat_database_conflicts` | recovery conflicts occurred during replication
+| postgres/databases | `pg_stat_databases` | databases general stats
+| postgres/indexes | `pg_stat_user_indexes`, `pg_statio_user_indexes` | indexes usage and IO stats
+| postgres/functions | `pg_stat_user_functions` | functions usage and timings stats
+| postgres/locks | `pg_locks` | current activity locks
+| postgres/logs |  | Postgres log messages; **required Postgres 10 or newer**
+| postgres/replication | `pg_stat_replication` | replication stats
+| postgres/replication_slots | `pg_replication_slots` | replication slots usage stats
+| postgres/statements | `pg_stat_statements` | executed statements stats
+| postgres/schemas |  | databases' schemas stats from system catalog; **required Postgres 9.5 or newer**
+| postgres/settings | `pg_show_all_settings()` | current settings
+| postgres/storage |  | data files/directories usage stats; **required Postgres 10 or newer**
+| postgres/tables | `pg_stat_user_tables`, `pg_statio_user_tables` | tables usage and IO stats
 
 ### Pgbouncer collectors
-- pgbouncer/pools: stats based on `SHOW POOLS` command
-- pgbouncer/stats: stats based on `SHOW STATS` command
-- pgbouncer/settings: settings from `SHOW CONFIG` command
+| Collector | Datasource | Description |
+| --- | --- | --- |
+| pgbouncer/pools | `SHOW POOLS` | pools usage stats
+| pgbouncer/stats | `SHOW STATS` | general pgbouncer stats
+| pgbouncer/settings | `SHOW CONFIG` | current settings (including per-database settings)
 
 ### Miscellaneous collectors
-- system/pgscv: pgSCV internal metrics
+| Collector | Datasource | Description |
+| --- | --- | --- |
+| system/pgscv | internal | pgSCV internal metrics 
