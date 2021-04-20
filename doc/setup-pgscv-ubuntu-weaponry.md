@@ -1,11 +1,14 @@
-### Installing pgSCV from tar.gz archive using bootstrap mode on Ubuntu 20.
+### Installing pgSCV from tar.gz using bootstrap mode on Ubuntu 20.
+
+**IMPORTANT:** This tutorial is intended for using by Weaponry users.
 
 **IMPORTANT**:
 - *Bootstrap mode in general, is preferred (but not restricted) for Weaponry users, because it strictly requires some Weaponry-specific settings which are not needed for non-Weaponry users.*
-- *Bootstrap mode uses `/usr/local/pgscv` installation path which is different from paths used in DEB/RPM packages. This necessary to allow auto-update working when pgSCV running under non-root user.*
+- *Bootstrap mode uses `/usr/local/pgscv` installation path instead of system PATHs. This necessary to allow auto-update working when pgSCV running under non-root user.*
 
 #### TLDR
-In this tutorial we are going to configure system and install pgSCV on Ubuntu 20 from `.tar.gz` archive using bootstrap mode.
+In this tutorial we are going to configure system and install pgSCV from .tar.gz archive on Ubuntu 20.04.
+In this tutorial we are going to configure system and install pgSCV from `.tar.gz` archive using `bootstrap` mode on Ubuntu 20.04.
 
 #### Content:
 - [Create database role](#create-database-user)
@@ -85,10 +88,10 @@ In this example we connect to Pgbouncer built-in database and ask its version.
 
 ### Install pgSCV
 
-Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.19 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
+Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.21 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
 ```
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.19/pgscv_0.4.19_linux_amd64.tar.gz
-tar xvzf pgscv_0.4.19_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.21/pgscv_0.4.21_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.21_linux_amd64.tar.gz
 ```
 
 Specify all necessary environment variables and run pgSCV with `--bootstrap` flag.
@@ -117,6 +120,13 @@ During bootstrap, you should see the following output:
 {"level":"info","service":"pgscv","time":"2021-03-31T10:29:18+02:00","message":"Cleanup"}
 {"level":"info","service":"pgscv","time":"2021-03-31T10:29:18+02:00","message":"Bootstrap successful"}
 ```
+
+This mean, pgscv made the following changes:
+- create bindir catalog - `/usr/local/pgscv`
+- created config file - `/etc/pgscv.yaml`
+- created systemd unit file - `/etc/systemd/system/pgscv.service` and reload systemd daemon
+- copy itself into bindir
+- enable and start pgscv.service 
 
 Check pgSCV status using `journalctl`. There should be no errors.
 ```

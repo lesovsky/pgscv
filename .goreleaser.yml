@@ -27,5 +27,5 @@ nfpms:
     maintainer: Weaponry
     description: pgSCV is a multi-purpose monitoring agent and metrics exporter
     license: BSD-3
-    formats: [ deb, rpm ]
+    formats: []
     bindir: /usr/bin

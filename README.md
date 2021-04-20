@@ -14,9 +14,8 @@
 If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/weaponry/pgscv/issues)
 
 ### Setup
-- [on Ubuntu 20 using deb package](doc/setup-pgscv-deb.md)
-- [on CentOS 7 using rpm package](doc/setup-pgscv-rpm.md)
-- [on Ubuntu 20 using bootstrap and .tar.gz acrhive](doc/setup-pgscv-targz.md)
+- [on Ubuntu 20 for non-Weaponry users](doc/setup-pgscv-ubuntu-non-weaponry.md)
+- [on Ubuntu 20 for Weaponry users using auto-bootstrap](doc/setup-pgscv-ubuntu-weaponry.md)
 
 ### Documentation
 For further documentation see [usage](doc/usage-en.md).
