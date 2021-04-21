@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -122,6 +123,54 @@ func Test_runSendMetricsLoop(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 	assert.NoError(t, runSendMetricsLoop(ctx, config, repo))
+}
+
+func Test_readLastSendTS(t *testing.T) {
+	testcases := []struct {
+		from string
+		want int64
+	}{
+		{from: "testdata/pgscv-last-send-ts.golden", want: 1618981876},
+		{from: "testdata/pgscv-last-send-ts.invalid", want: 0},
+		{from: "testdata/pgscv-last-send-ts.unknown", want: 0},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, readLastSendTS(tc.from))
+	}
+}
+
+func Test_writeLastSendTS(t *testing.T) {
+	now := time.Now().Unix()
+	f, err := os.CreateTemp("/tmp", "pgscv-testing-writeLastSendTS.tmp")
+	assert.NoError(t, err)
+	testfile := f.Name()
+	assert.NoError(t, f.Close())
+
+	writeLastSendTS(now, testfile)
+
+	value := readLastSendTS(testfile)
+	assert.Equal(t, now, value)
+
+	assert.NoError(t, os.Remove(testfile))
+}
+
+func Test_lastSendStaleness(t *testing.T) {
+	in := time.Now().Add(-20 * time.Second).Unix()
+
+	got := lastSendStaleness(in, time.Minute)
+	assert.Greater(t, int64(got), int64(time.Second))
+	assert.Less(t, int64(got), int64(41*time.Second))
+
+	// test stale
+	in = time.Now().Add(-120 * time.Second).Unix()
+
+	got = lastSendStaleness(in, time.Minute)
+	assert.Equal(t, int64(got), int64(0))
+
+	// test zero -- should be also stale
+	got = lastSendStaleness(0, time.Minute)
+	assert.Equal(t, int64(got), int64(0))
 }
 
 func Test_addDelay(t *testing.T) {

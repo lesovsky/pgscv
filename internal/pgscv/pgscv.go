@@ -14,10 +14,13 @@ import (
 	"math/rand"
 	"net/http"
 	"net/url"
+	"os"
+	"strconv"
 	"sync"
 	"time"
 )
 
+// Start is the application's starting point.
 func Start(ctx context.Context, config *Config) error {
 	log.Debug("start application")
 
@@ -106,6 +109,7 @@ func Start(ctx context.Context, config *Config) error {
 	}
 }
 
+// runMetricsListener start HTTP listener accordingly to passed configuration.
 func runMetricsListener(ctx context.Context, config *Config) error {
 	log.Infof("accepting requests on http://%s/metrics", config.ListenAddress)
 
@@ -143,7 +147,10 @@ func runMetricsListener(ctx context.Context, config *Config) error {
 	}
 }
 
+// runSendMetricsLoop starts infinite loop with periodic metric sending until it's interrupted.
 func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *service.Repository) error {
+	const lastSendTSFile = "/tmp/pgscv-last-send.timestamp"
+
 	log.Infof("sending metrics to %s every %d seconds", config.SendMetricsURL, config.SendMetricsInterval/time.Second)
 
 	// Before sending metrics wait until any services appear in the repo, else need to wait an one MetricsSendInterval.
@@ -162,12 +169,13 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 		return err
 	}
 
-	// инициализируем lastSuccessfulSendTimestamp
-	// читаем значение из /var/run/pgscv/???.
+	// Initialize last send timestamp from file.
+	lastSendTS := readLastSendTS(lastSendTSFile)
+
+	// Do one-time sleep depending on last send timestamp staleness.
+	time.Sleep(lastSendStaleness(lastSendTS, config.SendMetricsInterval))
 
 	ticker := time.NewTicker(config.SendMetricsInterval)
-
-	// если now()-lastSuccessfulSendTimestamp < SendMetricsInterval, то считаем величину задержки (сколько секунд до след. отправки метрик)
 
 	var delay time.Duration
 	for {
@@ -183,6 +191,8 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 			continue
 		}
 
+		lastSendTS = time.Now().Unix()
+
 		err = sendClient.sendMetrics(buf)
 		if err != nil {
 			delay = addDelay(delay)
@@ -193,7 +203,8 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 		// Reading and sending successful, reset delay.
 		delay = 0
 
-		// обновляем lastSuccessfulSendTimestamp в /var/run/pgscv/???
+		// Update last successful send timestamp, in case of pgSCV restarts
+		writeLastSendTS(lastSendTS, lastSendTSFile)
 
 		// Sleeping for next iteration.
 		select {
@@ -207,16 +218,66 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 	}
 }
 
-// sendClient ...
+// Last send timestamp.
+// Data model of timeseries databases (Prometheus or VictoriaMetrics) relies on
+// interval between stored datapoints. The best case that interval is consistent
+// across long period of time. This easy to follow when agent is scraped by
+// external system (like Prometheus, Vmagent, etc). In case of sending metrics,
+// agent should follow the configured sending interval across agent restarts.
+// For keeping the sending interval, pgSCV saves UNIX timestamp of the last
+// sending attempt into the file. After restart, pgSCV at first reading the file,
+// and if it is found and has valid timestamp, agent correct when to make next
+// metric sending.
+
+// readLastSendTS read last send timestamp from file and return its value.
+func readLastSendTS(from string) int64 {
+	content, err := os.ReadFile(from)
+	if err != nil {
+		log.Warnf("read %s failed; last send timestamp will be reinitialized", err)
+		return 0
+	}
+
+	v, err := strconv.ParseInt(string(content), 10, 64)
+	if err != nil {
+		log.Warnf("invalid input, parse %s failed; last send timestamp will be reinitialized", err)
+		return 0
+	}
+
+	return v
+}
+
+// writeLastSendTS writes passed last timestamp value and write it to file.
+func writeLastSendTS(v int64, to string) {
+	data := []byte(fmt.Sprintf("%d", v))
+	err := os.WriteFile(to, data, 0644)
+	if err != nil {
+		log.Warnf("write last send timestamp failed: %s; skip", err)
+	}
+}
+
+// lastSendStaleness calculate how much time before last send timestamp become stale.
+func lastSendStaleness(v int64, limit time.Duration) time.Duration {
+	delta := time.Now().Unix() - v
+
+	// timestamp since last send exceeds limit, means last send is already stale.
+	if (time.Duration(delta) * time.Second) > limit {
+		return 0
+	}
+
+	// timestamp since last send does not exceed limit, return how many seconds left before stale.
+	return limit - (time.Duration(delta) * time.Second)
+}
+
+// sendClient defines worker which read metrics from local source and send metrics to remote URL.
 type sendClient struct {
-	apiKey   string
-	readURL  *url.URL
-	writeURL *url.URL
+	apiKey   string   // API key used for communicating with remote HTTP service
+	readURL  *url.URL // local URL for reading metrics
+	writeURL *url.URL // remote URL for sending metrics
 	timeout  time.Duration
 	Client   *http.Client
 }
 
-// newSendClient ...
+// newSendClient creates new sendClient.
 func newSendClient(config *Config) (sendClient, error) {
 	readURL, err := url.Parse("http://" + config.ListenAddress + "/metrics")
 	if err != nil {
@@ -243,7 +304,7 @@ func newSendClient(config *Config) (sendClient, error) {
 	}, nil
 }
 
-// readMetrics ...
+// readMetrics read metrics from configured URL and returns response.
 func (s *sendClient) readMetrics() ([]byte, error) {
 	resp, err := http.Get(s.readURL.String())
 	if err != nil {
@@ -263,7 +324,7 @@ func (s *sendClient) readMetrics() ([]byte, error) {
 	return body, nil
 }
 
-// sendMetrics ...
+// sendMetrics wrap buffer data into POST HTTP request and send to remote URL.
 func (s *sendClient) sendMetrics(buf []byte) error {
 	log.Debugln("start sending metrics")
 
