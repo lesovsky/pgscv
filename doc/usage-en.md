@@ -19,9 +19,9 @@ Index of content:
   start collecting metrics from them. In case of authentication, valid requisites should be specified.
 - **Remote services support**. pgSCV is recommended to start on the same systems where monitored services are running.
   But this is not strict and pgSCV could connect and collect metrics from remote services. 
-- **Bootstrap**. pgSCV can bootstrap itself - install itself to system path, create minimal required configuration, 
-  install systemd unit and start itself.
-- **Auto-update**. pgSCV can track new releases and update itself. This feature is mostly useful for Weaponry users.
+- **Bootstrap**. pgSCV can bootstrap itself - it is one-time procedure, during bootstrap pgSCV installs itself into system path, creates minimal required configuration, 
+  installs systemd unit and starts itself. **Requires root privileges.**
+- **Auto-update**. pgSCV can track new releases and update itself. This feature is mostly useful for Weaponry users. **Requires root privileges.**
 - **Collectors management**. Collectors could be disabled if necessary.
 - **Collectors filters**. Some collectors could be adjusted to skip collecting metrics about unnecessary stuff, like 
   block devices, network interfaces, filesystems, etc.
@@ -29,14 +29,14 @@ Index of content:
 ### Requirements
 - requisites for connecting to the services, such as login and password.
 - database user should have privileges for executing stats functions and reading views.
-For more details see security considerations.
+For more details see [security considerations](#security-considerations).
 
 ### Quick start
 Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.15/pgscv_0.4.15_linux_amd64.tar.gz
-tar xvzf pgscv_0.4.15_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.22/pgscv_0.4.22_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.22_linux_amd64.tar.gz
 sudo -u postgres ./pgscv 
 ```
 
@@ -145,19 +145,18 @@ For configuring YAML configuration during bootstrap, the following environment v
 
 ### Security considerations
 For collecting metrics and auto-discovery pgSCV requires some kind of privileges. pgSCV uses the following sources for collecting metrics:
-- Procfs and Sysfs pseudo-filesystems
-- Postgres and Pgbouncer log files
-- Postgres stat views beginning from `pg_stat` prefix
-- Postgres system catalog tables
-- Postgres admin functions
-- Filesystem paths in Postgres data directory (for auto-discovery)
-- Filesystem paths in /etc (for auto-discovery)
-- Pgbouncer's stats from `pgbouncer` built-in database.
+- reading `procfs` and `sysfs` pseudo-filesystems
+- reading Postgres and Pgbouncer log files
+- reading Postgres stats views beginning from `pg_stat` prefix
+- reading Postgres system catalog tables
+- executing Postgres functions for reading configs, stats, files metadata, etc.
+- walking on filesystem paths inside Postgres data directory (auto-discovery)
+- walking filesystem paths in /etc (auto-discovery)
+- reading Pgbouncer stats from `pgbouncer` built-in database.
 
 **System access**
 - regular, unprivileged system user is sufficient to read all necessary stats.
 - this user must have access to Postgres/Pgbouncer log directories
-- when **autoupdate** is enabled, pgSCV requires write-access to the directory where `pgscv` binary is stored.
 
 **Postgres access**
 - regular, unprivileged database role is *NOT* sufficient to read all necessary stats
@@ -167,6 +166,12 @@ For collecting metrics and auto-discovery pgSCV requires some kind of privileges
 
 **Pgbouncer access**
 - user specified in `stats_users` of `pgbouncer.ini` is sufficient to read all necessary stats.
+
+**Auto-update procedure**
+pgSCV can check new releases on Github releases page, when new version is available, pgSCV can automatically fetch it and 
+upgrade itself. This is recommended for Weaponry users for automatically delivering new features. The main issue here, pgSCV
+requires to be running with `root` privileges - this need to properly restart systemd service during upgrade. If security 
+policy restrict to run pgSCV with `root` privileges, auto-update should be disabled at `bootstrap` or in `pgscv.yaml`.
 
 ### Troubleshooting
 - Check pgSCV is running by systemd - service should be in **active (running)** state:

@@ -2,13 +2,15 @@
 
 **IMPORTANT:** This tutorial is intended for using by Weaponry users.
 
-**IMPORTANT**:
-- *Bootstrap mode in general, is preferred (but not restricted) for Weaponry users, because it strictly requires some Weaponry-specific settings which are not needed for non-Weaponry users.*
-- *Bootstrap mode uses `/usr/local/pgscv` installation path instead of system PATHs. This necessary to allow auto-update working when pgSCV running under non-root user.*
-
 #### TLDR
-In this tutorial we are going to configure system and install pgSCV from .tar.gz archive on Ubuntu 20.04.
 In this tutorial we are going to configure system and install pgSCV from `.tar.gz` archive using `bootstrap` mode on Ubuntu 20.04.
+- create dedicated monitoring roles in Postgres and Pgbouncer (optional)
+- install pgSCV from `tar.gz` on Ubuntu 20.04
+- configure using `bootstrap` mode
+Finally, pgSCV will be run under `root` user with enabled auto-update feature. 
+
+**NOTES**:
+- *Bootstrap mode is preferred (but not strict) for Weaponry users, because it requires Weaponry-only settings which are not needed for non-Weaponry users.*
 
 #### Content:
 - [Create database role](#create-database-user)
@@ -48,8 +50,7 @@ Exact path to `pg_hba.conf` depends on Postgres version. Default path on Ubuntu 
 
 After adding lines to `pg_hba.conf`, Postgres service should be reloaded. Connect to Postgres and execute `pg_reload_conf()` function.
 ```
-sudo -u postgres psql
-postgres=# select pg_reload_conf();
+sudo -u postgres psql -c 'select pg_reload_conf()'
 ```
 
 Now, test the connection using created database role using `psql` utility. Specify the password in environment variable.
@@ -88,19 +89,23 @@ In this example we connect to Pgbouncer built-in database and ask its version.
 
 ### Install pgSCV
 
-Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.21 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
+Download the `tar.gz` archive and extract it using `tar` utility. In this tutorial, v0.4.22 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
 ```
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.21/pgscv_0.4.21_linux_amd64.tar.gz
-tar xvzf pgscv_0.4.21_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.22/pgscv_0.4.22_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.22_linux_amd64.tar.gz
 ```
 
 Specify all necessary environment variables and run pgSCV with `--bootstrap` flag.
-**NOTE**: these settings enable auto-update and run service under `root` user. This is necessary because auto-update restarts service using systemd and root privileges required. You can use `sudo` and allow to restart the service to unprivileged user.
+**NOTES**:
+    - these settings enable auto-update and run service under `root` user. This is necessary because restart service is required during auto-update.
+    - if you don't need auto-update or want to use non-root user, specify it with `PGSCV_RUN_AS_USER` and set `PGSCV_AUTOUPDATE=no`.
+    - bootstrap mode uses `/usr/local/pgscv` installation path instead of system PATHs.
+    - you need to specify your Weaponry project API key (checkout project setup instructions) 
 ```
 sudo -E PGSCV_RUN_AS_USER=root \
 PGSCV_SEND_METRICS_URL="https://push.weaponry.io" \
-PGSCV_AUTOUPDATE=stable \
-PGSCV_API_KEY=12345678-0000-1111-2222-1234567890ab \
+PGSCV_AUTOUPDATE=yes \
+PGSCV_API_KEY=00000000-0000-0000-00000-000000000000 \
 PGSCV_PG_PASSWORD=SUPERSECRETPASSWORD PGSCV_PGB_PASSWORD=SUPERSECRETPASSWORD \
 ./pgscv --bootstrap
 ```

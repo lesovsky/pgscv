@@ -37,7 +37,7 @@ Group={{ .RunAsUser }}
 # Start the agent process
 ExecStart={{ .Bindir }}/{{ .ExecutableName }} --config-file={{ .ConfigFile }}
 
-# Only kill the agent process
+# Kill all processes in the cgroup
 KillMode=control-group
 
 # Wait reasonable amount of time for agent up/down
@@ -47,7 +47,7 @@ TimeoutSec=5
 Restart=on-failure
 RestartSec=10
 
-# if agent leaks during long period of time, let him to be the first person for eviction
+# If agent leaks during long period of time, let him to be the first person for eviction
 OOMScoreAdjust=1000
 
 [Install]

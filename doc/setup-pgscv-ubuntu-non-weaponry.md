@@ -4,6 +4,10 @@
 
 #### TLDR
 In this tutorial we are going to configure system and install pgSCV from `.tar.gz` archive on Ubuntu 20.04.
+- create dedicated monitoring roles in Postgres and Pgbouncer (optional)
+- install pgSCV from `tar.gz` on Ubuntu 20.04
+Finally, pgSCV will be run under `postgres` user with disabled auto-update feature.
+
 
 #### Content:
 - [Create database role](#create-database-user)
@@ -43,8 +47,7 @@ Exact path to `pg_hba.conf` depends on Postgres version. Default path on Ubuntu 
 
 After adding lines to `pg_hba.conf`, Postgres service should be reloaded. Connect to Postgres and execute `pg_reload_conf()` function.
 ```
-sudo -u postgres psql
-postgres=# select pg_reload_conf();
+sudo -u postgres psql -c 'select pg_reload_conf()'
 ```
 
 Now, test the connection using created database role using `psql` utility. Specify the password in environment variable.
@@ -83,10 +86,11 @@ In this example we connect to Pgbouncer built-in database and ask its version.
 
 ### Install pgSCV
 
-Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.21 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
+Download the `deb` package and install it using `dpkg` utility. In this tutorial, v0.4.22 is used, check out the latest version in [releases](https://github.com/weaponry/pgscv/releases) page.
 ```
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.21/pgscv_0.4.21_linux_amd64.tar.gz
-tar xvzf pgscv_0.4.21_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.4.22/pgscv_0.4.22_linux_amd64.tar.gz
+tar xvzf pgscv_0.4.22_linux_amd64.tar.gz
+sudo cp pgscv /usr/bin/pgscv
 ```
 
 Create pgSCV default configuration in `/etc/pgscv.yaml` with the credentials created in previous steps.
@@ -113,7 +117,7 @@ Group=postgres
 # Start the agent process
 ExecStart=/usr/bin/pgscv --config-file=/etc/pgscv.yaml
 
-# Only kill the agent process
+# Kill all processes in the cgroup
 KillMode=control-group
 
 # Wait reasonable amount of time for agent up/down

@@ -14,8 +14,9 @@
 If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/weaponry/pgscv/issues)
 
 ### Setup
-- [on Ubuntu 20 for non-Weaponry users](doc/setup-pgscv-ubuntu-non-weaponry.md)
-- [on Ubuntu 20 for Weaponry users using auto-bootstrap](doc/setup-pgscv-ubuntu-weaponry.md)
+pgSCV setup is possible in two ways:
+1. For **non-Weaponry** users. Setup as a standalone service, which accepts metrics scrape requests only. Checkout complete setup [guide](doc/setup-pgscv-ubuntu-non-weaponry.md).
+2. For **Weaponry** users. Setup as an agent of Weaponry SaaS, which receives metrics to Weaponry service. Checkout complete setup [guide](doc/setup-pgscv-ubuntu-weaponry.md). Listening for scrape requests also work.
 
 ### Documentation
 For further documentation see [usage](doc/usage-en.md).
