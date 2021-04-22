@@ -233,7 +233,7 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 func readLastSendTS(from string) int64 {
 	content, err := os.ReadFile(from)
 	if err != nil {
-		log.Warnf("read %s failed; last send timestamp will be reinitialized", err)
+		log.Warnf("%s; last send timestamp will be reinitialized", err)
 		return 0
 	}
 
