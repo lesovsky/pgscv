@@ -104,32 +104,32 @@ func NewRepository() *Repository {
 
 /* Public wrapper-methods of Repository */
 
-//
+// GetService is a public wrapper on getService method.
 func (repo *Repository) GetService(id string) Service {
 	return repo.getService(id)
 }
 
-//
+// TotalServices is a public wrapper on TotalServices method.
 func (repo *Repository) TotalServices() int {
 	return repo.totalServices()
 }
 
-//
+// GetServiceIDs is a public wrapper on GetServiceIDs method.
 func (repo *Repository) GetServiceIDs() []string {
 	return repo.getServiceIDs()
 }
 
-//
+// AddServicesFromConfig is a public wrapper on AddServicesFromConfig method.
 func (repo *Repository) AddServicesFromConfig(config Config) {
 	repo.addServicesFromConfig(config)
 }
 
-//
+// SetupServices is a public wrapper on SetupServices method.
 func (repo *Repository) SetupServices(config Config) error {
 	return repo.setupServices(config)
 }
 
-//
+// StartBackgroundDiscovery is a public wrapper on StartBackgroundDiscovery method.
 func (repo *Repository) StartBackgroundDiscovery(ctx context.Context, config Config) {
 	repo.startBackgroundDiscovery(ctx, config)
 }
@@ -137,10 +137,9 @@ func (repo *Repository) StartBackgroundDiscovery(ctx context.Context, config Con
 /* Private methods of Repository */
 
 // addService adds service to the repo.
-// TODO: refactor to remove id argument, because it is already in the 's' argument.
-func (repo *Repository) addService(id string, s Service) {
+func (repo *Repository) addService(s Service) {
 	repo.Lock()
-	repo.Services[id] = s
+	repo.Services[s.ServiceID] = s
 	repo.Unlock()
 }
 
@@ -209,7 +208,7 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 	log.Debug("config: add services from config file")
 
 	// Always add system service.
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
+	repo.addService(Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
 	log.Info("registered new service [system:0]")
 
 	// Sanity check, but basically should be always passed.
@@ -246,7 +245,7 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 		}
 
 		// Use entry key as ServiceID unique identifier.
-		repo.addService(k, s)
+		repo.addService(s)
 		log.Infof("registered new service [%s]", s.ServiceID)
 		log.Debugf("new service available through: %s@%s:%d/%s", pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
 	}
@@ -257,7 +256,7 @@ func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Con
 	log.Debug("starting background auto-discovery loop")
 
 	// add pseudo-service for system metrics
-	repo.addService("system:0", Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
+	repo.addService(Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
 	log.Infoln("auto-discovery: service added [system:0]")
 
 	for {
@@ -324,7 +323,7 @@ func (repo *Repository) lookupServices(config Config) error {
 					break
 				}
 
-				repo.addService(postgres.ServiceID, postgres) // add postgresql service to the repo
+				repo.addService(postgres) // add postgresql service to the repo
 				log.Infof("auto-discovery [postgres]: service added [%s]", postgres.ServiceID)
 			}
 		case "pgbouncer":
@@ -340,7 +339,7 @@ func (repo *Repository) lookupServices(config Config) error {
 				break
 			}
 
-			repo.addService(pgbouncer.ServiceID, pgbouncer) // add pgbouncer service to the repo
+			repo.addService(pgbouncer) // add pgbouncer service to the repo
 			log.Infof("auto-discovery [pgbouncer]: service added [%s]", pgbouncer.ServiceID)
 		default:
 			continue // others are not interesting
@@ -391,7 +390,7 @@ func (repo *Repository) setupServices(config Config) error {
 			prometheus.MustRegister(service.Collector)
 
 			// put updated service copy into repo
-			repo.addService(id, service)
+			repo.addService(service)
 			log.Debugf("service configured [%s]", id)
 		}
 	}

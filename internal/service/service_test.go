@@ -16,16 +16,16 @@ func TestRepository_addService(t *testing.T) {
 	s1 := TestSystemService()
 	s2 := TestPostgresService()
 	s3 := TestPgbouncerService()
-	r.addService(s1.ServiceID, s1)
-	r.addService(s2.ServiceID, s2)
-	r.addService(s3.ServiceID, s3)
+	r.addService(s1)
+	r.addService(s2)
+	r.addService(s3)
 	assert.Equal(t, 3, r.totalServices())
 }
 
 func TestRepository_getService(t *testing.T) {
 	r := NewRepository()
 	s := TestSystemService()
-	r.addService(s.ServiceID, s)
+	r.addService(s)
 
 	got := r.getService(s.ServiceID)
 	assert.Equal(t, s.ServiceID, got.ServiceID)
@@ -35,7 +35,7 @@ func TestRepository_getService(t *testing.T) {
 func TestRepository_markServiceFailed(t *testing.T) {
 	r := NewRepository()
 	s := TestSystemService()
-	r.addService(s.ServiceID, s)
+	r.addService(s)
 
 	// mark service as failed
 	r.markServiceFailed(s.ServiceID)
@@ -55,7 +55,7 @@ func TestRepository_markServiceFailed(t *testing.T) {
 func TestRepository_removeService(t *testing.T) {
 	r := NewRepository()
 	s := TestSystemService()
-	r.addService(s.ServiceID, s)
+	r.addService(s)
 	assert.Equal(t, 1, r.totalServices())
 	r.removeService(s.ServiceID)
 	assert.Equal(t, 0, r.totalServices())
@@ -66,9 +66,9 @@ func TestRepository_getServiceIDs(t *testing.T) {
 	s1 := TestSystemService()
 	s2 := TestPostgresService()
 	s3 := TestPgbouncerService()
-	r.addService(s1.ServiceID, s1)
-	r.addService(s2.ServiceID, s2)
-	r.addService(s3.ServiceID, s3)
+	r.addService(s1)
+	r.addService(s2)
+	r.addService(s3)
 
 	ids := r.getServiceIDs()
 	assert.Equal(t, 3, len(ids))
@@ -173,11 +173,11 @@ func TestRepository_setupServices(t *testing.T) {
 func Test_healthcheckServices(t *testing.T) {
 	r := NewRepository()
 	s1 := TestSystemService()
-	r.addService(s1.ServiceID, s1)
+	r.addService(s1)
 
 	s2 := TestPostgresService()
 	s2.ConnSettings.Conninfo = "host=invalid dbname=invalid user=invalid"
-	r.addService(s2.ServiceID, s2)
+	r.addService(s2)
 
 	assert.Equal(t, 2, r.totalServices())
 
