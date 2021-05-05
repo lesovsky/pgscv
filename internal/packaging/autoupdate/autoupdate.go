@@ -35,6 +35,7 @@ func StartAutoupdateLoop(ctx context.Context, c *Config) {
 		return
 	}
 
+	rand.Seed(time.Now().UnixNano())
 	itv := time.Duration(60+rand.Intn(60)) * time.Minute // #nosec G404
 
 	log.Info("start background auto-update loop")
@@ -407,7 +408,7 @@ func updateBinary(sourceFile string, destFile string) error {
 	return nil
 }
 
-// restartSystemdService restart pgscv service.
+// restartSystemdService checks privileges and restarts pgscv service.
 func restartSystemdService() error {
 	cmd := exec.Command("systemctl", "restart", "pgscv.service")
 	// after cmd.Start execution of this code could be interrupted, end even err might not be handled.
