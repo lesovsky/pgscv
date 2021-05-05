@@ -410,6 +410,10 @@ func updateBinary(sourceFile string, destFile string) error {
 
 // restartSystemdService checks privileges and restarts pgscv service.
 func restartSystemdService() error {
+	if os.Geteuid() != 0 {
+		return fmt.Errorf("root privileges required")
+	}
+
 	cmd := exec.Command("systemctl", "restart", "pgscv.service")
 	// after cmd.Start execution of this code could be interrupted, end even err might not be handled.
 	err := cmd.Start()
