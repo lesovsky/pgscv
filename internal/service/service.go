@@ -54,7 +54,7 @@ type Config struct {
 	RuntimeMode        int
 	NoTrackMode        bool
 	ConnDefaults       map[string]string `yaml:"defaults"` // Defaults
-	ConnSettings       []ConnSetting
+	ConnsSettings      ConnsSettings
 	Filters            map[string]filter.Filter
 	DisabledCollectors []string
 }
@@ -73,6 +73,9 @@ type ConnSetting struct {
 	// Conninfo is the connection string in service-specific format.
 	Conninfo string `yaml:"conninfo"`
 }
+
+// ConnsSettings defines a set of all connection settings of exact services.
+type ConnsSettings map[string]ConnSetting
 
 // connectionParams is the set of parameters that may be required when constructing connection string.
 // For example, this struct describes the postmaster.pid representation https://www.postgresql.org/docs/current/storage-file-layout.html
@@ -134,6 +137,7 @@ func (repo *Repository) StartBackgroundDiscovery(ctx context.Context, config Con
 /* Private methods of Repository */
 
 // addService adds service to the repo.
+// TODO: refactor to remove id argument, because it is already in the 's' argument.
 func (repo *Repository) addService(id string, s Service) {
 	repo.Lock()
 	repo.Services[id] = s
@@ -209,15 +213,15 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 	log.Info("registered new service [system:0]")
 
 	// Sanity check, but basically should be always passed.
-	if config.ConnSettings == nil {
+	if config.ConnsSettings == nil {
 		log.Warn("connection settings for service are not defined, do nothing")
 		return
 	}
 
 	// Check all passed connection settings and try to connect using them. In case of success, create a 'Service' instance
 	// in the repo.
-	for _, cs := range config.ConnSettings {
-		// *ConnConfig struct will be used for
+	for k, cs := range config.ConnsSettings {
+		// each ConnSetting struct is used for
 		//   1) doing connection;
 		//   2) getting connection properties to define service-specific parameters.
 		pgconfig, err := pgx.ParseConfig(cs.Conninfo)
@@ -236,14 +240,13 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 
 		// Connection was successful, create 'Service' struct with service-related properties and add it to service repo.
 		s := Service{
-			ServiceID:    cs.ServiceType + ":" + strconv.Itoa(int(pgconfig.Port)),
+			ServiceID:    k,
 			ConnSettings: cs,
 			Collector:    nil,
 		}
 
-		// Add "host", because user might manually specify services with the same port (but the are running on different hosts).
-		var key = strings.Join([]string{cs.ServiceType, pgconfig.Host, strconv.Itoa(int(pgconfig.Port))}, ":")
-		repo.addService(key, s)
+		// Use entry key as ServiceID unique identifier.
+		repo.addService(k, s)
 		log.Infof("registered new service [%s]", s.ServiceID)
 		log.Debugf("new service available through: %s@%s:%d/%s", pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
 	}

@@ -24,18 +24,18 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryPath           string                // full path of the program, required for auto-update procedure
-	BinaryVersion        string                // version of the program, required for auto-update procedure
-	AutoUpdate           string                `yaml:"autoupdate"`       // controls auto-update procedure
-	NoTrackMode          bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
-	ListenAddress        string                `yaml:"listen_address"`   // Network address and port where the application should listen on
-	SendMetricsURL       string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
-	SendMetricsInterval  time.Duration         // Metric send interval
-	APIKey               string                `yaml:"api_key"`  // API key for accessing to Weaponry
-	ServicesConnSettings []service.ConnSetting `yaml:"services"` // Slice of connection settings for exact services
-	Defaults             map[string]string     `yaml:"defaults"` // Defaults
-	Filters              filter.Filters        `yaml:"filters"`
-	DisableCollectors    []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
+	BinaryPath            string                // full path of the program, required for auto-update procedure
+	BinaryVersion         string                // version of the program, required for auto-update procedure
+	AutoUpdate            string                `yaml:"autoupdate"`       // controls auto-update procedure
+	NoTrackMode           bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
+	ListenAddress         string                `yaml:"listen_address"`   // Network address and port where the application should listen on
+	SendMetricsURL        string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
+	SendMetricsInterval   time.Duration         // Metric send interval
+	APIKey                string                `yaml:"api_key"`  // API key for accessing to Weaponry
+	ServicesConnsSettings service.ConnsSettings `yaml:"services"` // All connections settings for exact services
+	Defaults              map[string]string     `yaml:"defaults"` // Defaults
+	Filters               filter.Filters        `yaml:"filters"`
+	DisableCollectors     []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
 }
 
 // NewConfig creates new config based on config file or return default config of config is not exists.
@@ -110,16 +110,19 @@ func (c *Config) Validate() error {
 
 	// User might specify its own set of services which he would like to monitor. This services should be validated and
 	// invalid should be rejected. Validation is performed using pgx.ParseConfig method which does all dirty work.
-	if c.ServicesConnSettings != nil {
-		if len(c.ServicesConnSettings) != 0 {
-			for _, s := range c.ServicesConnSettings {
+	if c.ServicesConnsSettings != nil {
+		if len(c.ServicesConnsSettings) != 0 {
+			for k, s := range c.ServicesConnsSettings {
+				if k == "" {
+					return fmt.Errorf("empty service specified")
+				}
 				if s.ServiceType == "" {
-					return fmt.Errorf("service_type is not specified for %s", s.Conninfo)
+					return fmt.Errorf("empty service_type for %s", k)
 				}
 
 				_, err := pgx.ParseConfig(s.Conninfo)
 				if err != nil {
-					return fmt.Errorf("invalid conninfo: %s", err)
+					return fmt.Errorf("invalid conninfo for %s: %s", k, err)
 				}
 			}
 		}

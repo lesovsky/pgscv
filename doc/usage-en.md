@@ -5,6 +5,7 @@ Index of content:
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
 - [YAML configuration](#yaml-configuration-settings)
+- [YAML configuration example](#yaml-configuration-file-example)
 - [Bootstrap and Uninstall modes](#bootstrap-and-uninstall-modes)
 - [Security considerations](#security-considerations)
 - [Troubleshooting](#troubleshooting)
@@ -65,8 +66,8 @@ used.
 - **api_key**: API key for accessing to Weaponry service. Default value: "". *Needed only for Weaponry clients.*
 
 
-- **services**: list of services to which pgSCV should connect and monitor. Defining `services` automatically disables 
-auto-discovery. Empty by default, looking for services using auto-discovery.
+- **services**: dictionary of services to which pgSCV should connect and monitor. Defining `services` automatically disables 
+auto-discovery. Empty by default, looking for services using auto-discovery. See [example](#yaml-configuration-file-example) for details. 
   - **service_type**: type of the service, must be one of `postgres`, `pgbouncer`.
   - **conninfo**: connection string or DSN for connecting to service.
 
@@ -94,7 +95,8 @@ auto-discovery. Empty by default, looking for services using auto-discovery.
 
 - **disable_collectors**: list of [collectors](./collectors.md) which should be disabled. Default value: [] (all collectors are enabled).
 
-YAML configuration file example:
+### YAML Configuration file example
+Complete YAML configuration file example:
 ```
 listen_address: 127.0.0.1:9890
 autoupdate: off
@@ -102,9 +104,11 @@ no_track_mode: false
 send_metrics_url: https://push.weaponry.io
 api_key: 12345678-abcd-1234-abcd-123456789012
 services:
-  - service_type: "postgres"
+  "postgres:5432":
+    service_type: "postgres"
     conninfo: "postgres://postgres@127.0.0.1:5432/postgres"
-  - service_type: "pgbouncer"
+  "pgbouncer:6432": 
+    service_type: "pgbouncer"
     conninfo: "postgres://pgbouncer@127.0.0.1:6432/pgbouncer"
 defaults:
     postgres_username: "monitoring"

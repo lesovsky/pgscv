@@ -86,8 +86,8 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 	}{
 		{
 			name: "valid",
-			config: Config{ConnSettings: []ConnSetting{
-				{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
+			config: Config{ConnsSettings: ConnsSettings{
+				"test": {ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
 			}},
 			expected: 2,
 		},
@@ -98,12 +98,12 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 		},
 		{
 			name:     "invalid service",
-			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid conninfo"}}},
+			config:   Config{ConnsSettings: ConnsSettings{"test": {ServiceType: model.ServiceTypePostgresql, Conninfo: "invalid conninfo"}}},
 			expected: 1,
 		},
 		{
 			name:     "unavailable service",
-			config:   Config{ConnSettings: []ConnSetting{{ServiceType: model.ServiceTypePostgresql, Conninfo: "port=1"}}},
+			config:   Config{ConnsSettings: ConnsSettings{"test": {ServiceType: model.ServiceTypePostgresql, Conninfo: "port=1"}}},
 			expected: 1,
 		},
 	}
@@ -149,8 +149,8 @@ func TestRepository_setupServices(t *testing.T) {
 		{
 			name: "valid",
 			config: Config{
-				ConnSettings: []ConnSetting{
-					{ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
+				ConnsSettings: ConnsSettings{
+					"test": {ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"},
 				},
 			},
 			expected: 2,
@@ -163,7 +163,7 @@ func TestRepository_setupServices(t *testing.T) {
 		assert.Equal(t, tc.expected, r.totalServices())
 
 		assert.NoError(t, r.setupServices(tc.config))
-		s := r.GetService("postgres:127.0.0.1:5432")
+		s := r.GetService("test")
 		assert.NotNil(t, s.Collector)
 
 		prometheus.Unregister(s.Collector)

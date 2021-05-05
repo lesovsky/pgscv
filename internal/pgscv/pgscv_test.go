@@ -115,8 +115,8 @@ func Test_runSendMetricsLoop(t *testing.T) {
 	}
 	repo := service.NewRepository()
 	repo.AddServicesFromConfig(service.Config{
-		ConnSettings: nil,
-		ConnDefaults: nil,
+		ConnsSettings: nil,
+		ConnDefaults:  nil,
 	})
 
 	// Run sending metrics to test server.
