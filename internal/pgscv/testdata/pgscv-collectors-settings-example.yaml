@@ -1,0 +1,14 @@
+listen_address: "127.0.0.1:8080"
+collectors:
+  postgres/archiver:
+    echo: "example"
+    subsystems:
+      activity:
+        query: "SELECT l1, v1 FROM t1 WHERE q"
+        metrics:
+          l1:
+            usage: LABEL
+            description: l1 description
+          v1:
+            usage: COUNTER
+            description: v1 description

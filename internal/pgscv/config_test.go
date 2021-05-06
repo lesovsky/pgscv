@@ -73,6 +73,28 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
+			name:  "valid: with collectors settings",
+			valid: true,
+			file:  "testdata/pgscv-collectors-settings-example.yaml",
+			want: &Config{
+				ListenAddress: "127.0.0.1:8080",
+				Defaults:      map[string]string{},
+				Collectors: map[string]model.CollectorSettings{
+					"postgres/archiver": {
+						Subsystems: map[string]model.MetricsSubsystem{
+							"activity": {
+								Query: "SELECT l1, v1 FROM t1 WHERE q",
+								Metrics: model.Metrics{
+									"l1": {Usage: "LABEL", Description: "l1 description"},
+									"v1": {Usage: "COUNTER", Description: "v1 description"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:  "empty config-file opt",
 			valid: true,
 			file:  "",

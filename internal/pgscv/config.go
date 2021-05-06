@@ -5,6 +5,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
 	"gopkg.in/yaml.v2"
 	"os"
@@ -35,7 +36,8 @@ type Config struct {
 	ServicesConnsSettings service.ConnsSettings `yaml:"services"` // All connections settings for exact services
 	Defaults              map[string]string     `yaml:"defaults"` // Defaults
 	Filters               filter.Filters        `yaml:"filters"`
-	DisableCollectors     []string              `yaml:"disable_collectors"` // List of collectors which should be disabled.
+	DisableCollectors     []string              `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
+	Collectors            model.Collectors      `yaml:"collectors"`         // Collectors and its settings
 }
 
 // NewConfig creates new config based on config file or return default config of config is not exists.
