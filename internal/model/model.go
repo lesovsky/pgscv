@@ -40,8 +40,8 @@ type PGResult struct {
 //              usage: COUNTER
 //              description: v1 description
 
-// Collectors unions all collectors settings in one place.
-type Collectors map[string]CollectorSettings
+// CollectorsSettings unions all collectors settings in one place.
+type CollectorsSettings map[string]CollectorSettings
 
 // CollectorSettings unions all settings related to a single collector.
 type CollectorSettings struct {

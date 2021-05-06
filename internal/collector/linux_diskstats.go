@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"path/filepath"
@@ -36,7 +37,7 @@ type diskstatsCollector struct {
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt and https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
-func NewDiskstatsCollector(labels prometheus.Labels) (Collector, error) {
+func NewDiskstatsCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	var diskLabelNames = []string{"device", "type"}
 
 	return &diskstatsCollector{

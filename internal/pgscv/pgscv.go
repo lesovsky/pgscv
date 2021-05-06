@@ -32,6 +32,7 @@ func Start(ctx context.Context, config *Config) error {
 		ConnsSettings:      config.ServicesConnsSettings,
 		Filters:            config.Filters,
 		DisabledCollectors: config.DisableCollectors,
+		CollectorsSettings: config.CollectorsSettings,
 	}
 
 	var wg sync.WaitGroup

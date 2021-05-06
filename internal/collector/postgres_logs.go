@@ -5,6 +5,7 @@ import (
 	"github.com/nxadm/tail"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"io"
 	"regexp"
@@ -37,7 +38,7 @@ type postgresLogsCollector struct {
 }
 
 // NewPostgresLogsCollector creates new collector for Postgres log messages.
-func NewPostgresLogsCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresLogsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	collector := &postgresLogsCollector{
 		updateLogfile: make(chan string),
 		totals: syncKV{

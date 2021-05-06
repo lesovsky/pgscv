@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"sync"
@@ -21,7 +22,7 @@ type filesystemCollector struct {
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
-func NewFilesystemCollector(labels prometheus.Labels) (Collector, error) {
+func NewFilesystemCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &filesystemCollector{
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(

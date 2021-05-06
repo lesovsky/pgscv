@@ -5,12 +5,13 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"strconv"
 	"strings"
 )
 
-// Config defines collector configuration settings
+// Config defines collector's global configuration.
 type Config struct {
 	// ServiceType defines the type of discovered service. Depending on the type there should be different settings or
 	// settings-specifics metric collection usecases.
@@ -23,6 +24,8 @@ type Config struct {
 	PostgresServiceConfig
 	// Filters are user-defined regular expressions allow to include/exclude collecting various stats.
 	Filters map[string]filter.Filter
+	// Settings defines collectors settings propagated from main YAML configuration.
+	Settings model.CollectorsSettings
 }
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.

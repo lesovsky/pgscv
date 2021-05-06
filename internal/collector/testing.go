@@ -17,7 +17,7 @@ type pipelineInput struct {
 	// prints warning.
 	optional []string
 	// Collector function used for creating metric collector.
-	collector func(prometheus.Labels) (Collector, error)
+	collector func(prometheus.Labels, model.CollectorSettings) (Collector, error)
 	// Service type related to collector.
 	service string
 }
@@ -30,7 +30,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 	// requiredMetricNamesCounter is the counter of how many times metrics have been collected
 	metricNamesCounter := map[string]int{}
 
-	collector, err := input.collector(prometheus.Labels{"example_label": "example_value"})
+	collector, err := input.collector(prometheus.Labels{"example_label": "example_value"}, model.CollectorSettings{})
 	assert.NoError(t, err)
 	ch := make(chan prometheus.Metric)
 

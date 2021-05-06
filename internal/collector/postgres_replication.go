@@ -52,7 +52,7 @@ type postgresReplicationCollector struct {
 
 // NewPostgresReplicationCollector returns a new Collector exposing postgres replication stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-REPLICATION-VIEW
-func NewPostgresReplicationCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresReplicationCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"client_addr", "usename", "application_name", "state", "lag"}
 
 	return &postgresReplicationCollector{

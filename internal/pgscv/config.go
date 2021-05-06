@@ -25,19 +25,19 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryPath            string                // full path of the program, required for auto-update procedure
-	BinaryVersion         string                // version of the program, required for auto-update procedure
-	AutoUpdate            string                `yaml:"autoupdate"`       // controls auto-update procedure
-	NoTrackMode           bool                  `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
-	ListenAddress         string                `yaml:"listen_address"`   // Network address and port where the application should listen on
-	SendMetricsURL        string                `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
-	SendMetricsInterval   time.Duration         // Metric send interval
-	APIKey                string                `yaml:"api_key"`  // API key for accessing to Weaponry
-	ServicesConnsSettings service.ConnsSettings `yaml:"services"` // All connections settings for exact services
-	Defaults              map[string]string     `yaml:"defaults"` // Defaults
-	Filters               filter.Filters        `yaml:"filters"`
-	DisableCollectors     []string              `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
-	Collectors            model.Collectors      `yaml:"collectors"`         // Collectors and its settings
+	BinaryPath            string                   // full path of the program, required for auto-update procedure
+	BinaryVersion         string                   // version of the program, required for auto-update procedure
+	AutoUpdate            string                   `yaml:"autoupdate"`       // controls auto-update procedure
+	NoTrackMode           bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
+	ListenAddress         string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
+	SendMetricsURL        string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
+	SendMetricsInterval   time.Duration            // Metric send interval
+	APIKey                string                   `yaml:"api_key"`  // API key for accessing to Weaponry
+	ServicesConnsSettings service.ConnsSettings    `yaml:"services"` // All connections settings for exact services
+	Defaults              map[string]string        `yaml:"defaults"` // Defaults
+	Filters               filter.Filters           `yaml:"filters"`
+	DisableCollectors     []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
+	CollectorsSettings    model.CollectorsSettings `yaml:"collectors"`         // Collectors settings propagated from main YAML configuration
 }
 
 // NewConfig creates new config based on config file or return default config of config is not exists.

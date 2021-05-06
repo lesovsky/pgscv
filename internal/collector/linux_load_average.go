@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"strconv"
 	"strings"
@@ -16,7 +17,7 @@ type loadaverageCollector struct {
 }
 
 // NewLoadAverageCollector returns a new Collector exposing load average statistics.
-func NewLoadAverageCollector(labels prometheus.Labels) (Collector, error) {
+func NewLoadAverageCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &loadaverageCollector{
 		load1: typedDesc{
 			desc: prometheus.NewDesc(

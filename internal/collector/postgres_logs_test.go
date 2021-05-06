@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"os"
 	"sync"
@@ -13,7 +14,7 @@ import (
 )
 
 func Test_runTailLoop(t *testing.T) {
-	c, err := NewPostgresLogsCollector(nil)
+	c, err := NewPostgresLogsCollector(nil, model.CollectorSettings{})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	lc := c.(*postgresLogsCollector)
@@ -119,7 +120,7 @@ func Test_runTailLoop(t *testing.T) {
 }
 
 func Test_tailCollect(t *testing.T) {
-	c, err := NewPostgresLogsCollector(nil)
+	c, err := NewPostgresLogsCollector(nil, model.CollectorSettings{})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	lc := c.(*postgresLogsCollector)
@@ -156,7 +157,7 @@ func Test_newLogParser(t *testing.T) {
 }
 
 func Test_logParser_updateMessagesStats(t *testing.T) {
-	c, err := NewPostgresLogsCollector(nil)
+	c, err := NewPostgresLogsCollector(nil, model.CollectorSettings{})
 	assert.NoError(t, err)
 	assert.NotNil(t, c)
 	lc := c.(*postgresLogsCollector)

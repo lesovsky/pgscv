@@ -46,7 +46,7 @@ type postgresTablesCollector struct {
 // For details see
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-TABLES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-TABLES-VIEW
-func NewPostgresTablesCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresTablesCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	var tablesLabelNames = []string{"datname", "schemaname", "relname"}
 
 	return &postgresTablesCollector{

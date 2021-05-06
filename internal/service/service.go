@@ -57,6 +57,8 @@ type Config struct {
 	ConnsSettings      ConnsSettings
 	Filters            map[string]filter.Filter
 	DisabledCollectors []string
+	// CollectorsSettings defines all collector settings propagated from main YAML configuration.
+	CollectorsSettings model.CollectorsSettings
 }
 
 // Exporter is an interface for prometheus.Collector.
@@ -361,6 +363,7 @@ func (repo *Repository) setupServices(config Config) error {
 				ServiceType: service.ConnSettings.ServiceType,
 				ConnString:  service.ConnSettings.Conninfo,
 				Filters:     config.Filters,
+				Settings:    config.CollectorsSettings,
 			}
 
 			switch service.ConnSettings.ServiceType {

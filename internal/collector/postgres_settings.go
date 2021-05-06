@@ -21,7 +21,7 @@ type postgresSettingsCollector struct {
 // NewPostgresSettingsCollector returns a new Collector exposing postgres settings stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-settings.html
 // and https://www.postgresql.org/docs/current/view-pg-file-settings.html
-func NewPostgresSettingsCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresSettingsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresSettingsCollector{
 		settings: typedDesc{
 			desc: prometheus.NewDesc(

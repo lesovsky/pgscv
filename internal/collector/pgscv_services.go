@@ -1,6 +1,9 @@
 package collector
 
-import "github.com/prometheus/client_golang/prometheus"
+import (
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/model"
+)
 
 // pgscvServicesCollector defines metrics about discovered and monitored services.
 type pgscvServicesCollector struct {
@@ -8,7 +11,7 @@ type pgscvServicesCollector struct {
 }
 
 // NewPgscvServicesCollector creates new collector.
-func NewPgscvServicesCollector(labels prometheus.Labels) (Collector, error) {
+func NewPgscvServicesCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &pgscvServicesCollector{
 		service: typedDesc{
 			desc: prometheus.NewDesc(

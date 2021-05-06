@@ -3,12 +3,13 @@ package collector
 import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"sync"
 )
 
 // Factories defines collector functions which used for collecting metrics.
-type Factories map[string]func(prometheus.Labels) (Collector, error)
+type Factories map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error)
 
 // RegisterSystemCollectors unions all system-related collectors and registers them in single place.
 func (f Factories) RegisterSystemCollectors(disabled []string) {
@@ -17,7 +18,7 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels) (Collector, error){
+	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
 		"system/pgscv":       NewPgscvServicesCollector,
 		"system/loadaverage": NewLoadAverageCollector,
 		"system/cpu":         NewCPUCollector,
@@ -47,7 +48,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels) (Collector, error){
+	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
 		"postgres/pgscv":             NewPgscvServicesCollector,
 		"postgres/activity":          NewPostgresActivityCollector,
 		"postgres/archiver":          NewPostgresWalArchivingCollector,
@@ -84,7 +85,7 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels) (Collector, error){
+	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
 		"pgbouncer/pgscv":    NewPgscvServicesCollector,
 		"pgbouncer/pools":    NewPgbouncerPoolsCollector,
 		"pgbouncer/stats":    NewPgbouncerStatsCollector,
@@ -103,7 +104,7 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 }
 
 // register is the generic routine which register any kind of collectors.
-func (f Factories) register(collector string, factory func(prometheus.Labels) (Collector, error)) {
+func (f Factories) register(collector string, factory func(prometheus.Labels, model.CollectorSettings) (Collector, error)) {
 	f[collector] = factory
 }
 
@@ -132,7 +133,9 @@ func NewPgscvCollector(serviceID string, factories Factories, config Config) (*P
 	constLabels := prometheus.Labels{"instance": hostname, "service_id": serviceID}
 
 	for key := range factories {
-		collector, err := factories[key](constLabels)
+		settings := config.Settings[key]
+
+		collector, err := factories[key](constLabels, settings)
 		if err != nil {
 			return nil, err
 		}

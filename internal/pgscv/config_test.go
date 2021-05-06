@@ -79,7 +79,7 @@ func TestNewConfig(t *testing.T) {
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
-				Collectors: map[string]model.CollectorSettings{
+				CollectorsSettings: model.CollectorsSettings{
 					"postgres/archiver": {
 						Subsystems: map[string]model.MetricsSubsystem{
 							"activity": {

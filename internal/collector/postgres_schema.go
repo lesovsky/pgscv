@@ -4,6 +4,7 @@ import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"golang.org/x/net/context"
 	"strings"
@@ -22,7 +23,7 @@ type postgresSchemaCollector struct {
 
 // NewPostgresSchemaCollector returns a new Collector exposing postgres schema stats. Stats are based on different
 // sources inside system catalog.
-func NewPostgresSchemasCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresSchemasCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresSchemaCollector{
 		syscatalog: typedDesc{
 			desc: prometheus.NewDesc(

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"os/exec"
@@ -24,7 +25,7 @@ type cpuCollector struct {
 }
 
 // NewCPUCollector returns a new Collector exposing kernel/system statistics.
-func NewCPUCollector(labels prometheus.Labels) (Collector, error) {
+func NewCPUCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	cmdOutput, err := exec.Command("getconf", "CLK_TCK").Output()
 	if err != nil {
 		return nil, fmt.Errorf("determine clock frequency failed: %s", err)

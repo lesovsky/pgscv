@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"path"
@@ -27,7 +28,7 @@ type systemCollector struct {
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
-func NewSysconfigCollector(labels prometheus.Labels) (Collector, error) {
+func NewSysconfigCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &systemCollector{
 		sysctlList: []string{
 			"kernel.sched_migration_cost_ns",

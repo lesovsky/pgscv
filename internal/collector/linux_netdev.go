@@ -6,6 +6,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"strconv"
@@ -19,7 +20,7 @@ type netdevCollector struct {
 }
 
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
-func NewNetdevCollector(labels prometheus.Labels) (Collector, error) {
+func NewNetdevCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &netdevCollector{
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
+	"github.com/weaponry/pgscv/internal/model"
 	"net"
 	"strings"
 )
@@ -13,7 +14,7 @@ type networkCollector struct {
 	publicAddresses  typedDesc
 }
 
-func NewNetworkCollector(labels prometheus.Labels) (Collector, error) {
+func NewNetworkCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &networkCollector{
 		publicAddresses: typedDesc{
 			desc: prometheus.NewDesc(

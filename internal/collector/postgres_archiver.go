@@ -22,7 +22,7 @@ type postgresWalArchivingCollector struct {
 
 // NewPostgresWalArchivingCollector returns a new Collector exposing postgres WAL archiving stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ARCHIVER-VIEW
-func NewPostgresWalArchivingCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPostgresWalArchivingCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresWalArchivingCollector{
 		archived: typedDesc{
 			desc: prometheus.NewDesc(

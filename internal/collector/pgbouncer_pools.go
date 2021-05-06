@@ -24,7 +24,7 @@ type pgbouncerPoolsCollector struct {
 
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
 // For details see https://www.pgbouncer.org/usage.html#show-pools.
-func NewPgbouncerPoolsCollector(constLabels prometheus.Labels) (Collector, error) {
+func NewPgbouncerPoolsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
 	var poolsLabelNames = []string{"user", "database", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
