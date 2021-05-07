@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/model"
 )
 
 // typedDesc is the descriptor wrapper with extra properties
@@ -20,4 +21,56 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 		value *= d.factor
 	}
 	return prometheus.MustNewConstMetric(d.desc, d.valueType, value, labels...)
+}
+
+// typedDescSet unions metrics in a set, which could be collected using query.
+type typedDescSet struct {
+	query          string               // query used for requesting stats
+	variableLabels []string             // ordered list of labels names
+	metricNames    []string             // ordered list of metrics short names (with no namespace/subsystem)
+	descs          map[string]typedDesc // metrics descriptors
+}
+
+// newDescSet creates new typedDescSet based on passed metrics attributes.
+func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, settings model.MetricsSubsystem) typedDescSet {
+	var variableLabels []string
+	for _, m := range settings.Metrics {
+		if m.Usage == "LABEL" {
+			variableLabels = append(variableLabels, m.ShortName)
+		}
+	}
+
+	descs := make(map[string]typedDesc)
+
+	typeMap := map[string]prometheus.ValueType{
+		"COUNTER": prometheus.CounterValue,
+		"GAUGE":   prometheus.GaugeValue,
+	}
+
+	var metricNames []string
+	for _, m := range settings.Metrics {
+		if m.Usage == "LABEL" {
+			continue
+		}
+
+		metricNames = append(metricNames, m.ShortName)
+
+		metricName := prometheus.BuildFQName(namespace, subsystem, m.ShortName)
+		d := typedDesc{
+			desc: prometheus.NewDesc(
+				metricName,
+				m.Description,
+				variableLabels, constLabels,
+			), valueType: typeMap[m.Usage],
+		}
+
+		descs[m.ShortName] = d
+	}
+
+	return typedDescSet{
+		query:          settings.Query,
+		metricNames:    metricNames,
+		variableLabels: variableLabels,
+		descs:          descs,
+	}
 }

@@ -85,8 +85,8 @@ func TestNewConfig(t *testing.T) {
 							"activity": {
 								Query: "SELECT l1, v1 FROM t1 WHERE q",
 								Metrics: model.Metrics{
-									"l1": {Usage: "LABEL", Description: "l1 description"},
-									"v1": {Usage: "COUNTER", Description: "v1 description"},
+									{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
+									{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
 								},
 							},
 						},

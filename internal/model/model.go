@@ -33,10 +33,10 @@ type PGResult struct {
 //        activity:                                             <- MetricsSubsystem
 //          query: "SELECT l1, v1 FROM t1 WHERE t1"             <- MetricsSubsystem.Query
 //          metrics:                                            <- MetricsSubsystem.Metrics
-//            l1:                                               <- UserMetric
+//            - name: l1                                        <- UserMetric
 //              usage: LABEL                                    <- UserMetric.Usage
 //              description: l1 description                     <- UserMetric.Description
-//            v1:
+//            - name: v1
 //              usage: COUNTER
 //              description: v1 description
 
@@ -64,11 +64,14 @@ type MetricsSubsystem struct {
 }
 
 // Metrics unions all metrics in one place.
-type Metrics map[string]UserMetric
+//type Metrics map[string]UserMetric
+type Metrics []UserMetric
 
 // UserMetric defines a single metric and its properties.
 type UserMetric struct {
-	FQName      string
+	ShortName   string `yaml:"name"`
 	Usage       string `yaml:"usage"`
 	Description string `yaml:"description"`
 }
+
+// TODO: add UserMetric validation (например Usage может иметь только ограниченное число значений - LABEL, GAUGE, COUNTER)

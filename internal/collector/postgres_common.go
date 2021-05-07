@@ -28,8 +28,7 @@ type postgresGenericStat struct {
 	values map[string]float64
 }
 
-// parsePostgresGenericStats extracts values from query result, generates metrics using extracted values and passed
-// labels and send them to Prometheus.
+// parsePostgresGenericStats extracts labels and values from query result and returns stats object.
 func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[string]postgresGenericStat {
 	log.Debug("parse postgres generic stats")
 
@@ -59,8 +58,8 @@ func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[strin
 
 		for i, colname := range r.Colnames {
 			// Column's values act as metric values or as labels values.
-			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
-			// is in the labelNames, skip that column.
+			// If column's name is NOT in the labelNames, process column's values
+			// as values for metrics. If column's name is in the labelNames, skip that column.
 			if stringsContains(labelNames, string(colname.Name)) {
 				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
@@ -81,6 +80,62 @@ func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[strin
 			// Append value to values map
 			stat.values[string(colname.Name)] = v
 		}
+	}
+
+	return stats
+}
+
+// customValues unions values names and values in single place
+type customValues map[string]float64
+
+// postgresCustomStat unions customValues using label values as a key.
+type postgresCustomStat map[string]customValues
+
+// parsePostgresCustomStats parses query result, extract labels ans values and returns stats object.
+func parsePostgresCustomStats(r *model.PGResult, labelNames []string) postgresCustomStat {
+	log.Debug("parse postgres custom stats")
+
+	stats := postgresCustomStat{}
+
+	// process row by row
+	for _, row := range r.Rows {
+		// collect label values and assemble map key
+		var key string
+		for i, colname := range r.Colnames {
+			if stringsContains(labelNames, string(colname.Name)) {
+				key = key + "/" + row[i].String
+			}
+		}
+
+		// trim leading slash
+		key = strings.TrimLeft(key, "/")
+
+		values := customValues{}
+		for i, colname := range r.Colnames {
+			// Column's values act as metric values or as labels values.
+			// If column's name is NOT in the labelNames, process column's values as values for metrics. If column's name
+			// is in the labelNames, skip that column.
+			if stringsContains(labelNames, string(colname.Name)) {
+				continue
+			}
+
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
+
+			// Convert value from string to float64.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+				continue
+			}
+
+			// Append value to values map
+			values[string(colname.Name)] = v
+		}
+
+		stats[key] = values
 	}
 
 	return stats

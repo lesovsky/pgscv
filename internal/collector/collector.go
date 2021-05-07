@@ -66,6 +66,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 		"postgres/settings":          NewPostgresSettingsCollector,
 		"postgres/storage":           NewPostgresStorageCollector,
 		"postgres/tables":            NewPostgresTablesCollector,
+		"postgres/custom":            NewPostgresCustomCollector,
 	}
 
 	for name, fn := range funcs {
