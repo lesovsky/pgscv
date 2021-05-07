@@ -10,6 +10,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
 
@@ -137,6 +138,64 @@ func (c *Config) Validate() error {
 	c.Filters.SetDefault()
 	if err := c.Filters.Compile(); err != nil {
 		return err
+	}
+
+	// Validate collector settings.
+	err = validateCollectorSettings(c.CollectorsSettings)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// validateCollectorSettings validates collectors settings passed from main YAML configuration.
+func validateCollectorSettings(cs model.CollectorsSettings) error {
+	if cs == nil || len(cs) == 0 {
+		return nil
+	}
+
+	for csName, settings := range cs {
+		re1 := regexp.MustCompile(`^[a-zA-Z0-9]+/[a-zA-Z0-9]+$`)
+		if !re1.MatchString(csName) {
+			return fmt.Errorf("invalid collector name: %s", csName)
+		}
+
+		// Validate subsystems level
+		for ssName, subsys := range settings.Subsystems {
+			re2 := regexp.MustCompilePOSIX(`^[a-zA-Z0-9_]+$`)
+
+			if !re2.MatchString(ssName) {
+				return fmt.Errorf("invalid subsystem name: %s", ssName)
+			}
+
+			if len(subsys.Metrics) > 0 && subsys.Query == "" {
+				return fmt.Errorf("query is not specified for: %s", ssName)
+			}
+
+			// Validate metrics level
+			reLabel := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+			reMetric := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+
+			for _, m := range subsys.Metrics {
+				usage := m.Usage
+				switch usage {
+				case "LABEL":
+					if !reLabel.MatchString(m.ShortName) {
+						return fmt.Errorf("invalid label name '%s'", m.ShortName)
+					}
+				case "COUNTER", "GAUGE":
+					if !reMetric.MatchString(m.ShortName) {
+						return fmt.Errorf("invalid metric name '%s'", m.ShortName)
+					}
+					if m.Description == "" {
+						return fmt.Errorf("metric description is not specified for %s", m.ShortName)
+					}
+				default:
+					return fmt.Errorf("invalid metric usage '%s'", usage)
+				}
+			}
+		}
 	}
 
 	return nil

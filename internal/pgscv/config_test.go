@@ -210,6 +210,144 @@ func TestConfig_Validate(t *testing.T) {
 	}
 }
 
+func Test_validateCollectorSettings(t *testing.T) {
+	testcases := []struct {
+		valid    bool
+		settings model.CollectorsSettings
+	}{
+		{valid: true, settings: nil},
+		{valid: true, settings: make(map[string]model.CollectorSettings)},
+		{
+			valid: true,
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
+								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+							},
+						},
+						"example2": {
+							Query: "SELECT 'label1' as l1, 1 as v1, 2 as v2",
+							Metrics: model.Metrics{
+								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
+								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+								{ShortName: "v2", Usage: "GAUGE", Description: "v2 description"},
+							},
+						},
+					},
+				},
+				"example/example2": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
+								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+							},
+						},
+					},
+				},
+			},
+		},
+		// invalid collectors names
+		{valid: false, settings: map[string]model.CollectorSettings{"invalid": {}}},
+		{valid: false, settings: map[string]model.CollectorSettings{"invalid/": {}}},
+		{valid: false, settings: map[string]model.CollectorSettings{"/invalid": {}}},
+		{valid: false, settings: map[string]model.CollectorSettings{"example/inva:lid": {}}},
+		{
+			valid: false, // Invalid subsystem name for metric
+			settings: map[string]model.CollectorSettings{
+				"example/example": {Subsystems: map[string]model.MetricsSubsystem{"inva:lid": {}}},
+			},
+		},
+		{
+			valid: false, // No query specified when metric exists
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Metrics: model.Metrics{
+								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // Invalid name for label
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "inva:lid", Usage: "LABEL", Description: "l1 description"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // Invalid name for metric
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "inva:lid", Usage: "COUNTER", Description: "v1 description"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // Empty metric descriptor
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "v1", Usage: "COUNTER"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // Invalid usage
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'label1' as l1, 1 as v1",
+							Metrics: model.Metrics{
+								{ShortName: "v1", Usage: "INVALID"},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testcases {
+		if tc.valid {
+			assert.NoError(t, validateCollectorSettings(tc.settings))
+		} else {
+			assert.Error(t, validateCollectorSettings(tc.settings))
+		}
+	}
+}
+
 func Test_toggleAutoupdate(t *testing.T) {
 	testcases := []struct {
 		valid bool
