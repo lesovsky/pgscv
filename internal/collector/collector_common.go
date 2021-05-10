@@ -104,8 +104,8 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 	return sets
 }
 
-// UpdateDescSet collect metrics for specified desc set.
-func UpdateDescSet(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
+// updateAllDescSets collect metrics for specified desc set.
+func updateAllDescSets(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
 
 	// Get de-duplicated list of databases should be visited.
 	databases := listDeskSetDatabases(descSets)
@@ -145,7 +145,7 @@ func updateFromSingleDatabase(config Config, descSets []typedDescSet, ch chan<- 
 			continue
 		}
 
-		err = updateDescSet(conn, s, ch)
+		err = updateSingleDescSet(conn, s, ch)
 		if err != nil {
 			log.Errorf("collect failed: %s; skip", err)
 			continue
@@ -199,7 +199,7 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, userDat
 				s.variableLabels = append([]string{"database"}, s.variableLabels...)
 			}
 
-			err = updateDescSet(conn, s, ch)
+			err = updateSingleDescSet(conn, s, ch)
 			if err != nil {
 				log.Errorf("collect failed: %s; skip", err)
 				continue
@@ -213,8 +213,8 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, userDat
 	return nil
 }
 
-// updateDescSet using passed connection collects metrics for specified descSet and receives it to metric channel.
-func updateDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.Metric) error {
+// updateSingleDescSet using passed connection collects metrics for specified descSet and receives it to metric channel.
+func updateSingleDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.Metric) error {
 	res, err := conn.Query(set.query)
 	if err != nil {
 		return err

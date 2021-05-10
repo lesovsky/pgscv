@@ -96,7 +96,7 @@ func Test_newDeskSetsFromSubsystems(t *testing.T) {
 	}
 }
 
-func Test_UpdateDescSet(t *testing.T) {
+func Test_updateAllDescSets(t *testing.T) {
 	config := Config{ConnString: store.TestPostgresConnStr}
 
 	subsystems := map[string]model.MetricsSubsystem{
@@ -141,7 +141,7 @@ func Test_UpdateDescSet(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		assert.NoError(t, UpdateDescSet(config, desksets, ch))
+		assert.NoError(t, updateAllDescSets(config, desksets, ch))
 		close(ch)
 		wg.Done()
 	}()
@@ -261,7 +261,7 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 	wg.Wait()
 }
 
-func Test_updateDescSet(t *testing.T) {
+func Test_updateSingleDescSet(t *testing.T) {
 	conn := store.NewTest(t)
 	defer conn.Close()
 
@@ -309,7 +309,7 @@ func Test_updateDescSet(t *testing.T) {
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				assert.NoError(t, updateDescSet(conn, tc.set, ch))
+				assert.NoError(t, updateSingleDescSet(conn, tc.set, ch))
 				close(ch)
 				wg.Done()
 			}()

@@ -67,13 +67,13 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	}
 
 	// Update builtin metrics.
-	err := UpdateDescSet(config, c.builtin, ch)
+	err := updateAllDescSets(config, c.builtin, ch)
 	if err != nil {
 		return err
 	}
 
 	// Update user-defined metrics.
-	err = UpdateDescSet(config, c.custom, ch)
+	err = updateAllDescSets(config, c.custom, ch)
 	if err != nil {
 		return err
 	}

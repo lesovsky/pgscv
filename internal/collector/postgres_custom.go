@@ -18,5 +18,5 @@ func NewPostgresCustomCollector(constLabels prometheus.Labels, settings model.Co
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresCustomCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	return UpdateDescSet(config, c.descSets, ch)
+	return updateAllDescSets(config, c.descSets, ch)
 }
