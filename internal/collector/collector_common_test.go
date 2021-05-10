@@ -355,3 +355,39 @@ func Test_listDeskSetDatabases(t *testing.T) {
 		assert.Equal(t, tc.want, len(listDeskSetDatabases(tc.sets)))
 	}
 }
+
+func Test_removeCollisions(t *testing.T) {
+	s1 := model.Subsystems{
+		"example1": {
+			Query: "SELECT 'label1' AS label1, 1 AS value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description."},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description."},
+			},
+		},
+	}
+	s2 := model.Subsystems{
+		"example1": {
+			Query: "SELECT 'label1' AS label1, 2 AS value2",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description."},
+				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description."},
+			},
+		},
+		"example2": {
+			Query: "SELECT 'label1' AS label1, 1 AS value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description."},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description."},
+			},
+		},
+	}
+
+	assert.Len(t, s1, 1)
+	assert.Len(t, s2, 2)
+
+	removeCollisions(s1, s2)
+
+	assert.Len(t, s1, 1)
+	assert.Len(t, s2, 1)
+}

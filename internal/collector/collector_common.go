@@ -269,3 +269,20 @@ func listDeskSetDatabases(sets []typedDescSet) []string {
 
 	return databases
 }
+
+// removeCollisions looking for metrics with the same name in subsystems with the same name.
+func removeCollisions(s1 model.Subsystems, s2 model.Subsystems) {
+	for name, subsys1 := range s1 {
+		if subsys2, ok := s2[name]; ok {
+
+			for _, m1 := range subsys1.Metrics {
+				for _, m2 := range subsys2.Metrics {
+					if m1.ShortName == m2.ShortName {
+						log.Warnf("ignore subsystem '%s': metric '%s' collision found. Check the configuration.", name, m2.ShortName)
+						delete(s2, name)
+					}
+				}
+			}
+		}
+	}
+}

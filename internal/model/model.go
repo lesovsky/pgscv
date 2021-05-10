@@ -56,7 +56,6 @@ type Subsystems map[string]MetricsSubsystem
 
 // MetricsSubsystem describes a single subsystem.
 type MetricsSubsystem struct {
-	Name string
 	// TODO: this should be an interface because use cases are not limited by queries only,
 	//   there could by system commands, HTTP requests, etc...
 	// Databases defines which databases should be visited for collecting metrics.
