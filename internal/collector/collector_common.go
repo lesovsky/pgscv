@@ -25,6 +25,7 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 
 // typedDescSet unions metrics in a set, which could be collected using query.
 type typedDescSet struct {
+	databases      []string             // list of databases from which metrics should be collected
 	query          string               // query used for requesting stats
 	variableLabels []string             // ordered list of labels names
 	metricNames    []string             // ordered list of metrics short names (with no namespace/subsystem)
@@ -34,6 +35,13 @@ type typedDescSet struct {
 // newDescSet creates new typedDescSet based on passed metrics attributes.
 func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, settings model.MetricsSubsystem) typedDescSet {
 	var variableLabels []string
+
+	// Add extra "database" label to metrics collected from different databases.
+	if len(settings.Databases) > 0 {
+		variableLabels = append(variableLabels, "database")
+	}
+
+	// Construct the rest of labels slice.
 	for _, m := range settings.Metrics {
 		if m.Usage == "LABEL" {
 			variableLabels = append(variableLabels, m.ShortName)
@@ -42,11 +50,13 @@ func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, sett
 
 	descs := make(map[string]typedDesc)
 
+	// typeMap is auxiliary dictionary for selecting proper Prometheus data type depending on 'usage' property.
 	typeMap := map[string]prometheus.ValueType{
 		"COUNTER": prometheus.CounterValue,
 		"GAUGE":   prometheus.GaugeValue,
 	}
 
+	// Construct metrics names and descriptors slices.
 	var metricNames []string
 	for _, m := range settings.Metrics {
 		if m.Usage == "LABEL" {
@@ -68,6 +78,7 @@ func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, sett
 	}
 
 	return typedDescSet{
+		databases:      settings.Databases,
 		query:          settings.Query,
 		metricNames:    metricNames,
 		variableLabels: variableLabels,

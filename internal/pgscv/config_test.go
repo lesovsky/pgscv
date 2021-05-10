@@ -83,7 +83,8 @@ func TestNewConfig(t *testing.T) {
 					"postgres/archiver": {
 						Subsystems: map[string]model.MetricsSubsystem{
 							"activity": {
-								Query: "SELECT l1, v1 FROM t1 WHERE q",
+								Databases: []string{"example1", "example2"},
+								Query:     "SELECT l1, v1 FROM t1 WHERE q",
 								Metrics: model.Metrics{
 									{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
 									{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},

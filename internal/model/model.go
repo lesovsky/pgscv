@@ -59,7 +59,11 @@ type MetricsSubsystem struct {
 	Name string
 	// TODO: this should be an interface because use cases are not limited by queries only,
 	//   there could by system commands, HTTP requests, etc...
-	Query   string  `yaml:"query"`
+	// Databases defines which databases should be visited for collecting metrics.
+	Databases []string `yaml:"databases"`
+	// Query defines a SQL statement used for getting label/values for metrics.
+	Query string `yaml:"query"`
+	// Metrics defines a list of labels and metrics should be extracted from Query result.
 	Metrics Metrics `yaml:"metrics"`
 }
 
@@ -73,5 +77,3 @@ type UserMetric struct {
 	Usage       string `yaml:"usage"`
 	Description string `yaml:"description"`
 }
-
-// TODO: add UserMetric validation (например Usage может иметь только ограниченное число значений - LABEL, GAUGE, COUNTER)
