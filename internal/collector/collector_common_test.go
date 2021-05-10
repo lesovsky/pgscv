@@ -1,9 +1,13 @@
 package collector
 
 import (
+	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
+	"strings"
+	"sync"
 	"testing"
 )
 
@@ -57,5 +61,248 @@ func Test_newDescSet(t *testing.T) {
 		assert.Equal(t, tc.wantVarLabels, descSet.variableLabels)
 		assert.Equal(t, tc.wantMetricNames, descSet.metricNames)
 		assert.NotNil(t, descSet.descs)
+	}
+}
+
+func Test_newDeskSetsFromSubsystems(t *testing.T) {
+	subsystems := map[string]model.MetricsSubsystem{
+		// This should be in the output
+		"example1": {
+			Query: "SELECT 'label1' as label1, 1 as value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description"},
+			},
+		},
+		// This should be in the output
+		"example2": {
+			Databases: []string{"example2"},
+			Query:     "SELECT 'label2' as label2, 2 as value2",
+			Metrics: model.Metrics{
+				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
+				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
+			},
+		},
+	}
+
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+	assert.Equal(t, 2, len(desksets))
+
+	for _, set := range desksets {
+		assert.NotEqual(t, "", set.query)
+		assert.NotNil(t, set.variableLabels)
+		assert.NotNil(t, set.metricNames)
+		assert.Equal(t, 1, len(desksets[0].descs))
+	}
+}
+
+func Test_UpdateDescSet(t *testing.T) {
+	config := Config{ConnString: store.TestPostgresConnStr}
+
+	subsystems := map[string]model.MetricsSubsystem{
+		// This should be in the output
+		"example1": {
+			Query: "SELECT 'label1' as label1, 1 as value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description"},
+			},
+		},
+		// This should be in the output
+		"example2": {
+			Databases: []string{"pgscv_fixtures"},
+			Query:     "SELECT 'label2' as label2, 2 as value2",
+			Metrics: model.Metrics{
+				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
+				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
+			},
+		},
+	}
+
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+
+	ch := make(chan prometheus.Metric)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		assert.NoError(t, UpdateDescSet(config, desksets, ch))
+		close(ch)
+		wg.Done()
+	}()
+
+	var counter = 0
+	for m := range ch {
+		//fmt.Println(m.Desc().String())
+		counter++
+		for _, s := range []string{"postgres_example", `const="example"`} {
+			assert.True(t, strings.Contains(m.Desc().String(), s))
+		}
+	}
+	assert.Equal(t, 2, counter)
+
+	wg.Wait()
+}
+
+func Test_updateFromSingleDatabase(t *testing.T) {
+	config := Config{ConnString: store.TestPostgresConnStr}
+
+	subsystems := map[string]model.MetricsSubsystem{
+		// This should be in the output
+		"example1": {
+			Query: "SELECT 'label1' as label1, 1 as value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description"},
+			},
+		},
+		// This should be skipped because it has databases specified
+		"example2": {
+			Databases: []string{"pgscv_fixtures"},
+			Query:     "SELECT 'label2' as label2, 2 as value2",
+			Metrics: model.Metrics{
+				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
+				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
+			},
+		},
+	}
+
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+
+	ch := make(chan prometheus.Metric)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		assert.NoError(t, updateFromSingleDatabase(config, desksets, ch))
+		close(ch)
+		wg.Done()
+	}()
+
+	var counter = 0
+	for m := range ch {
+		//fmt.Println(m.Desc().String())
+		counter++
+		for _, s := range []string{"postgres_example1_value1", `const="example"`, `variableLabels: [label1]`} {
+			assert.True(t, strings.Contains(m.Desc().String(), s))
+		}
+	}
+	assert.Equal(t, 1, counter)
+
+	wg.Wait()
+}
+
+func Test_updateFromMultipleDatabases(t *testing.T) {
+	config := Config{ConnString: store.TestPostgresConnStr}
+	databases := []string{"pgscv_fixtures", "postgres", "invalid"}
+
+	subsystems := map[string]model.MetricsSubsystem{
+		// This should be skipped because it has no databases specified
+		"example1": {
+			Query: "SELECT 'label1' as label1, 1 as value1",
+			Metrics: model.Metrics{
+				{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description"},
+			},
+		},
+		// This should be in the output
+		"example2": {
+			Databases: []string{"pgscv_fixtures", "invalid"},
+			Query:     "SELECT 'label2' as label2, 'label3' as label3, 2 as value2",
+			Metrics: model.Metrics{
+				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
+				{ShortName: "label3", Usage: "LABEL", Description: "label3 description"},
+				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
+			},
+		},
+	}
+
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+
+	ch := make(chan prometheus.Metric)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		assert.NoError(t, updateFromMultipleDatabases(config, desksets, databases, ch))
+		close(ch)
+		wg.Done()
+	}()
+
+	var counter = 0
+	for m := range ch {
+		//fmt.Println(m.Desc().String())
+		counter++
+		for _, s := range []string{"postgres_example2_value2", `const="example"`, `variableLabels: [database label2 label3]`} {
+			assert.True(t, strings.Contains(m.Desc().String(), s))
+		}
+	}
+	assert.Equal(t, 1, counter)
+
+	wg.Wait()
+}
+
+func Test_updateDescSet(t *testing.T) {
+	conn := store.NewTest(t)
+	defer conn.Close()
+
+	testcases := []struct {
+		set  typedDescSet
+		want []string
+	}{
+		{
+			// descSet with no specified databases
+			set: newDescSet(
+				prometheus.Labels{"constlabel": "example1"}, "postgres", "class1",
+				model.MetricsSubsystem{
+					Query: "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
+					Metrics: model.Metrics{
+						{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+						{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
+						{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
+					},
+				},
+			),
+			want: []string{"postgres_class1_metric", `constlabel="example1"`, `variableLabels: [label1]`},
+		},
+		{
+			// descSet with specified databases
+			set: newDescSet(
+				prometheus.Labels{"constlabel": "example2"}, "postgres", "class2",
+				model.MetricsSubsystem{
+					Databases: []string{conn.Conn().Config().Database},
+					Query:     "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
+					Metrics: model.Metrics{
+						{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+						{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
+						{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
+					},
+				},
+			),
+			want: []string{"postgres_class2_metric", `constlabel="example2"`, `variableLabels: [database label1]`},
+		},
+	}
+
+	for i, tc := range testcases {
+		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
+			ch := make(chan prometheus.Metric)
+
+			var wg sync.WaitGroup
+			wg.Add(1)
+			go func() {
+				assert.NoError(t, updateDescSet(conn, tc.set, ch))
+				close(ch)
+				wg.Done()
+			}()
+
+			for m := range ch {
+				//fmt.Println(m.Desc().String())
+				for _, s := range tc.want {
+					assert.True(t, strings.Contains(m.Desc().String(), s))
+				}
+			}
+
+			wg.Wait()
+		})
 	}
 }
