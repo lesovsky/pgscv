@@ -329,17 +329,17 @@ func Test_updateDescSet(t *testing.T) {
 func Test_listDeskSetDatabases(t *testing.T) {
 	testcases := []struct {
 		sets []typedDescSet
-		want []string
+		want int
 	}{
-		{sets: []typedDescSet{{databases: []string{}}}, want: []string{}},
-		{sets: []typedDescSet{{databases: []string{"example1"}}}, want: []string{"example1"}},
-		{sets: []typedDescSet{{databases: []string{"example1", "example2"}}}, want: []string{"example1", "example2"}},
+		{sets: []typedDescSet{{databases: []string{}}}, want: 0},
+		{sets: []typedDescSet{{databases: []string{"example1"}}}, want: 1},
+		{sets: []typedDescSet{{databases: []string{"example1", "example2"}}}, want: 2},
 		{
 			sets: []typedDescSet{
 				{databases: []string{"example1", "example2"}},
 				{databases: []string{"example2", "example3"}},
 			},
-			want: []string{"example1", "example2", "example3"},
+			want: 3,
 		},
 		{
 			sets: []typedDescSet{
@@ -347,11 +347,11 @@ func Test_listDeskSetDatabases(t *testing.T) {
 				{databases: []string{"example2", "example3"}},
 				{databases: []string{"example3", "example1"}},
 			},
-			want: []string{"example1", "example2", "example3"},
+			want: 3,
 		},
 	}
 
 	for _, tc := range testcases {
-		assert.Equal(t, tc.want, listDeskSetDatabases(tc.sets))
+		assert.Equal(t, tc.want, len(listDeskSetDatabases(tc.sets)))
 	}
 }
