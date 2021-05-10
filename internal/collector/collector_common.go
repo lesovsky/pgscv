@@ -107,18 +107,8 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 // UpdateDescSet collect metrics for specified desc set.
 func UpdateDescSet(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
 
-	// Make list of databases should be visited for collecting metrics.
-	databases := []string{}
-	for _, set := range descSets {
-		m := map[string]bool{}
-		for _, dbname := range set.databases {
-			m[dbname] = true
-		}
-
-		for dbname := range m {
-			databases = append(databases, dbname)
-		}
-	}
+	// Get de-duplicated list of databases should be visited.
+	databases := listDeskSetDatabases(descSets)
 
 	// Collect multiple-databases metrics.
 	if len(databases) > 0 {
@@ -239,13 +229,18 @@ func updateDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.Metric
 
 	// iterate over stats, extract labels and values, wrap to metric and send to receiver.
 	for key, stat := range stats {
-
 		// If database label present in variable labels, prepend label values with database name.
 		var labelValues []string
 		if len(set.variableLabels) > 0 && set.variableLabels[0] == "database" {
-			labelValues = append([]string{dbname}, strings.Split(key, "/")...)
+			if key != "" {
+				labelValues = append([]string{dbname}, strings.Split(key, "/")...)
+			} else {
+				labelValues = []string{dbname}
+			}
 		} else {
-			labelValues = strings.Split(key, "/")
+			if key != "" {
+				labelValues = strings.Split(key, "/")
+			}
 		}
 
 		for name, value := range stat {
@@ -255,4 +250,22 @@ func updateDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.Metric
 	}
 
 	return nil
+}
+
+// listDeskSetDatabases parses slice of descSet and returns de-duplicated list of databases.
+func listDeskSetDatabases(sets []typedDescSet) []string {
+	// Make list of databases should be visited for collecting metrics.
+	m := map[string]bool{}
+	for _, set := range sets {
+		for _, dbname := range set.databases {
+			m[dbname] = true
+		}
+	}
+
+	databases := []string{}
+	for dbname := range m {
+		databases = append(databases, dbname)
+	}
+
+	return databases
 }

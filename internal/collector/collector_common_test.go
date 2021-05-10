@@ -102,19 +102,34 @@ func Test_UpdateDescSet(t *testing.T) {
 	subsystems := map[string]model.MetricsSubsystem{
 		// This should be in the output
 		"example1": {
-			Query: "SELECT 'label1' as label1, 1 as value1",
+			Query: "SELECT 1 as value1",
 			Metrics: model.Metrics{
-				{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
 				{ShortName: "value1", Usage: "COUNTER", Description: "value1 description"},
 			},
 		},
 		// This should be in the output
 		"example2": {
-			Databases: []string{"pgscv_fixtures"},
-			Query:     "SELECT 'label2' as label2, 2 as value2",
+			Query: "SELECT 'label2' as label2, 2 as value2",
 			Metrics: model.Metrics{
 				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
 				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
+			},
+		},
+		// This should be in the output
+		"example3": {
+			Databases: []string{"pgscv_fixtures"},
+			Query:     "SELECT 'label3' as label3, 3 as value3",
+			Metrics: model.Metrics{
+				{ShortName: "label3", Usage: "LABEL", Description: "label3 description"},
+				{ShortName: "value3", Usage: "COUNTER", Description: "value3 description"},
+			},
+		},
+		// This should be in the output
+		"example4": {
+			Databases: []string{"pgscv_fixtures"},
+			Query:     "SELECT 4 as value4",
+			Metrics: model.Metrics{
+				{ShortName: "value4", Usage: "COUNTER", Description: "value4 description"},
 			},
 		},
 	}
@@ -139,7 +154,7 @@ func Test_UpdateDescSet(t *testing.T) {
 			assert.True(t, strings.Contains(m.Desc().String(), s))
 		}
 	}
-	assert.Equal(t, 2, counter)
+	assert.Equal(t, 4, counter)
 
 	wg.Wait()
 }
@@ -215,6 +230,13 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 				{ShortName: "value2", Usage: "COUNTER", Description: "value2 description"},
 			},
 		},
+		"example3": {
+			Databases: []string{"pgscv_fixtures"},
+			Query:     "SELECT 3 as value3",
+			Metrics: model.Metrics{
+				{ShortName: "value3", Usage: "COUNTER", Description: "value3 description"},
+			},
+		},
 	}
 
 	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
@@ -230,14 +252,11 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 	}()
 
 	var counter = 0
-	for m := range ch {
+	for range ch {
 		//fmt.Println(m.Desc().String())
 		counter++
-		for _, s := range []string{"postgres_example2_value2", `const="example"`, `variableLabels: [database label2 label3]`} {
-			assert.True(t, strings.Contains(m.Desc().String(), s))
-		}
 	}
-	assert.Equal(t, 1, counter)
+	assert.Equal(t, 2, counter)
 
 	wg.Wait()
 }
@@ -304,5 +323,35 @@ func Test_updateDescSet(t *testing.T) {
 
 			wg.Wait()
 		})
+	}
+}
+
+func Test_listDeskSetDatabases(t *testing.T) {
+	testcases := []struct {
+		sets []typedDescSet
+		want []string
+	}{
+		{sets: []typedDescSet{{databases: []string{}}}, want: []string{}},
+		{sets: []typedDescSet{{databases: []string{"example1"}}}, want: []string{"example1"}},
+		{sets: []typedDescSet{{databases: []string{"example1", "example2"}}}, want: []string{"example1", "example2"}},
+		{
+			sets: []typedDescSet{
+				{databases: []string{"example1", "example2"}},
+				{databases: []string{"example2", "example3"}},
+			},
+			want: []string{"example1", "example2", "example3"},
+		},
+		{
+			sets: []typedDescSet{
+				{databases: []string{"example1", "example2"}},
+				{databases: []string{"example2", "example3"}},
+				{databases: []string{"example3", "example1"}},
+			},
+			want: []string{"example1", "example2", "example3"},
+		},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, listDeskSetDatabases(tc.sets))
 	}
 }
