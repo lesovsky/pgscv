@@ -20,13 +20,13 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 
 	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
 		"system/pgscv":       NewPgscvServicesCollector,
-		"system/loadaverage": NewLoadAverageCollector,
 		"system/cpu":         NewCPUCollector,
 		"system/diskstats":   NewDiskstatsCollector,
 		"system/filesystems": NewFilesystemCollector,
+		"system/loadaverage": NewLoadAverageCollector,
+		"system/memory":      NewMeminfoCollector,
 		"system/netdev":      NewNetdevCollector,
 		"system/network":     NewNetworkCollector,
-		"system/memory":      NewMeminfoCollector,
 		"system/sysconfig":   NewSysconfigCollector,
 	}
 
@@ -55,15 +55,15 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 		"postgres/bgwriter":          NewPostgresBgwriterCollector,
 		"postgres/conflicts":         NewPostgresConflictsCollector,
 		"postgres/databases":         NewPostgresDatabasesCollector,
-		"postgres/indexes":           NewPostgresIndexesCollector,
 		"postgres/functions":         NewPostgresFunctionsCollector,
+		"postgres/indexes":           NewPostgresIndexesCollector,
 		"postgres/locks":             NewPostgresLocksCollector,
 		"postgres/logs":              NewPostgresLogsCollector,
 		"postgres/replication":       NewPostgresReplicationCollector,
 		"postgres/replication_slots": NewPostgresReplicationSlotsCollector,
-		"postgres/statements":        NewPostgresStatementsCollector,
 		"postgres/schemas":           NewPostgresSchemasCollector,
 		"postgres/settings":          NewPostgresSettingsCollector,
+		"postgres/statements":        NewPostgresStatementsCollector,
 		"postgres/storage":           NewPostgresStorageCollector,
 		"postgres/tables":            NewPostgresTablesCollector,
 		"postgres/custom":            NewPostgresCustomCollector,
@@ -89,8 +89,8 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
 		"pgbouncer/pgscv":    NewPgscvServicesCollector,
 		"pgbouncer/pools":    NewPgbouncerPoolsCollector,
-		"pgbouncer/stats":    NewPgbouncerStatsCollector,
 		"pgbouncer/settings": NewPgbouncerSettingsCollector,
+		"pgbouncer/stats":    NewPgbouncerStatsCollector,
 	}
 
 	for name, fn := range funcs {

@@ -26,6 +26,7 @@ type postgresIndexesCollector struct {
 	io         typedDesc
 	sizes      typedDesc
 	labelNames []string
+	custom     []typedDescSet
 }
 
 // NewPostgresIndexesCollector returns a new Collector exposing postgres indexes stats.
@@ -33,15 +34,34 @@ type postgresIndexesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
 func NewPostgresIndexesCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	var tablesLabelNames = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
+	// This instance of builtinSubsystems just used for detecting collisions with user-defined metrics.
+	// This must be always synchronized with metric descriptors in returned value.
+	builtinSubsystems := model.Subsystems{
+		"index": {
+			Metrics: model.Metrics{
+				{ShortName: "scans_total"},
+				{ShortName: "tuples_total"},
+				{ShortName: "size_bytes"},
+			},
+		},
+		"index_io": {
+			Metrics: model.Metrics{
+				{ShortName: "blocks_total"},
+			},
+		},
+	}
+
+	removeCollisions(builtinSubsystems, settings.Subsystems)
+
+	labelNames := []string{"datname", "schemaname", "relname", "indexrelname", "key"}
 
 	return &postgresIndexesCollector{
-		labelNames: tablesLabelNames,
+		labelNames: labelNames,
 		indexes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "scans_total"),
 				"Total number of index scans initiated.",
-				tablesLabelNames, constLabels,
+				labelNames, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -69,6 +89,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, settings model.C
 			),
 			valueType: prometheus.GaugeValue,
 		},
+		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil
 }
 
@@ -126,6 +147,12 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 				ch <- c.io.mustNewConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "true")
 			}
 		}
+	}
+
+	// Update user-defined metrics.
+	err = updateAllDescSets(config, c.custom, ch)
+	if err != nil {
+		return err
 	}
 
 	return nil
