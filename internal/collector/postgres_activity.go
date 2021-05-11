@@ -138,7 +138,6 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	if err != nil {
 		return err
 	}
-	defer conn.Close()
 
 	// get pg_stat_activity stats
 	res, err := conn.Query(selectActivityQuery(config.ServerVersionNum))
@@ -157,6 +156,8 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	} else {
 		stats.prepared = float64(count)
 	}
+
+	conn.Close()
 
 	// Send collected metrics.
 
