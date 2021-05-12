@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql"
 	"github.com/jackc/pgproto3/v2"
+	"regexp"
 )
 
 const (
@@ -59,7 +60,8 @@ type MetricsSubsystem struct {
 	// TODO: this should be an interface because use cases are not limited by queries only,
 	//   there could by system commands, HTTP requests, etc...
 	// Databases defines which databases should be visited for collecting metrics.
-	Databases []string `yaml:"databases"`
+	Databases   string `yaml:"databases"`
+	DatabasesRE *regexp.Regexp
 	// Query defines a SQL statement used for getting label/values for metrics.
 	Query string `yaml:"query"`
 	// Metrics defines a list of labels and metrics should be extracted from Query result.

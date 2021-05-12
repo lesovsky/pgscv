@@ -6,6 +6,7 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
+	"regexp"
 	"strings"
 )
 
@@ -29,7 +30,7 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 
 // typedDescSet unions metrics in a set, which could be collected using query.
 type typedDescSet struct {
-	databases      []string             // list of databases from which metrics should be collected
+	databasesRE    *regexp.Regexp       // compiled regexp.Regexp object with databases from which metrics should be collected
 	query          string               // query used for requesting stats
 	variableLabels []string             // ordered list of labels names
 	metricNames    []string             // ordered list of metrics short names (with no namespace/subsystem)
@@ -37,12 +38,19 @@ type typedDescSet struct {
 }
 
 // newDescSet creates new typedDescSet based on passed metrics attributes.
-func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, settings model.MetricsSubsystem) typedDescSet {
+func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, settings model.MetricsSubsystem) (typedDescSet, error) {
 	var variableLabels []string
 
 	// Add extra "database" label to metrics collected from different databases.
+	var databasesRE *regexp.Regexp
 	if len(settings.Databases) > 0 {
 		variableLabels = append(variableLabels, "database")
+
+		var err error
+		databasesRE, err = regexp.Compile(settings.Databases)
+		if err != nil {
+			return typedDescSet{}, err
+		}
 	}
 
 	// Construct the rest of labels slice.
@@ -82,12 +90,12 @@ func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, sett
 	}
 
 	return typedDescSet{
-		databases:      settings.Databases,
+		databasesRE:    databasesRE,
 		query:          settings.Query,
 		metricNames:    metricNames,
 		variableLabels: variableLabels,
 		descs:          descs,
-	}
+	}, nil
 }
 
 // newDeskSetsFromSubsystems parses subsystem object and produces []typedDescSet object.
@@ -97,7 +105,10 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 	// Iterate over all passed subsystems and create dedicated descs set per each subsystem.
 	// Consider all metrics are in the 'postgres' namespace.
 	for k, v := range subsystems {
-		descset := newDescSet(constLabels, namespace, k, v)
+		descset, err := newDescSet(constLabels, namespace, k, v)
+		if err != nil {
+			log.Warnf("create metrics descriptors set failed: %s; skip", err)
+		}
 		sets = append(sets, descset)
 	}
 
@@ -107,12 +118,9 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 // updateAllDescSets collect metrics for specified desc set.
 func updateAllDescSets(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
 
-	// Get de-duplicated list of databases should be visited.
-	databases := listDeskSetDatabases(descSets)
-
 	// Collect multiple-databases metrics.
-	if len(databases) > 0 {
-		err := updateFromMultipleDatabases(config, descSets, databases, ch)
+	if needMultipleUpdate(descSets) {
+		err := updateFromMultipleDatabases(config, descSets, ch)
 		if err != nil {
 			log.Errorf("collect failed: %s; skip", err)
 		}
@@ -141,7 +149,7 @@ func updateFromSingleDatabase(config Config, descSets []typedDescSet, ch chan<- 
 
 	for _, s := range descSets {
 		// Skip sets with multiple databases.
-		if len(s.databases) > 0 {
+		if s.databasesRE != nil {
 			continue
 		}
 
@@ -156,7 +164,7 @@ func updateFromSingleDatabase(config Config, descSets []typedDescSet, ch chan<- 
 }
 
 // updateFromMultipleDatabases method visits all requested databases and collects necessary metrics.
-func updateFromMultipleDatabases(config Config, descSets []typedDescSet, userDatabases []string, ch chan<- prometheus.Metric) error {
+func updateFromMultipleDatabases(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
 	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
@@ -175,22 +183,10 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, userDat
 	}
 
 	// walk through all databases, connect to it and collect schema-specific stats
-	for _, dbname := range userDatabases {
-		// Skip user-specified databases which are not really exist.
-		if !stringsContains(realDatabases, dbname) {
-			continue
-		}
-
-		// Create
-		pgconfig.Database = dbname
-		conn, err := store.NewWithConfig(pgconfig)
-		if err != nil {
-			return err
-		}
-
+	for _, dbname := range realDatabases {
 		for _, s := range descSets {
-			// Skip sets with single databases, and databases which are not listed in set's databases.
-			if len(s.databases) == 0 || !stringsContains(s.databases, dbname) {
+			// Skip sets with update on single database, and databases which are not matched to user-defined databases.
+			if s.databasesRE == nil || !s.databasesRE.MatchString(dbname) {
 				continue
 			}
 
@@ -199,15 +195,23 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, userDat
 				s.variableLabels = append([]string{"database"}, s.variableLabels...)
 			}
 
+			// Connect to the database and update metrics.
+			pgconfig.Database = dbname
+			conn, err := store.NewWithConfig(pgconfig)
+			if err != nil {
+				return err
+			}
+
 			err = updateSingleDescSet(conn, s, ch)
 			if err != nil {
 				log.Errorf("collect failed: %s; skip", err)
+				conn.Close()
 				continue
 			}
-		}
 
-		// Close connection.
-		conn.Close()
+			// Close connection.
+			conn.Close()
+		}
 	}
 
 	return nil
@@ -252,22 +256,16 @@ func updateSingleDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.
 	return nil
 }
 
-// listDeskSetDatabases parses slice of descSet and returns de-duplicated list of databases.
-func listDeskSetDatabases(sets []typedDescSet) []string {
+// needMultipleUpdate parses slice of descSet and looking .
+func needMultipleUpdate(sets []typedDescSet) bool {
 	// Make list of databases should be visited for collecting metrics.
-	m := map[string]bool{}
 	for _, set := range sets {
-		for _, dbname := range set.databases {
-			m[dbname] = true
+		if set.databasesRE != nil {
+			return true
 		}
 	}
 
-	databases := []string{}
-	for dbname := range m {
-		databases = append(databases, dbname)
-	}
-
-	return databases
+	return false
 }
 
 // removeCollisions looking for metrics with the same name in subsystems with the same name.

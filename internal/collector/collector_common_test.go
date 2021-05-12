@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -37,7 +38,7 @@ func Test_newDescSet(t *testing.T) {
 		{
 			// With databases specified
 			subsystem: model.MetricsSubsystem{
-				Databases: []string{"pgscv_fixtures"},
+				Databases: "pgscv_fixtures",
 				Query:     "SELECT 'l1' as label1, 'l2' as label2, 0.123 as metric1, 0.456 as metric2, 0.789 as metric3",
 				Metrics: model.Metrics{
 					{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
@@ -56,7 +57,8 @@ func Test_newDescSet(t *testing.T) {
 	constLabels := prometheus.Labels{"constlabel": "example"}
 
 	for _, tc := range testcases {
-		descSet := newDescSet(constLabels, "postgres", "class", tc.subsystem)
+		descSet, err := newDescSet(constLabels, "postgres", "class", tc.subsystem)
+		assert.NoError(t, err)
 		assert.Equal(t, tc.wantQuery, descSet.query)
 		assert.Equal(t, tc.wantVarLabels, descSet.variableLabels)
 		assert.Equal(t, tc.wantMetricNames, descSet.metricNames)
@@ -76,7 +78,7 @@ func Test_newDeskSetsFromSubsystems(t *testing.T) {
 		},
 		// This should be in the output
 		"example2": {
-			Databases: []string{"example2"},
+			Databases: "example2",
 			Query:     "SELECT 'label2' as label2, 2 as value2",
 			Metrics: model.Metrics{
 				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
@@ -117,7 +119,7 @@ func Test_updateAllDescSets(t *testing.T) {
 		},
 		// This should be in the output
 		"example3": {
-			Databases: []string{"pgscv_fixtures"},
+			Databases: "pgscv_fixtures",
 			Query:     "SELECT 'label3' as label3, 3 as value3",
 			Metrics: model.Metrics{
 				{ShortName: "label3", Usage: "LABEL", Description: "label3 description"},
@@ -126,7 +128,7 @@ func Test_updateAllDescSets(t *testing.T) {
 		},
 		// This should be in the output
 		"example4": {
-			Databases: []string{"pgscv_fixtures"},
+			Databases: "pgscv_fixtures",
 			Query:     "SELECT 4 as value4",
 			Metrics: model.Metrics{
 				{ShortName: "value4", Usage: "COUNTER", Description: "value4 description"},
@@ -173,7 +175,7 @@ func Test_updateFromSingleDatabase(t *testing.T) {
 		},
 		// This should be skipped because it has databases specified
 		"example2": {
-			Databases: []string{"pgscv_fixtures"},
+			Databases: "pgscv_fixtures",
 			Query:     "SELECT 'label2' as label2, 2 as value2",
 			Metrics: model.Metrics{
 				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
@@ -209,7 +211,6 @@ func Test_updateFromSingleDatabase(t *testing.T) {
 
 func Test_updateFromMultipleDatabases(t *testing.T) {
 	config := Config{ConnString: store.TestPostgresConnStr}
-	databases := []string{"pgscv_fixtures", "postgres", "invalid"}
 
 	subsystems := map[string]model.MetricsSubsystem{
 		// This should be skipped because it has no databases specified
@@ -222,7 +223,7 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 		},
 		// This should be in the output
 		"example2": {
-			Databases: []string{"pgscv_fixtures", "invalid"},
+			Databases: `(pgscv_fixtures|invalid)`,
 			Query:     "SELECT 'label2' as label2, 'label3' as label3, 2 as value2",
 			Metrics: model.Metrics{
 				{ShortName: "label2", Usage: "LABEL", Description: "label2 description"},
@@ -231,7 +232,7 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 			},
 		},
 		"example3": {
-			Databases: []string{"pgscv_fixtures"},
+			Databases: "pgscv_fixtures",
 			Query:     "SELECT 3 as value3",
 			Metrics: model.Metrics{
 				{ShortName: "value3", Usage: "COUNTER", Description: "value3 description"},
@@ -246,7 +247,7 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
-		assert.NoError(t, updateFromMultipleDatabases(config, desksets, databases, ch))
+		assert.NoError(t, updateFromMultipleDatabases(config, desksets, ch))
 		close(ch)
 		wg.Done()
 	}()
@@ -266,56 +267,58 @@ func Test_updateSingleDescSet(t *testing.T) {
 	defer conn.Close()
 
 	testcases := []struct {
-		set  typedDescSet
-		want []string
+		constLabels prometheus.Labels
+		subsysName  string
+		subsys      model.MetricsSubsystem
+		want        []string
 	}{
 		{
 			// descSet with no specified databases
-			set: newDescSet(
-				prometheus.Labels{"constlabel": "example1"}, "postgres", "class1",
-				model.MetricsSubsystem{
-					Query: "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
-					Metrics: model.Metrics{
-						{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
-						{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
-						{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
-					},
+			constLabels: prometheus.Labels{"constlabel": "example1"},
+			subsysName:  "class1",
+			subsys: model.MetricsSubsystem{
+				Query: "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
+				Metrics: model.Metrics{
+					{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+					{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
+					{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
 				},
-			),
+			},
 			want: []string{"postgres_class1_metric", `constlabel="example1"`, `variableLabels: [label1]`},
 		},
 		{
 			// descSet with specified databases
-			set: newDescSet(
-				prometheus.Labels{"constlabel": "example2"}, "postgres", "class2",
-				model.MetricsSubsystem{
-					Databases: []string{conn.Conn().Config().Database},
-					Query:     "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
-					Metrics: model.Metrics{
-						{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
-						{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
-						{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
-					},
+			constLabels: prometheus.Labels{"constlabel": "example2"},
+			subsysName:  "class2",
+			subsys: model.MetricsSubsystem{
+				Databases: "conn.Conn().Config().Database",
+				Query:     "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
+				Metrics: model.Metrics{
+					{ShortName: "label1", Usage: "LABEL", Description: "label1 description"},
+					{ShortName: "metric1", Usage: "GAUGE", Description: "metric1 description"},
+					{ShortName: "metric2", Usage: "GAUGE", Description: "metric2 description"},
 				},
-			),
+			},
 			want: []string{"postgres_class2_metric", `constlabel="example2"`, `variableLabels: [database label1]`},
 		},
 	}
 
 	for i, tc := range testcases {
 		t.Run(fmt.Sprintf("test-%d", i), func(t *testing.T) {
+			set, err := newDescSet(tc.constLabels, "postgres", tc.subsysName, tc.subsys)
+			assert.NoError(t, err)
 			ch := make(chan prometheus.Metric)
 
 			var wg sync.WaitGroup
 			wg.Add(1)
 			go func() {
-				assert.NoError(t, updateSingleDescSet(conn, tc.set, ch))
+				assert.NoError(t, updateSingleDescSet(conn, set, ch))
 				close(ch)
 				wg.Done()
 			}()
 
 			for m := range ch {
-				//fmt.Println(m.Desc().String())
+				fmt.Println(m.Desc().String())
 				for _, s := range tc.want {
 					assert.True(t, strings.Contains(m.Desc().String(), s))
 				}
@@ -326,33 +329,32 @@ func Test_updateSingleDescSet(t *testing.T) {
 	}
 }
 
-func Test_listDeskSetDatabases(t *testing.T) {
+func Test_needMultipleUpdate(t *testing.T) {
 	testcases := []struct {
 		sets []typedDescSet
-		want int
+		want bool
 	}{
-		{sets: []typedDescSet{{databases: []string{}}}, want: 0},
-		{sets: []typedDescSet{{databases: []string{"example1"}}}, want: 1},
-		{sets: []typedDescSet{{databases: []string{"example1", "example2"}}}, want: 2},
+		{sets: []typedDescSet{{databasesRE: nil}}, want: false},
+		{sets: []typedDescSet{{databasesRE: regexp.MustCompile("example")}}, want: true},
 		{
 			sets: []typedDescSet{
-				{databases: []string{"example1", "example2"}},
-				{databases: []string{"example2", "example3"}},
+				{databasesRE: nil},
+				{databasesRE: regexp.MustCompile("example")},
 			},
-			want: 3,
+			want: true,
 		},
 		{
 			sets: []typedDescSet{
-				{databases: []string{"example1", "example2"}},
-				{databases: []string{"example2", "example3"}},
-				{databases: []string{"example3", "example1"}},
+				{databasesRE: nil},
+				{databasesRE: regexp.MustCompile("example")},
+				{databasesRE: nil},
 			},
-			want: 3,
+			want: true,
 		},
 	}
 
 	for _, tc := range testcases {
-		assert.Equal(t, tc.want, len(listDeskSetDatabases(tc.sets)))
+		assert.Equal(t, tc.want, needMultipleUpdate(tc.sets))
 	}
 }
 

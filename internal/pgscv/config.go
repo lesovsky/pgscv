@@ -169,6 +169,12 @@ func validateCollectorSettings(cs model.CollectorsSettings) error {
 				return fmt.Errorf("invalid subsystem name: %s", ssName)
 			}
 
+			// Validate databases regexp
+			_, err := regexp.Compile(subsys.Databases)
+			if err != nil {
+				return fmt.Errorf("databases invalid regular expression specified: %s", err)
+			}
+
 			if len(subsys.Metrics) > 0 && subsys.Query == "" {
 				return fmt.Errorf("query is not specified for: %s", ssName)
 			}

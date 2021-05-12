@@ -9,7 +9,7 @@ func TestPostgresCustomCollector_Update(t *testing.T) {
 	settings := model.CollectorSettings{
 		Subsystems: map[string]model.MetricsSubsystem{
 			"example1": {
-				Databases: []string{"pgscv_fixtures"},
+				Databases: "pgscv_fixtures",
 				Query:     "SELECT 'label1' as l1, 1 as v1",
 				Metrics: model.Metrics{
 					{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},

@@ -83,7 +83,7 @@ func TestNewConfig(t *testing.T) {
 					"postgres/archiver": {
 						Subsystems: map[string]model.MetricsSubsystem{
 							"activity": {
-								Databases: []string{"example1", "example2"},
+								Databases: `example(1|2)`,
 								Query:     "SELECT l1, v1 FROM t1 WHERE q",
 								Metrics: model.Metrics{
 									{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
@@ -333,6 +333,18 @@ func Test_validateCollectorSettings(t *testing.T) {
 							Metrics: model.Metrics{
 								{ShortName: "v1", Usage: "INVALID"},
 							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // Invalid databases regexp
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Databases: "[",
 						},
 					},
 				},
