@@ -80,27 +80,26 @@ func TestNewConfig(t *testing.T) {
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
 				CollectorsSettings: model.CollectorsSettings{
-					"postgres/archiver": {
+					"postgres/custom": {
 						Subsystems: map[string]model.MetricsSubsystem{
 							"activity": {
-								Databases: `example(1|2)`,
-								Query:     "SELECT l1, v1 FROM t1 WHERE q",
+								Query: "select datname as database,xact_commit,xact_rollback,blks_read as read,blks_write as write from pg_stat_database",
 								Metrics: model.Metrics{
-									{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
-									{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+									{ShortName: "xact_commit_total", Usage: "COUNTER", Labels: []string{"database"}, Value: "xact_commit", Description: "description"},
+									{ShortName: "blocks_total", Usage: "COUNTER", Labels: []string{"database"},
+										LabeledValues: map[string][]string{"access": {"read", "write"}}, Description: "description",
+									},
+								},
+							},
+							"bgwriter": {
+								Query: "select maxwritten_clean from pg_stat_bgwriter",
+								Metrics: model.Metrics{
+									{ShortName: "maxwritten_clean_total", Usage: "COUNTER", Value: "maxwritten_clean", Description: "description"},
 								},
 							},
 						},
 					},
 				},
-			},
-		},
-		{
-			name:  "empty config-file opt",
-			valid: true,
-			file:  "",
-			want: &Config{
-				Defaults: map[string]string{},
 			},
 		},
 	}

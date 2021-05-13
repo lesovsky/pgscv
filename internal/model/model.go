@@ -32,13 +32,18 @@ type PGResult struct {
 //      echo: "example"                                         <- CollectorSettings.Echo (example)
 //      subsystems:                                             <- Subsystems
 //        activity:                                             <- MetricsSubsystem
-//          query: "SELECT l1, v1 FROM t1 WHERE t1"             <- MetricsSubsystem.Query
+//          databases: "^db(1|2)$"                              <- MetricsSubsystem.Databases
+//          query: "SELECT l1, l2, l3, v1 FROM t1 WHERE t1"     <- MetricsSubsystem.Query
 //          metrics:                                            <- MetricsSubsystem.Metrics
 //            - name: l1                                        <- UserMetric
-//              usage: LABEL                                    <- UserMetric.Usage
+//              usage: COUNTER                                  <- UserMetric.Usage
+//              value: v1                                       <- UserMetric.Value
+//              labels: [ l1 ]                                  <- UserMetric.Labels
 //              description: l1 description                     <- UserMetric.Description
 //            - name: v1
 //              usage: COUNTER
+//              labeledValues:                                  <- UserMetric.LabeledValues
+//                extra: [ l2, l3 ]
 //              description: v1 description
 
 // CollectorsSettings unions all collectors settings in one place.
@@ -74,7 +79,10 @@ type Metrics []UserMetric
 
 // UserMetric defines a single metric and its properties.
 type UserMetric struct {
-	ShortName   string `yaml:"name"`
-	Usage       string `yaml:"usage"`
-	Description string `yaml:"description"`
+	ShortName     string              `yaml:"name"`
+	Usage         string              `yaml:"usage"`
+	Labels        []string            `yaml:"labels,omitempty"`
+	Value         string              `yaml:"value"`
+	LabeledValues map[string][]string `yaml:"labeled_values,omitempty"`
+	Description   string              `yaml:"description"`
 }

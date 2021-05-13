@@ -1,15 +1,28 @@
 listen_address: "127.0.0.1:8080"
 collectors:
-  postgres/archiver:
+  postgres/custom:
     echo: "example"
     subsystems:
       activity:
-        databases: "example(1|2)"
-        query: "SELECT l1, v1 FROM t1 WHERE q"
+        query: "select datname as database,xact_commit,xact_rollback,blks_read as read,blks_write as write from pg_stat_database"
         metrics:
-          - name: "l1"
-            usage: LABEL
-            description: l1 description
-          - name: "v1"
+          - name: xact_commit_total
             usage: COUNTER
-            description: v1 description
+            labels:
+              - database
+            value: xact_commit
+            description: "description"
+          - name: "blocks_total"
+            usage: COUNTER
+            labels:
+              - database
+            labeled_values:
+              access: [ "read", "write" ]
+            description: "description"
+      bgwriter:
+        query: "select maxwritten_clean from pg_stat_bgwriter"
+        metrics:
+          - name: "maxwritten_clean_total"
+            usage: COUNTER
+            value: maxwritten_clean
+            description: "description"

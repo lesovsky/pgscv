@@ -1,13 +1,14 @@
 package collector
 
 import (
+	"database/sql"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"regexp"
-	"strings"
+	"strconv"
 )
 
 // typedDesc is the descriptor wrapper with extra properties
@@ -18,6 +19,13 @@ type typedDesc struct {
 	valueType prometheus.ValueType
 	// multiplier used to cast value to necessary units.
 	factor float64
+	// value defines column name where metric value should be collected
+	value string
+	// labeledValues defines pairs with labelname:[]column_name,
+	// where column name used as label values, column values used as metric values
+	labeledValues map[string][]string
+	// list of all metric labels (including those from labeledValues)
+	labels []string
 }
 
 // mustNewConstMetric is the wrapper on prometheus.MustNewConstMetric
@@ -30,72 +38,9 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 
 // typedDescSet unions metrics in a set, which could be collected using query.
 type typedDescSet struct {
-	databasesRE    *regexp.Regexp       // compiled regexp.Regexp object with databases from which metrics should be collected
-	query          string               // query used for requesting stats
-	variableLabels []string             // ordered list of labels names
-	metricNames    []string             // ordered list of metrics short names (with no namespace/subsystem)
-	descs          map[string]typedDesc // metrics descriptors
-}
-
-// newDescSet creates new typedDescSet based on passed metrics attributes.
-func newDescSet(constLabels prometheus.Labels, namespace, subsystem string, settings model.MetricsSubsystem) (typedDescSet, error) {
-	var variableLabels []string
-
-	// Add extra "database" label to metrics collected from different databases.
-	var databasesRE *regexp.Regexp
-	if len(settings.Databases) > 0 {
-		variableLabels = append(variableLabels, "database")
-
-		var err error
-		databasesRE, err = regexp.Compile(settings.Databases)
-		if err != nil {
-			return typedDescSet{}, err
-		}
-	}
-
-	// Construct the rest of labels slice.
-	for _, m := range settings.Metrics {
-		if m.Usage == "LABEL" {
-			variableLabels = append(variableLabels, m.ShortName)
-		}
-	}
-
-	descs := make(map[string]typedDesc)
-
-	// typeMap is auxiliary dictionary for selecting proper Prometheus data type depending on 'usage' property.
-	typeMap := map[string]prometheus.ValueType{
-		"COUNTER": prometheus.CounterValue,
-		"GAUGE":   prometheus.GaugeValue,
-	}
-
-	// Construct metrics names and descriptors slices.
-	var metricNames []string
-	for _, m := range settings.Metrics {
-		if m.Usage == "LABEL" {
-			continue
-		}
-
-		metricNames = append(metricNames, m.ShortName)
-
-		metricName := prometheus.BuildFQName(namespace, subsystem, m.ShortName)
-		d := typedDesc{
-			desc: prometheus.NewDesc(
-				metricName,
-				m.Description,
-				variableLabels, constLabels,
-			), valueType: typeMap[m.Usage],
-		}
-
-		descs[m.ShortName] = d
-	}
-
-	return typedDescSet{
-		databasesRE:    databasesRE,
-		query:          settings.Query,
-		metricNames:    metricNames,
-		variableLabels: variableLabels,
-		descs:          descs,
-	}, nil
+	databasesRE *regexp.Regexp // compiled regexp.Regexp object with databases from which metrics should be collected
+	query       string         // query used for requesting stats
+	descs       []typedDesc    // metrics descriptors
 }
 
 // newDeskSetsFromSubsystems parses subsystem object and produces []typedDescSet object.
@@ -104,20 +49,76 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 
 	// Iterate over all passed subsystems and create dedicated descs set per each subsystem.
 	// Consider all metrics are in the 'postgres' namespace.
-	for k, v := range subsystems {
-		descset, err := newDescSet(constLabels, namespace, k, v)
+	for subsystemName, subsystem := range subsystems {
+		descs, err := newDescSet(namespace, subsystemName, subsystem, constLabels)
 		if err != nil {
 			log.Warnf("create metrics descriptors set failed: %s; skip", err)
 		}
-		sets = append(sets, descset)
+		sets = append(sets, descs)
 	}
 
 	return sets
 }
 
+// newDescSet creates new typedDescSet based on passed metrics attributes.
+func newDescSet(namespace string, subsystemName string, subsystem model.MetricsSubsystem, constLabels prometheus.Labels) (typedDescSet, error) {
+	// Add extra "database" label to metrics collected from different databases.
+	var databasesRE *regexp.Regexp
+	if subsystem.Databases != "" {
+		//variableLabels = append(variableLabels, "database")
+
+		var err error
+		databasesRE, err = regexp.Compile(subsystem.Databases)
+		if err != nil {
+			return typedDescSet{}, err
+		}
+	}
+
+	promtypes := map[string]prometheus.ValueType{
+		"COUNTER": prometheus.CounterValue,
+		"GAUGE":   prometheus.GaugeValue,
+	}
+
+	var descs []typedDesc
+	for _, m := range subsystem.Metrics {
+
+		// формируем метки для метрики. Если юзер указал собирать метрики с отдельных баз, то в метки следует добавить метку с именем бд - database
+		var labels []string
+		if subsystem.Databases != "" {
+			labels = append([]string{"database"}, m.Labels...)
+		} else {
+			labels = m.Labels
+		}
+
+		// append label names for labeled values
+		for k := range m.LabeledValues {
+			labels = append(labels, k)
+		}
+
+		d := typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName(namespace, subsystemName, m.ShortName),
+				m.Description,
+				labels, constLabels,
+			),
+			valueType:     promtypes[m.Usage],
+			value:         m.Value,
+			labeledValues: m.LabeledValues,
+			labels:        labels,
+		}
+
+		descs = append(descs, d)
+	}
+
+	return typedDescSet{
+		databasesRE: databasesRE,
+		query:       subsystem.Query,
+		descs:       descs,
+	}, nil
+}
+
 // updateAllDescSets collect metrics for specified desc set.
 func updateAllDescSets(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
-
 	// Collect multiple-databases metrics.
 	if needMultipleUpdate(descSets) {
 		err := updateFromMultipleDatabases(config, descSets, ch)
@@ -130,34 +131,6 @@ func updateAllDescSets(config Config, descSets []typedDescSet, ch chan<- prometh
 	err := updateFromSingleDatabase(config, descSets, ch)
 	if err != nil {
 		log.Errorf("collect failed: %s; skip", err)
-	}
-
-	return nil
-}
-
-// updateFromSingleDatabase method visit only one database and collect necessary metrics.
-func updateFromSingleDatabase(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
-	conn, err := store.New(config.ConnString)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-
-	// Iterate over descs sets. Every set contains metrics and labels names, query used
-	// for getting data and metrics descriptors. All these sufficient to request stats
-	// and translate stats into metrics.
-
-	for _, s := range descSets {
-		// Skip sets with multiple databases.
-		if s.databasesRE != nil {
-			continue
-		}
-
-		err = updateSingleDescSet(conn, s, ch)
-		if err != nil {
-			log.Errorf("collect failed: %s; skip", err)
-			continue
-		}
 	}
 
 	return nil
@@ -190,11 +163,6 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, ch chan
 				continue
 			}
 
-			// Swap descriptors labels, add database as first label
-			if len(s.variableLabels) > 0 && s.variableLabels[0] != "database" {
-				s.variableLabels = append([]string{"database"}, s.variableLabels...)
-			}
-
 			// Connect to the database and update metrics.
 			pgconfig.Database = dbname
 			conn, err := store.NewWithConfig(pgconfig)
@@ -202,7 +170,7 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, ch chan
 				return err
 			}
 
-			err = updateSingleDescSet(conn, s, ch)
+			err = updateSingleDescSet(conn, s, ch, true)
 			if err != nil {
 				log.Errorf("collect failed: %s; skip", err)
 				conn.Close()
@@ -217,48 +185,161 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, ch chan
 	return nil
 }
 
-// updateSingleDescSet using passed connection collects metrics for specified descSet and receives it to metric channel.
-func updateSingleDescSet(conn *store.DB, set typedDescSet, ch chan<- prometheus.Metric) error {
-	res, err := conn.Query(set.query)
+// updateFromSingleDatabase method visit only one database and collect necessary metrics.
+func updateFromSingleDatabase(config Config, descSets []typedDescSet, ch chan<- prometheus.Metric) error {
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
-	stats := parsePostgresCustomStats(res, set.variableLabels)
+	// Iterate over descs sets. Every set contains metrics and labels names, query used
+	// for getting data and metrics descriptors. All these sufficient to request stats
+	// and translate stats into metrics.
 
-	// Get database name from config.
-	// Database name used as value for 'database' label in case of
-	// user-defined metrics collected from multiple databases.
-	dbname := conn.Conn().Config().Database
-
-	// iterate over stats, extract labels and values, wrap to metric and send to receiver.
-	for key, stat := range stats {
-		// If database label present in variable labels, prepend label values with database name.
-		var labelValues []string
-		if len(set.variableLabels) > 0 && set.variableLabels[0] == "database" {
-			if key != "" {
-				labelValues = append([]string{dbname}, strings.Split(key, "/")...)
-			} else {
-				labelValues = []string{dbname}
-			}
-		} else {
-			if key != "" {
-				labelValues = strings.Split(key, "/")
-			}
+	for _, s := range descSets {
+		// Skip sets with multiple databases.
+		if s.databasesRE != nil {
+			continue
 		}
 
-		for name, value := range stat {
-			d := set.descs[name]
-			ch <- d.mustNewConstMetric(value, labelValues...)
+		err = updateSingleDescSet(conn, s, ch, false)
+		if err != nil {
+			log.Errorf("collect failed: %s; skip", err)
+			continue
 		}
 	}
 
 	return nil
 }
 
-// needMultipleUpdate parses slice of descSet and looking .
+// updateSingleDescSet requests data using passed connection, parses returned result and update metrics in passed descs.
+func updateSingleDescSet(conn *store.DB, descs typedDescSet, ch chan<- prometheus.Metric, addDatabaseLabel bool) error {
+	res, err := conn.Query(descs.query)
+	if err != nil {
+		return err
+	}
+
+	colnames := []string{}
+	for _, colname := range res.Colnames {
+		colnames = append(colnames, string(colname.Name))
+	}
+
+	var databaseLabelValue string
+	if addDatabaseLabel {
+		databaseLabelValue = conn.Conn().Config().Database
+	}
+
+	for _, row := range res.Rows {
+		for _, d := range descs.descs {
+			parseRow(row, colnames, d, ch, databaseLabelValue)
+		}
+	}
+
+	return nil
+}
+
+// parseRow parses row's content of PGresult and update metrics described in passed desc.
+func parseRow(row []sql.NullString, colnames []string, desc typedDesc, ch chan<- prometheus.Metric, databaseLabelValue string) {
+	// вопрос - сколько метрик надо отправить в рамках этого desc?
+	// 1. если Value != "", то 1
+	// 2. если LabeledValues != nil, то len(labeledValues)
+
+	initialLabelValues, labelValues, labelValuesOK := []string{}, []string{}, false
+	value, valueOK := float64(0), false
+
+	// TODO: databaseLabelValue может быть передано, при этом в метрике также может быть метка database.
+	if databaseLabelValue != "" {
+		initialLabelValues = []string{databaseLabelValue}
+		labelValues = append(labelValues, initialLabelValues...)
+	}
+	if len(labelValues) == len(desc.labels) {
+		labelValuesOK = true
+	}
+
+	var err error
+	if desc.value != "" {
+		// метрика может не иметь меток совсем
+		if desc.labels == nil {
+			labelValues = nil
+			labelValuesOK = true
+		}
+
+		for i, colname := range colnames {
+			// check for value
+			if colname == desc.value {
+				value, err = strconv.ParseFloat(row[i].String, 64)
+				if err != nil {
+					log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+					continue
+				}
+
+				valueOK = true
+				continue
+			}
+
+			// check for labels
+			if stringsContains(desc.labels, colname) {
+				labelValues = append(labelValues, row[i].String)
+
+				if len(labelValues) == len(desc.labels) {
+					labelValuesOK = true
+				}
+				continue
+			}
+		}
+
+		if valueOK && labelValuesOK {
+			ch <- desc.mustNewConstMetric(value, labelValues...)
+			labelValues, labelValuesOK = append([]string{}, initialLabelValues...), false
+			value, valueOK = float64(0), false
+		}
+	}
+
+	// case for labeledValues
+	if desc.labeledValues != nil {
+		for _, valueCols := range desc.labeledValues {
+			for _, col := range valueCols { // имена колонок labeledValues
+				for i, colname := range colnames { // имена колонок из реального запроса
+					// check for value
+					if col == colname && !valueOK {
+						value, err = strconv.ParseFloat(row[i].String, 64)
+						if err != nil {
+							log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+							continue
+						}
+
+						labelValues = append(labelValues, col)
+						if len(labelValues) == len(desc.labels) {
+							labelValuesOK = true
+						}
+						valueOK = true
+
+						continue
+					}
+
+					// check for rest labels
+					if stringsContains(desc.labels, colname) && !labelValuesOK {
+						labelValues = append(labelValues, row[i].String)
+
+						if len(labelValues) == len(desc.labels) {
+							labelValuesOK = true
+						}
+					}
+				}
+
+				if valueOK && labelValuesOK {
+					ch <- desc.mustNewConstMetric(value, labelValues...)
+					labelValues, labelValuesOK = append([]string{}, initialLabelValues...), false
+					value, valueOK = float64(0), false
+				}
+			}
+		}
+	}
+}
+
+// needMultipleUpdate returns true if databases regexp has been found.
 func needMultipleUpdate(sets []typedDescSet) bool {
-	// Make list of databases should be visited for collecting metrics.
 	for _, set := range sets {
 		if set.databasesRE != nil {
 			return true
