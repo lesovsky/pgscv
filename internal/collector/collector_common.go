@@ -62,11 +62,10 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 
 // newDescSet creates new typedDescSet based on passed metrics attributes.
 func newDescSet(namespace string, subsystemName string, subsystem model.MetricsSubsystem, constLabels prometheus.Labels) (typedDescSet, error) {
-	// Add extra "database" label to metrics collected from different databases.
+
+	// Compile regexp object if databases are specified
 	var databasesRE *regexp.Regexp
 	if subsystem.Databases != "" {
-		//variableLabels = append(variableLabels, "database")
-
 		var err error
 		databasesRE, err = regexp.Compile(subsystem.Databases)
 		if err != nil {
@@ -74,7 +73,7 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 		}
 	}
 
-	promtypes := map[string]prometheus.ValueType{
+	promValueTypes := map[string]prometheus.ValueType{
 		"COUNTER": prometheus.CounterValue,
 		"GAUGE":   prometheus.GaugeValue,
 	}
@@ -95,13 +94,23 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 			labels = append(labels, k)
 		}
 
+		if m.Value == "" && m.LabeledValues == nil {
+			log.Warnf("metric '%s' values of 'value' or 'labeledValues' must not be empty; skip", m.ShortName)
+			continue
+		}
+
+		if _, ok := promValueTypes[m.Usage]; !ok {
+			log.Warnf("metric '%s' value of 'usage' is unknown: %s; skip", m.ShortName, m.Usage)
+			continue
+		}
+
 		d := typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, subsystemName, m.ShortName),
 				m.Description,
 				labels, constLabels,
 			),
-			valueType:     promtypes[m.Usage],
+			valueType:     promValueTypes[m.Usage],
 			value:         m.Value,
 			labeledValues: m.LabeledValues,
 			labels:        labels,
@@ -232,110 +241,140 @@ func updateSingleDescSet(conn *store.DB, descs typedDescSet, ch chan<- prometheu
 
 	for _, row := range res.Rows {
 		for _, d := range descs.descs {
-			parseRow(row, colnames, d, ch, databaseLabelValue)
+			updateMetrics(row, d, colnames, ch, databaseLabelValue)
 		}
 	}
 
 	return nil
 }
 
-// parseRow parses row's content of PGresult and update metrics described in passed desc.
-func parseRow(row []sql.NullString, colnames []string, desc typedDesc, ch chan<- prometheus.Metric, databaseLabelValue string) {
-	// вопрос - сколько метрик надо отправить в рамках этого desc?
-	// 1. если Value != "", то 1
-	// 2. если LabeledValues != nil, то len(labeledValues)
+// updateMetrics
+func updateMetrics(row []sql.NullString, desc typedDesc, colnames []string, ch chan<- prometheus.Metric, databaseLabelValue string) {
+	// Using the descriptor a many metrics could be produced (with different label values).
 
-	initialLabelValues, labelValues, labelValuesOK := []string{}, []string{}, false
+	// When labeled values specified, it means a set of metrics returned.
+	if desc.labeledValues != nil {
+		updateMultipleMetrics(row, desc, colnames, ch, databaseLabelValue)
+		return
+	}
+
+	updateSingleMetric(row, desc, colnames, ch, databaseLabelValue)
+}
+
+// updateMultipleMetrics parses data row and update multiple metrics using passed metric descriptor.
+func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []string, ch chan<- prometheus.Metric, databaseLabelValue string) {
+	initialLabelValues := []string{}
+
+	// Insert into labels passed database name in case when there is no 'database' value in data row.
+	if databaseLabelValue != "" && !stringsContains(colnames, "database") {
+		initialLabelValues = []string{databaseLabelValue}
+	}
+
+	for _, valueCols := range desc.labeledValues { // walk through all labeledValues pairs
+		for _, descColname := range valueCols { // walk through column names from labeledValues of metric descriptor
+
+			labelValues, labelValuesOK := append([]string{}, initialLabelValues...), false
+			value, valueOK := float64(0), false
+
+			// Sanity check. Can't imaging such case when this condition is satisfied, but who knows...
+			if len(labelValues) == len(desc.labels) {
+				labelValuesOK = true
+			}
+
+			for i, resColname := range colnames { // walk through column names from data row
+				// Check for value.
+				if descColname == resColname && !valueOK {
+					var err error
+					value, err = strconv.ParseFloat(row[i].String, 64)
+					if err != nil {
+						log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+						continue
+					}
+
+					// When value found also update associated label.
+					labelValues = append(labelValues, descColname)
+					if len(labelValues) == len(desc.labels) {
+						labelValuesOK = true
+					}
+					valueOK = true
+
+					continue
+				}
+
+				// Check for rest labels.
+				if stringsContains(desc.labels, resColname) && !labelValuesOK {
+					labelValues = append(labelValues, row[i].String)
+
+					if len(labelValues) == len(desc.labels) {
+						labelValuesOK = true
+					}
+				}
+			}
+
+			// Update metric only when value and all necessary labels are collected.
+
+			if !valueOK || !labelValuesOK {
+				log.Warnln("metric value or labels are not collected, skip")
+				continue
+			}
+
+			ch <- desc.mustNewConstMetric(value, labelValues...)
+		}
+	}
+}
+
+// updateSingleMetric parses data row and update single metric using passed metric descriptor.
+func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string, ch chan<- prometheus.Metric, databaseLabelValue string) {
+	labelValues, labelValuesOK := []string{}, false
 	value, valueOK := float64(0), false
 
-	// TODO: databaseLabelValue может быть передано, при этом в метрике также может быть метка database.
-	if databaseLabelValue != "" {
-		initialLabelValues = []string{databaseLabelValue}
-		labelValues = append(labelValues, initialLabelValues...)
+	// Insert into labels passed database name in case when there is no 'database' value in data row.
+	if databaseLabelValue != "" && !stringsContains(colnames, "database") {
+		labelValues = append(labelValues, databaseLabelValue)
 	}
 	if len(labelValues) == len(desc.labels) {
 		labelValuesOK = true
 	}
 
-	var err error
-	if desc.value != "" {
-		// метрика может не иметь меток совсем
-		if desc.labels == nil {
-			labelValues = nil
-			labelValuesOK = true
-		}
+	// Case when metric doesn't have any labels.
+	if desc.labels == nil {
+		labelValues = nil
+		labelValuesOK = true
+	}
 
-		for i, colname := range colnames {
-			// check for value
-			if colname == desc.value {
-				value, err = strconv.ParseFloat(row[i].String, 64)
-				if err != nil {
-					log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
-					continue
-				}
-
-				valueOK = true
+	for i, colname := range colnames {
+		// Check for value.
+		if colname == desc.value {
+			var err error
+			value, err = strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
 				continue
 			}
 
-			// check for labels
-			if stringsContains(desc.labels, colname) {
-				labelValues = append(labelValues, row[i].String)
-
-				if len(labelValues) == len(desc.labels) {
-					labelValuesOK = true
-				}
-				continue
-			}
+			valueOK = true
+			continue
 		}
 
-		if valueOK && labelValuesOK {
-			ch <- desc.mustNewConstMetric(value, labelValues...)
-			labelValues, labelValuesOK = append([]string{}, initialLabelValues...), false
-			value, valueOK = float64(0), false
+		// Check for labels.
+		if stringsContains(desc.labels, colname) {
+			labelValues = append(labelValues, row[i].String)
+
+			if len(labelValues) == len(desc.labels) {
+				labelValuesOK = true
+			}
+			continue
 		}
 	}
 
-	// case for labeledValues
-	if desc.labeledValues != nil {
-		for _, valueCols := range desc.labeledValues {
-			for _, col := range valueCols { // имена колонок labeledValues
-				for i, colname := range colnames { // имена колонок из реального запроса
-					// check for value
-					if col == colname && !valueOK {
-						value, err = strconv.ParseFloat(row[i].String, 64)
-						if err != nil {
-							log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
-							continue
-						}
+	// Update metric only when value and all necessary labels are collected.
 
-						labelValues = append(labelValues, col)
-						if len(labelValues) == len(desc.labels) {
-							labelValuesOK = true
-						}
-						valueOK = true
-
-						continue
-					}
-
-					// check for rest labels
-					if stringsContains(desc.labels, colname) && !labelValuesOK {
-						labelValues = append(labelValues, row[i].String)
-
-						if len(labelValues) == len(desc.labels) {
-							labelValuesOK = true
-						}
-					}
-				}
-
-				if valueOK && labelValuesOK {
-					ch <- desc.mustNewConstMetric(value, labelValues...)
-					labelValues, labelValuesOK = append([]string{}, initialLabelValues...), false
-					value, valueOK = float64(0), false
-				}
-			}
-		}
+	if !valueOK || !labelValuesOK {
+		log.Warnln("metric value or labels are not collected, skip")
+		return
 	}
+
+	ch <- desc.mustNewConstMetric(value, labelValues...)
 }
 
 // needMultipleUpdate returns true if databases regexp has been found.

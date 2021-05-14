@@ -309,9 +309,8 @@ func Test_updateSingleDescSet(t *testing.T) {
 	}
 }
 
-func Test_parseRow(t *testing.T) {
+func Test_updateMetrics(t *testing.T) {
 	row := []sql.NullString{
-
 		{String: "123", Valid: true}, {String: "987654", Valid: true}, // seq_scan, idx_scan
 		{String: "852", Valid: true}, {String: "456", Valid: true}, {String: "753", Valid: true}, // ins, upd, del
 		{String: "example", Valid: true},
@@ -323,51 +322,6 @@ func Test_parseRow(t *testing.T) {
 		dbLabelValue string
 		want         int
 	}{
-		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database", "relname"},
-			},
-			dbLabelValue: "testdb",
-			want:         1,
-		},
-		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database"},
-			},
-			dbLabelValue: "testdb",
-			want:         1,
-		},
-		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					nil, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        nil,
-			},
-			dbLabelValue: "",
-			want:         1,
-		},
 		{
 			desc: typedDesc{
 				desc: prometheus.NewDesc(
@@ -386,17 +340,17 @@ func Test_parseRow(t *testing.T) {
 		{
 			desc: typedDesc{
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tuples_total"),
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
 					"description",
-					[]string{"tuples"}, prometheus.Labels{"const": "example"},
+					[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
 				),
 				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				labels:        []string{"tuples"},
+				value:         "seq_scan",
+				labeledValues: nil,
+				labels:        []string{"database", "relname"},
 			},
-			dbLabelValue: "",
-			want:         3,
+			dbLabelValue: "testdb",
+			want:         1,
 		},
 	}
 
@@ -405,19 +359,209 @@ func Test_parseRow(t *testing.T) {
 		var wg sync.WaitGroup
 		wg.Add(1)
 		go func() {
-			//parseRow(row, colnames, desc1, ch)
-			parseRow(row, colnames, tc.desc, ch, tc.dbLabelValue)
+			updateMetrics(row, tc.desc, colnames, ch, tc.dbLabelValue)
 			close(ch)
 			wg.Done()
 		}()
 
 		var counter int
-		for m := range ch {
+		for range ch {
 			counter++
-			fmt.Println(m.Desc().String())
-			//for _, s := range tc.want {
-			//	assert.True(t, strings.Contains(m.Desc().String(), s))
-			//}
+			//fmt.Println(m.Desc().String())
+		}
+
+		assert.Equal(t, tc.want, counter)
+		wg.Wait()
+	}
+}
+
+func Test_updateMultipleMetrics(t *testing.T) {
+	row := []sql.NullString{
+		{String: "852", Valid: true}, {String: "456", Valid: true}, {String: "753", Valid: true}, // ins, upd, del
+		{String: "example", Valid: true}, // relname
+	}
+	colnames := []string{"inserted", "updated", "deleted", "relname"}
+
+	testcases := []struct {
+		desc         typedDesc
+		dbLabelValue string
+		want         int
+	}{
+		{
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "tuples_total"),
+					"description",
+					[]string{"database", "relname", "tuples"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "",
+				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				labels:        []string{"database", "relname", "tuples"},
+			},
+			dbLabelValue: "pgscv_fixtures",
+			want:         3,
+		},
+		{
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "tuples_total"),
+					"description",
+					[]string{"database", "tuples"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "",
+				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				labels:        []string{"database", "tuples"},
+			},
+			dbLabelValue: "pgscv_fixtures",
+			want:         3,
+		},
+		{
+			// This is wrong case, but at at least it proves that no panic occurs
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "tuples_total"),
+					"description",
+					nil, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "",
+				labeledValues: nil,
+				labels:        nil,
+			},
+			dbLabelValue: "",
+			want:         0,
+		},
+		{
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "tuples_total"),
+					"description",
+					[]string{"database", "relname", "schema", "tuples"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "",
+				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				labels:        []string{"database", "relname", "schema", "tuples"},
+			},
+			dbLabelValue: "pgscv_fixtures",
+			want:         0,
+		},
+	}
+
+	for _, tc := range testcases {
+		ch := make(chan prometheus.Metric)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			updateMultipleMetrics(row, tc.desc, colnames, ch, tc.dbLabelValue)
+			close(ch)
+			wg.Done()
+		}()
+
+		var counter int
+		for range ch {
+			counter++
+			//fmt.Println(m.Desc().String())
+		}
+
+		assert.Equal(t, tc.want, counter)
+		wg.Wait()
+	}
+}
+
+func Test_updateSingleMetric(t *testing.T) {
+	row := []sql.NullString{
+		{String: "123", Valid: true}, {String: "987654", Valid: true}, {String: "example", Valid: true},
+	}
+	colnames := []string{"seq_scan", "idx_scan", "relname"}
+
+	testcases := []struct {
+		desc         typedDesc
+		dbLabelValue string
+		want         int
+	}{
+		{
+			// many labels
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
+					"description",
+					[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "seq_scan",
+				labeledValues: nil,
+				labels:        []string{"database", "relname"},
+			},
+			dbLabelValue: "testdb",
+			want:         1,
+		},
+		{
+			// 'database' label is single in label list
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
+					"description",
+					[]string{"database"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "seq_scan",
+				labeledValues: nil,
+				labels:        []string{"database"},
+			},
+			dbLabelValue: "testdb",
+			want:         1,
+		},
+		{
+			// no labels
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
+					"description",
+					nil, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "seq_scan",
+				labeledValues: nil,
+				labels:        nil,
+			},
+			dbLabelValue: "",
+			want:         1,
+		},
+		{
+			// label which present in metric labels, but absent in data row.
+			desc: typedDesc{
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
+					"description",
+					[]string{"database", "schemaname"}, prometheus.Labels{"const": "example"},
+				),
+				valueType:     prometheus.CounterValue,
+				value:         "seq_scan",
+				labeledValues: nil,
+				labels:        []string{"database", "schemaname"},
+			},
+			dbLabelValue: "testdb",
+			want:         0,
+		},
+	}
+
+	for _, tc := range testcases {
+		ch := make(chan prometheus.Metric)
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			updateSingleMetric(row, tc.desc, colnames, ch, tc.dbLabelValue)
+			close(ch)
+			wg.Done()
+		}()
+
+		var counter int
+		for range ch {
+			counter++
+			//fmt.Println(m.Desc().String())
 		}
 
 		assert.Equal(t, tc.want, counter)
