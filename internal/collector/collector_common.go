@@ -39,6 +39,8 @@ func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) promethe
 
 // typedDescSet unions metrics in a set, which could be collected using query.
 type typedDescSet struct {
+	namespace   string         // namespace to which all nested metrics are belong
+	subsystem   string         // subsystem to which all nested metrics are belong
 	databasesRE *regexp.Regexp // compiled regexp.Regexp object with databases from which metrics should be collected
 	query       string         // query used for requesting stats
 	descs       []typedDesc    // metrics descriptors
@@ -121,6 +123,8 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 	}
 
 	return typedDescSet{
+		namespace:   namespace,
+		subsystem:   subsystemName,
 		databasesRE: databasesRE,
 		query:       subsystem.Query,
 		descs:       descs,
