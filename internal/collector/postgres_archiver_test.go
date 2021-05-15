@@ -37,16 +37,16 @@ func Test_parsePostgresWalArchivingStats(t *testing.T) {
 				Ncols: 4,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("archived_count")}, {Name: []byte("failed_count")},
-					{Name: []byte("since_last_archive_seconds")}, {Name: []byte("lag_bytes")},
+					{Name: []byte("since_last_archive_seconds")}, {Name: []byte("lag_files")},
 				},
 				Rows: [][]sql.NullString{
 					{
 						{String: "4587", Valid: true}, {String: "0", Valid: true},
-						{String: "17", Valid: true}, {String: "12345678", Valid: true},
+						{String: "17", Valid: true}, {String: "159", Valid: true},
 					},
 				},
 			},
-			want: postgresWalArchivingStat{archived: 4587, failed: 0, sinceArchivedSeconds: 17, lagBytes: 12345678},
+			want: postgresWalArchivingStat{archived: 4587, failed: 0, sinceArchivedSeconds: 17, lagFiles: 159},
 		},
 		{
 			name: "no rows output",
@@ -59,7 +59,7 @@ func Test_parsePostgresWalArchivingStats(t *testing.T) {
 				},
 				Rows: [][]sql.NullString{},
 			},
-			want: postgresWalArchivingStat{archived: 0, failed: 0, sinceArchivedSeconds: 0, lagBytes: 0},
+			want: postgresWalArchivingStat{archived: 0, failed: 0, sinceArchivedSeconds: 0, lagFiles: 0},
 		},
 	}
 

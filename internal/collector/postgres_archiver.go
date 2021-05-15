@@ -10,7 +10,7 @@ import (
 
 const walArchivingQuery = "SELECT archived_count, failed_count, " +
 	"extract(epoch from now() - last_archived_time) AS since_last_archive_seconds, " +
-	"(SELECT count(*) * (SELECT setting FROM pg_settings WHERE name = 'wal_segment_size')::int FROM pg_ls_archive_statusdir() WHERE name ~'.ready') AS lag_bytes " +
+	"(SELECT count(*) FROM pg_ls_archive_statusdir() WHERE name ~'.ready') AS lag_files " +
 	"FROM pg_stat_archiver WHERE archived_count > 0"
 
 type postgresWalArchivingCollector struct {
@@ -83,7 +83,7 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	ch <- c.archived.mustNewConstMetric(stats.archived)
 	ch <- c.failed.mustNewConstMetric(stats.failed)
 	ch <- c.sinceArchivedSeconds.mustNewConstMetric(stats.sinceArchivedSeconds)
-	ch <- c.archivingLag.mustNewConstMetric(stats.lagBytes)
+	ch <- c.archivingLag.mustNewConstMetric(stats.lagFiles * float64(config.WalSegmentSize))
 
 	return nil
 }
@@ -93,7 +93,7 @@ type postgresWalArchivingStat struct {
 	archived             float64
 	failed               float64
 	sinceArchivedSeconds float64
-	lagBytes             float64
+	lagFiles             float64
 }
 
 // parsePostgresWalArchivingStats parses PGResult, extract data and return struct with stats values.
@@ -125,8 +125,8 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 				stats.failed = v
 			case "since_last_archive_seconds":
 				stats.sinceArchivedSeconds = v
-			case "lag_bytes":
-				stats.lagBytes = v
+			case "lag_files":
+				stats.lagFiles = v
 			default:
 				log.Debugf("unsupported pg_stat_archiver stat column: %s, skip", string(colname.Name))
 				continue
