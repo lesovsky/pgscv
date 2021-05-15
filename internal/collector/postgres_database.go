@@ -35,49 +35,19 @@ type postgresDatabasesCollector struct {
 	statsage   typedDesc
 	xidlimit   typedDesc
 	labelNames []string
-	custom     []typedDescSet
 }
 
 // NewPostgresDatabasesCollector returns a new Collector exposing postgres databases stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-VIEW
 func NewPostgresDatabasesCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	// This instance of builtinSubsystems just used for detecting collisions with user-defined metrics.
-	// This must be always synchronized with metric descriptors in returned value.
-	builtinSubsystems := model.Subsystems{
-		"database": {
-			Metrics: model.Metrics{
-				{ShortName: "datname"},
-				{ShortName: "xact_commits_total"},
-				{ShortName: "xact_rollbacks_total"},
-				{ShortName: "conflicts_total"},
-				{ShortName: "deadlocks_total"},
-				{ShortName: "blocks_total"},
-				{ShortName: "tuples_total"},
-				{ShortName: "temp_bytes_total"},
-				{ShortName: "temp_files_total"},
-				{ShortName: "blk_time_seconds"},
-				{ShortName: "size_bytes"},
-				{ShortName: "stats_age_seconds"},
-			},
-		},
-		"xacts": {
-			Metrics: model.Metrics{
-				{ShortName: "xid"},
-				{ShortName: "left_before_wraparound"},
-			},
-		},
-	}
-
-	removeCollisions(builtinSubsystems, settings.Subsystems)
-
-	databaseLabelNames := []string{"datname"}
+	var databaseLabelNames = []string{"datname"}
 
 	return &postgresDatabasesCollector{
 		labelNames: databaseLabelNames,
 		commits: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "xact_commits_total"),
-				"Total number of transactions had been committed.",
+				"Total number of transactions had been commited.",
 				databaseLabelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
@@ -154,11 +124,10 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels, settings model
 		xidlimit: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "xacts", "left_before_wraparound"),
-				"The least number of transactions (among all databases) left before force shutdown due to XID wraparound.",
+				"The number of transactions left before force shutdown due to XID wraparound.",
 				[]string{"xid"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
-		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil
 }
 
@@ -168,6 +137,7 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	res, err := conn.Query(databaseQuery)
 	if err != nil {
@@ -180,8 +150,6 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	if err != nil {
 		return err
 	}
-
-	conn.Close()
 
 	xidStats := parsePostgresXidLimitStats(res)
 
@@ -209,12 +177,6 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	ch <- c.xidlimit.mustNewConstMetric(xidStats.database, "pg_database")
 	ch <- c.xidlimit.mustNewConstMetric(xidStats.prepared, "pg_prepared_xacts")
 	ch <- c.xidlimit.mustNewConstMetric(xidStats.replSlot, "pg_replication_slots")
-
-	// Update user-defined metrics.
-	err = updateAllDescSets(config, c.custom, ch)
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
