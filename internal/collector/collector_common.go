@@ -9,6 +9,7 @@ import (
 	"github.com/weaponry/pgscv/internal/store"
 	"regexp"
 	"strconv"
+	"strings"
 )
 
 // typedDesc is the descriptor wrapper with extra properties
@@ -288,7 +289,9 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 				}
 
 				// Check for value.
-				if descColname == resColname && !valueOK {
+				sourceName, destName := parseLabeledValue(descColname)
+
+				if sourceName == resColname && !valueOK {
 					var err error
 					value, err = strconv.ParseFloat(row[i].String, 64)
 					if err != nil {
@@ -297,7 +300,7 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 					}
 
 					// When value found also update associated label.
-					labelValues = append(labelValues, descColname)
+					labelValues = append(labelValues, destName)
 					if len(labelValues) == len(desc.labels) {
 						labelValuesOK = true
 					}
@@ -413,4 +416,18 @@ func removeCollisions(s1 model.Subsystems, s2 model.Subsystems) {
 			}
 		}
 	}
+}
+
+// parseLabeledValue parses value from labeledValues and return source and destination labels
+func parseLabeledValue(s string) (string, string) {
+	if s == "" {
+		return "", ""
+	}
+
+	ff := strings.Split(s, "/")
+	if len(ff) == 1 {
+		return ff[0], ff[0]
+	}
+
+	return ff[0], ff[1]
 }

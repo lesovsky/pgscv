@@ -632,3 +632,21 @@ func Test_removeCollisions(t *testing.T) {
 	assert.Len(t, s1, 1)
 	assert.Len(t, s2, 1)
 }
+
+func Test_parseLabeledValue(t *testing.T) {
+	testcases := []struct {
+		value string
+		s1    string
+		s2    string
+	}{
+		{value: "", s1: "", s2: ""},
+		{value: "label", s1: "label", s2: "label"},
+		{value: "src/dst", s1: "src", s2: "dst"},
+	}
+
+	for _, tc := range testcases {
+		s1, s2 := parseLabeledValue(tc.value)
+		assert.Equal(t, tc.s1, s1)
+		assert.Equal(t, tc.s2, s2)
+	}
+}
