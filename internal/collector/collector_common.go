@@ -287,15 +287,15 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 			}
 
 			for i, resColname := range colnames { // walk through column names from data row
-				// Skip NULL values.
-				if !row[i].Valid {
-					continue
-				}
-
 				// Check for value.
 				sourceName, destName := parseLabeledValue(descColname)
 
 				if sourceName == resColname && !valueOK {
+					// Skip NULL values, metric must not be unknown (NULL).
+					if !row[i].Valid {
+						continue
+					}
+
 					var err error
 					value, err = strconv.ParseFloat(row[i].String, 64)
 					if err != nil {
@@ -355,13 +355,13 @@ func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string,
 	}
 
 	for i, colname := range colnames {
-		// Skip NULL values.
-		if !row[i].Valid {
-			continue
-		}
-
 		// Check for value.
 		if colname == desc.value {
+			// Skip NULL values - metric must not be unknown (NULL)
+			if !row[i].Valid {
+				continue
+			}
+
 			var err error
 			value, err = strconv.ParseFloat(row[i].String, 64)
 			if err != nil {
