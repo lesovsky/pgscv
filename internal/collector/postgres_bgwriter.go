@@ -28,21 +28,28 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels, _ model.Collect
 		descs: map[string]typedDesc{
 			"checkpoints": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "ckpt", "checkpoints_total"),
+					prometheus.BuildFQName("postgres", "checkpoints", "total"),
 					"Total number of checkpoints that have been performed of each type.",
-					[]string{"ckpt"}, constLabels,
+					[]string{"checkpoint"}, constLabels,
+				), valueType: prometheus.CounterValue,
+			},
+			"checkpoints_all": {
+				desc: prometheus.NewDesc(
+					prometheus.BuildFQName("postgres", "checkpoints", "all_total"),
+					"Total number of checkpoints that have been performed.",
+					nil, constLabels,
 				), valueType: prometheus.CounterValue,
 			},
 			"checkpoint_time": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_total"),
+					prometheus.BuildFQName("postgres", "checkpoints", "seconds_total"),
 					"Total amount of time that has been spent processing data during checkpoint in each stage, in seconds.",
 					[]string{"stage"}, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
 			},
 			"checkpoint_time_all": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "ckpt", "time_seconds_all_total"),
+					prometheus.BuildFQName("postgres", "checkpoints", "seconds_all_total"),
 					"Total amount of time that has been spent processing data during checkpoint, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue, factor: .001,
@@ -107,6 +114,8 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 		case "checkpoints":
 			ch <- desc.newConstMetric(stats.ckptTimed, "timed")
 			ch <- desc.newConstMetric(stats.ckptReq, "req")
+		case "checkpoints_all":
+			ch <- desc.newConstMetric(stats.ckptTimed + stats.ckptReq)
 		case "checkpoint_time":
 			ch <- desc.newConstMetric(stats.ckptWriteTime, "write")
 			ch <- desc.newConstMetric(stats.ckptSyncTime, "sync")
