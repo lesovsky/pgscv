@@ -8,7 +8,8 @@ import (
 
 // TODO: убрать подзапрос c определением wal_segment_size и заменить на использование значения из конфига
 
-const walArchivingNewQuery = "SELECT archived_count, failed_count, " +
+const walArchivingNewQuery = "SELECT archived_count AS archived_total, " +
+	"failed_count AS failed_total, " +
 	"extract(epoch from now() - last_archived_time) AS since_last_archive_seconds, " +
 	"(SELECT count(*) * (SELECT setting FROM pg_settings WHERE name = 'wal_segment_size')::int FROM pg_ls_archive_statusdir() WHERE name ~'.ready') AS lag_bytes " +
 	"FROM pg_stat_archiver WHERE archived_count > 0"
@@ -29,25 +30,21 @@ func NewPostgresWalArchivingCollector(constLabels prometheus.Labels, settings mo
 				{
 					ShortName:   "archived_total",
 					Usage:       "COUNTER",
-					Value:       "archived_count",
 					Description: "Total number of WAL segments had been successfully archived.",
 				},
 				{
 					ShortName:   "failed_total",
 					Usage:       "COUNTER",
-					Value:       "failed_count",
 					Description: "Total number of attempts when WAL segments had been failed to archive.",
 				},
 				{
 					ShortName:   "since_last_archive_seconds",
 					Usage:       "GAUGE",
-					Value:       "since_last_archive_seconds",
 					Description: "Number of seconds since last WAL segment had been successfully archived.",
 				},
 				{
 					ShortName:   "lag_bytes",
 					Usage:       "GAUGE",
-					Value:       "lag_bytes",
 					Description: "Amount of WAL segments ready, but not archived, in bytes.",
 				},
 			},
