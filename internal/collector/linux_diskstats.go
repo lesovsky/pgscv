@@ -37,7 +37,7 @@ type diskstatsCollector struct {
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt and https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
-func NewDiskstatsCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewDiskstatsCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	var diskLabelNames = []string{"device", "type"}
 
 	return &diskstatsCollector{

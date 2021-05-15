@@ -11,7 +11,7 @@ type pgscvServicesCollector struct {
 }
 
 // NewPgscvServicesCollector creates new collector.
-func NewPgscvServicesCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPgscvServicesCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &pgscvServicesCollector{
 		service: typedDesc{
 			desc: prometheus.NewDesc(

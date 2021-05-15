@@ -23,7 +23,7 @@ type postgresBgwriterCollector struct {
 
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-BGWRITER-VIEW
-func NewPostgresBgwriterCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresBgwriterCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
 			"checkpoints": {

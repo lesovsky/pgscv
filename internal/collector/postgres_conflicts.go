@@ -25,7 +25,7 @@ type postgresConflictsCollector struct {
 
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
-func NewPostgresConflictsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresConflictsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"datname", "reason"}
 
 	return &postgresConflictsCollector{

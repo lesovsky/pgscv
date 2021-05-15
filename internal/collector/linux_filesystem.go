@@ -22,7 +22,7 @@ type filesystemCollector struct {
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
-func NewFilesystemCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewFilesystemCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &filesystemCollector{
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(

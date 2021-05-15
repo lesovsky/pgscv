@@ -35,7 +35,7 @@ type postgresStorageCollector struct {
 
 // NewPostgresStorageCollector returns a new Collector exposing various stats related to Postgres storage layer.
 // This stats observed using different stats sources.
-func NewPostgresStorageCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresStorageCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresStorageCollector{
 		tempFiles: typedDesc{
 			desc: prometheus.NewDesc(

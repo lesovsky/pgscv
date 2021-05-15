@@ -17,7 +17,7 @@ type loadaverageCollector struct {
 }
 
 // NewLoadAverageCollector returns a new Collector exposing load average statistics.
-func NewLoadAverageCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewLoadAverageCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &loadaverageCollector{
 		load1: typedDesc{
 			desc: prometheus.NewDesc(

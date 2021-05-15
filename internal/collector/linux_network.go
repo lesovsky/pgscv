@@ -14,7 +14,7 @@ type networkCollector struct {
 	publicAddresses  typedDesc
 }
 
-func NewNetworkCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewNetworkCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &networkCollector{
 		publicAddresses: typedDesc{
 			desc: prometheus.NewDesc(

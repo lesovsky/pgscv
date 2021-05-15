@@ -18,7 +18,7 @@ type postgresLocksCollector struct {
 }
 
 // NewPostgresLocksCollector creates new postgresLocksCollector.
-func NewPostgresLocksCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresLocksCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresLocksCollector{
 		modes: typedDesc{
 			desc: prometheus.NewDesc(

@@ -20,7 +20,7 @@ type netdevCollector struct {
 }
 
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
-func NewNetdevCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewNetdevCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &netdevCollector{
 		bytes: typedDesc{
 			desc: prometheus.NewDesc(

@@ -57,7 +57,7 @@ type postgresActivityCollector struct {
 // For details see
 // 1. https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ACTIVITY-VIEW
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
-func NewPostgresActivityCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresActivityCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
 		waitEvents: typedDesc{
 			desc: prometheus.NewDesc(

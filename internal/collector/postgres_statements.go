@@ -62,7 +62,7 @@ type postgresStatementsCollector struct {
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
 // For details see https://www.postgresql.org/docs/current/pgstatstatements.html
-func NewPostgresStatementsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresStatementsCollector{
 		query: typedDesc{
 			desc: prometheus.NewDesc(

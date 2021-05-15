@@ -28,7 +28,7 @@ type systemCollector struct {
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
-func NewSysconfigCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewSysconfigCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &systemCollector{
 		sysctlList: []string{
 			"kernel.sched_migration_cost_ns",

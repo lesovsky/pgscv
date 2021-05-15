@@ -20,7 +20,7 @@ type pgbouncerStatsCollector struct {
 
 // NewPgbouncerStatsCollector returns a new Collector exposing pgbouncer pools usage stats (except averages).
 // For details see https://www.pgbouncer.org/usage.html#show-stats.
-func NewPgbouncerStatsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPgbouncerStatsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	var pgbouncerLabelNames = []string{"database"}
 
 	return &pgbouncerStatsCollector{

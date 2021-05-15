@@ -21,7 +21,7 @@ type meminfoCollector struct {
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
-func NewMeminfoCollector(labels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewMeminfoCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &meminfoCollector{
 		re:          regexp.MustCompile(`\((.*)\)`),
 		constLabels: labels,

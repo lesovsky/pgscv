@@ -32,7 +32,7 @@ type postgresIndexesCollector struct {
 // For details see
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
-func NewPostgresIndexesCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	var tablesLabelNames = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
 
 	return &postgresIndexesCollector{

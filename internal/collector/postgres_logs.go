@@ -38,7 +38,7 @@ type postgresLogsCollector struct {
 }
 
 // NewPostgresLogsCollector creates new collector for Postgres log messages.
-func NewPostgresLogsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresLogsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	collector := &postgresLogsCollector{
 		updateLogfile: make(chan string),
 		totals: syncKV{
