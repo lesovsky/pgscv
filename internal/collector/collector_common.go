@@ -84,7 +84,7 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 	var descs []typedDesc
 	for _, m := range subsystem.Metrics {
 
-		// формируем метки для метрики. Если юзер указал собирать метрики с отдельных баз, то в метки следует добавить метку с именем бд - database
+		// When particular databases specified in user-defined metrics, add 'database' label for metric labels.
 		var labels []string
 		if subsystem.Databases != "" {
 			labels = append([]string{"database"}, m.Labels...)
@@ -92,7 +92,7 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 			labels = m.Labels
 		}
 
-		// append label names for labeled values
+		// Append label names for labeled values.
 		for k := range m.LabeledValues {
 			labels = append(labels, k)
 		}
@@ -111,7 +111,8 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName(namespace, subsystemName, m.ShortName),
 				m.Description,
-				labels, constLabels,
+				labels,
+				constLabels,
 			),
 			valueType:     promValueTypes[m.Usage],
 			value:         m.Value,
@@ -405,24 +406,7 @@ func needMultipleUpdate(sets []typedDescSet) bool {
 	return false
 }
 
-// removeCollisions looking for metrics with the same name in subsystems with the same name.
-func removeCollisions(s1 model.Subsystems, s2 model.Subsystems) {
-	for name, subsys1 := range s1 {
-		if subsys2, ok := s2[name]; ok {
-
-			for _, m1 := range subsys1.Metrics {
-				for _, m2 := range subsys2.Metrics {
-					if m1.ShortName == m2.ShortName {
-						log.Warnf("ignore subsystem '%s': metric '%s' collision found. Check the configuration.", name, m2.ShortName)
-						delete(s2, name)
-					}
-				}
-			}
-		}
-	}
-}
-
-// parseLabeledValue parses value from labeledValues and return source and destination labels
+// parseLabeledValue parses value from labeledValues and return source and destination labels.
 func parseLabeledValue(s string) (string, string) {
 	if s == "" {
 		return "", ""

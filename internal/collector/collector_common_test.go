@@ -600,39 +600,6 @@ func Test_needMultipleUpdate(t *testing.T) {
 	}
 }
 
-func Test_removeCollisions(t *testing.T) {
-	s1 := model.Subsystems{
-		"example1": {
-			Query: "SELECT 'L1' AS label1, 1 AS value1",
-			Metrics: model.Metrics{
-				{ShortName: "value1", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "description"},
-			},
-		},
-	}
-	s2 := model.Subsystems{
-		"example1": {
-			Query: "SELECT 'L1' AS label1, 1 AS value1",
-			Metrics: model.Metrics{
-				{ShortName: "value1", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "description"},
-			},
-		},
-		"example2": {
-			Query: "SELECT 'L2' AS label2, 2 AS value2",
-			Metrics: model.Metrics{
-				{ShortName: "value2", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "description"},
-			},
-		},
-	}
-
-	assert.Len(t, s1, 1)
-	assert.Len(t, s2, 2)
-
-	removeCollisions(s1, s2)
-
-	assert.Len(t, s1, 1)
-	assert.Len(t, s2, 1)
-}
-
 func Test_parseLabeledValue(t *testing.T) {
 	testcases := []struct {
 		value string
