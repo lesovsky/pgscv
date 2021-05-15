@@ -1,12 +1,9 @@
 package collector
 
 import (
-	"context"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
-	"strconv"
 )
 
 const (
@@ -41,235 +38,120 @@ const (
 )
 
 type postgresReplicationCollector struct {
-	labelNames      []string
-	recovery        typedDesc
-	wal             typedDesc
-	lagbytes        typedDesc
-	lagseconds      typedDesc
-	lagtotalbytes   typedDesc
-	lagtotalseconds typedDesc
+	builtin []typedDescSet
+	custom  []typedDescSet
 }
 
 // NewPostgresReplicationCollector returns a new Collector exposing postgres replication stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-REPLICATION-VIEW
 func NewPostgresReplicationCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	var labelNames = []string{"client_addr", "usename", "application_name", "state", "lag"}
+	builtinSubsystems := model.Subsystems{
+		"replication": {
+			Query: "",
+			Metrics: model.Metrics{
+				{
+					ShortName: "lag_bytes",
+					Usage:     "GAUGE",
+					LabeledValues: map[string][]string{
+						"lag": {
+							"pending_lag_bytes/pending",
+							"write_lag_bytes/write",
+							"flush_lag_bytes/flush",
+							"replay_lag_bytes/replay",
+						},
+					},
+					Labels:      []string{"client_addr", "usename", "application_name", "state"},
+					Description: "Number of bytes standby is behind than primary in each WAL processing phase.",
+				},
+				{
+					ShortName:   "lag_total_bytes",
+					Usage:       "GAUGE",
+					Value:       "total_lag_bytes",
+					Labels:      []string{"client_addr", "usename", "application_name", "state"},
+					Description: "Number of bytes standby is behind than primary including all phases.",
+				},
+				{
+					ShortName: "lag_seconds",
+					Usage:     "GAUGE",
+					LabeledValues: map[string][]string{
+						"lag": {
+							"write_lag_seconds/write",
+							"flush_lag_seconds/flush",
+							"replay_lag_seconds/replay",
+						},
+					},
+					Labels:      []string{"client_addr", "usename", "application_name", "state"},
+					Description: "Number of seconds standby is behind than primary in each WAL processing phase.",
+				},
+				{
+					ShortName:   "lag_total_seconds",
+					Usage:       "GAUGE",
+					Value:       "total_lag_seconds",
+					Labels:      []string{"client_addr", "usename", "application_name", "state"},
+					Description: "Number of seconds standby is behind than primary including all phases.",
+				},
+			},
+		},
+		"wal": {
+			Query: "",
+			Metrics: model.Metrics{
+				{
+					ShortName:   "bytes_total",
+					Usage:       "COUNTER",
+					Value:       "wal_bytes",
+					Description: "Total amount of WAL generated or received, in bytes.",
+				},
+			},
+		},
+		"recovery": {
+			Query: "",
+			Metrics: model.Metrics{
+				{
+					ShortName:   "info",
+					Usage:       "GAUGE",
+					Value:       "recovery",
+					Description: "Current recovery state, 0 - not in recovery; 1 - in recovery.",
+				},
+			},
+		},
+	}
+
+	removeCollisions(builtinSubsystems, settings.Subsystems)
 
 	return &postgresReplicationCollector{
-		labelNames: labelNames,
-		recovery: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "recovery", "info"),
-				"Current recovery state, 0 - not in recovery; 1 - in recovery.",
-				[]string{}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		wal: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "wal", "bytes_total"),
-				"Total amount of WAL generated or received, in bytes.",
-				[]string{}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		lagbytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_bytes"),
-				"Number of bytes standby is behind than primary in each WAL processing phase.",
-				labelNames, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagseconds: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_seconds"),
-				"Number of seconds standby is behind than primary in each WAL processing phase.",
-				labelNames, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagtotalbytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_total_bytes"),
-				"Number of bytes standby is behind than primary including all phases.",
-				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagtotalseconds: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_total_seconds"),
-				"Number of seconds standby is behind than primary including all phases.",
-				[]string{"client_addr", "usename", "application_name", "state"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		builtin: newDeskSetsFromSubsystems("postgres", builtinSubsystems, constLabels),
+		custom:  newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil
 }
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	conn, err := store.New(config.ConnString)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
 
-	// Get recovery state.
-	var recovery int
-	var walBytes int64
-	err = conn.Conn().QueryRow(context.TODO(), selectWalQuery(config.ServerVersionNum)).Scan(&recovery, &walBytes)
-	if err != nil {
-		log.Warnf("get recovery state failed: %s; skip", err)
-	} else {
-		ch <- c.recovery.mustNewConstMetric(float64(recovery))
-		ch <- c.wal.mustNewConstMetric(float64(walBytes))
+	// Adjust queries depending on PostgreSQL version.
+	for i, subsys := range c.builtin {
+		switch subsys.subsystem {
+		case "replication":
+			c.builtin[i].query = selectReplicationQuery(config.ServerVersionNum)
+		case "wal", "recovery":
+			c.builtin[i].query = selectWalQuery(config.ServerVersionNum)
+		default:
+			log.Warnf("unknown builtin subsystem '%s/%s' found; skip", subsys.namespace, subsys.subsystem)
+		}
 	}
 
-	// Get replication stats.
-	res, err := conn.Query(selectReplicationQuery(config.ServerVersionNum))
+	// Update builtin metrics.
+	err := updateAllDescSets(config, c.builtin, ch)
 	if err != nil {
 		return err
 	}
 
-	// Parse pg_stat_replication stats.
-	stats := parsePostgresReplicationStats(res, c.labelNames)
-
-	for _, stat := range stats {
-		if value, ok := stat.values["pending_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
-		}
-		if value, ok := stat.values["write_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
-		}
-		if value, ok := stat.values["flush_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
-		}
-		if value, ok := stat.values["replay_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
-		}
-		if value, ok := stat.values["write_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
-		}
-		if value, ok := stat.values["flush_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
-		}
-		if value, ok := stat.values["replay_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
-		}
-		if value, ok := stat.values["total_lag_bytes"]; ok {
-			ch <- c.lagtotalbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
-		}
-		if value, ok := stat.values["total_lag_seconds"]; ok {
-			ch <- c.lagtotalseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
-		}
+	// Update user-defined metrics.
+	err = updateAllDescSets(config, c.custom, ch)
+	if err != nil {
+		return err
 	}
 
 	return nil
-}
-
-// postgresReplicationStat represents per-replica stats based on pg_stat_replication.
-type postgresReplicationStat struct {
-	pid             string
-	clientaddr      string
-	usename         string
-	applicationName string
-	state           string
-	values          map[string]float64
-}
-
-// parsePostgresReplicationStats parses PGResult and returns struct with stats values.
-func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[string]postgresReplicationStat {
-	log.Debug("parse postgres replication stats")
-
-	var stats = make(map[string]postgresReplicationStat)
-
-	for _, row := range r.Rows {
-		stat := postgresReplicationStat{values: map[string]float64{}}
-
-		// collect label values
-		for i, colname := range r.Colnames {
-			switch string(colname.Name) {
-			case "pid":
-				stat.pid = row[i].String
-			case "client_addr":
-				stat.clientaddr = row[i].String
-			case "usename":
-				stat.usename = row[i].String
-			case "application_name":
-				stat.applicationName = row[i].String
-			case "state":
-				stat.state = row[i].String
-			}
-		}
-
-		// use pid as key in the map
-		pid := stat.pid
-
-		// Put stats with labels (but with no data values yet) into stats store.
-		stats[pid] = stat
-
-		// fetch data values from columns
-		for i, colname := range r.Colnames {
-			// skip columns if its value used as a label
-			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
-				continue
-			}
-
-			// Skip empty (NULL) values.
-			if !row[i].Valid {
-				continue
-			}
-
-			// Get data value and convert it to float64 used by Prometheus.
-			v, err := strconv.ParseFloat(row[i].String, 64)
-			if err != nil {
-				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
-				continue
-			}
-
-			// Run column-specific logic
-			switch string(colname.Name) {
-			case "pending_lag_bytes":
-				s := stats[pid]
-				s.values["pending_lag_bytes"] = v
-				stats[pid] = s
-			case "write_lag_bytes":
-				s := stats[pid]
-				s.values["write_lag_bytes"] = v
-				stats[pid] = s
-			case "flush_lag_bytes":
-				s := stats[pid]
-				s.values["flush_lag_bytes"] = v
-				stats[pid] = s
-			case "replay_lag_bytes":
-				s := stats[pid]
-				s.values["replay_lag_bytes"] = v
-				stats[pid] = s
-			case "write_lag_seconds":
-				s := stats[pid]
-				s.values["write_lag_seconds"] = v
-				stats[pid] = s
-			case "flush_lag_seconds":
-				s := stats[pid]
-				s.values["flush_lag_seconds"] = v
-				stats[pid] = s
-			case "replay_lag_seconds":
-				s := stats[pid]
-				s.values["replay_lag_seconds"] = v
-				stats[pid] = s
-			case "total_lag_bytes":
-				s := stats[pid]
-				s.values["total_lag_bytes"] = v
-				stats[pid] = s
-			case "total_lag_seconds":
-				s := stats[pid]
-				s.values["total_lag_seconds"] = v
-				stats[pid] = s
-			default:
-				log.Debugf("unsupported pg_stat_replication stat column: %s, skip", string(colname.Name))
-				continue
-			}
-		}
-	}
-
-	return stats
 }
 
 // selectReplicationQuery returns suitable replication query depending on passed version.
