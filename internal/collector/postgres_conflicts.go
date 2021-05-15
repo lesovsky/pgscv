@@ -9,13 +9,7 @@ import (
 )
 
 const (
-	postgresDatabaseConflictsQuery = "SELECT datname," +
-		"nullif(confl_tablespace, 0) AS confl_tablespace," +
-		"nullif(confl_lock, 0) AS confl_lock," +
-		"nullif(confl_snapshot, 0) AS confl_snapshot," +
-		"nullif(confl_bufferpin, 0) AS confl_bufferpin," +
-		"nullif(confl_deadlock, 0) AS confl_deadlock " +
-		"FROM pg_stat_database_conflicts"
+	postgresDatabaseConflictsQuery = "SELECT datname AS database, confl_tablespace, confl_lock, confl_snapshot, confl_bufferpin, confl_deadlock FROM pg_stat_database_conflicts where pg_is_in_recovery() = 't'"
 )
 
 type postgresConflictsCollector struct {
@@ -26,7 +20,7 @@ type postgresConflictsCollector struct {
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
 func NewPostgresConflictsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labelNames = []string{"datname", "reason"}
+	var labelNames = []string{"database", "conflict"}
 
 	return &postgresConflictsCollector{
 		labelNames: labelNames,
@@ -56,22 +50,11 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 	stats := parsePostgresConflictStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		// avoid zero-value metric spam
-		if stat.tablespace > 0 {
-			ch <- c.conflicts.newConstMetric(stat.tablespace, stat.datname, "tablespace")
-		}
-		if stat.lock > 0 {
-			ch <- c.conflicts.newConstMetric(stat.lock, stat.datname, "lock")
-		}
-		if stat.snapshot > 0 {
-			ch <- c.conflicts.newConstMetric(stat.snapshot, stat.datname, "snapshot")
-		}
-		if stat.bufferpin > 0 {
-			ch <- c.conflicts.newConstMetric(stat.bufferpin, stat.datname, "bufferpin")
-		}
-		if stat.deadlock > 0 {
-			ch <- c.conflicts.newConstMetric(stat.deadlock, stat.datname, "deadlock")
-		}
+		ch <- c.conflicts.newConstMetric(stat.tablespace, stat.database, "tablespace")
+		ch <- c.conflicts.newConstMetric(stat.lock, stat.database, "lock")
+		ch <- c.conflicts.newConstMetric(stat.snapshot, stat.database, "snapshot")
+		ch <- c.conflicts.newConstMetric(stat.bufferpin, stat.database, "bufferpin")
+		ch <- c.conflicts.newConstMetric(stat.deadlock, stat.database, "deadlock")
 	}
 
 	return nil
@@ -79,7 +62,7 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 
 // postgresConflictStat represents per-database recovery conflicts stats based on pg_stat_database_conflicts.
 type postgresConflictStat struct {
-	datname    string
+	database   string
 	tablespace float64
 	lock       float64
 	snapshot   float64
@@ -100,13 +83,13 @@ func parsePostgresConflictStats(r *model.PGResult, labelNames []string) map[stri
 		// collect label values
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				stat.datname = row[i].String
+			case "database":
+				stat.database = row[i].String
 			}
 		}
 
 		// Define a map key as a database name.
-		databaseFQName := stat.datname
+		databaseFQName := stat.database
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		stats[databaseFQName] = stat

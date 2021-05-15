@@ -32,7 +32,7 @@ func Test_parsePostgresConflictsStats(t *testing.T) {
 				Nrows: 2,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("confl_tablespace")}, {Name: []byte("confl_lock")},
+					{Name: []byte("database")}, {Name: []byte("confl_tablespace")}, {Name: []byte("confl_lock")},
 					{Name: []byte("confl_snapshot")}, {Name: []byte("confl_bufferpin")}, {Name: []byte("confl_deadlock")},
 				},
 				Rows: [][]sql.NullString{
@@ -46,15 +46,15 @@ func Test_parsePostgresConflictsStats(t *testing.T) {
 				},
 			},
 			want: map[string]postgresConflictStat{
-				"testdb1": {datname: "testdb1", tablespace: 123, lock: 548, snapshot: 784, bufferpin: 896, deadlock: 896},
-				"testdb2": {datname: "testdb2"},
+				"testdb1": {database: "testdb1", tablespace: 123, lock: 548, snapshot: 784, bufferpin: 896, deadlock: 896},
+				"testdb2": {database: "testdb2"},
 			},
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parsePostgresConflictStats(tc.res, []string{"datname", "reason"})
+			got := parsePostgresConflictStats(tc.res, []string{"database", "reason"})
 			assert.EqualValues(t, tc.want, got)
 		})
 	}
