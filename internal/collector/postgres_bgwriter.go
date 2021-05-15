@@ -18,44 +18,12 @@ const (
 )
 
 type postgresBgwriterCollector struct {
-	descs  map[string]typedDesc
-	custom []typedDescSet
+	descs map[string]typedDesc
 }
 
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-BGWRITER-VIEW
 func NewPostgresBgwriterCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	// This instance of builtinSubsystems just used for detecting collisions with user-defined metrics.
-	// This must be always synchronized with metric descriptors in returned value.
-	builtinSubsystems := model.Subsystems{
-		"ckpt": {
-			Metrics: model.Metrics{
-				{ShortName: "checkpoints_total"},
-				{ShortName: "time_seconds_total"},
-				{ShortName: "time_seconds_all_total"},
-			},
-		},
-		"written": {
-			Metrics: model.Metrics{
-				{ShortName: "bytes_total"},
-			},
-		},
-		"bgwriter": {
-			Metrics: model.Metrics{
-				{ShortName: "maxwritten_clean_total"},
-				{ShortName: "stats_age_seconds"},
-			},
-		},
-		"backends": {
-			Metrics: model.Metrics{
-				{ShortName: "fsync_total"},
-				{ShortName: "allocated_bytes_total"},
-			},
-		},
-	}
-
-	removeCollisions(builtinSubsystems, settings.Subsystems)
-
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
 			"checkpoints": {
@@ -115,7 +83,6 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels, settings model.
 				), valueType: prometheus.CounterValue,
 			},
 		},
-		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil
 }
 
@@ -125,6 +92,7 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	res, err := conn.Query(postgresBgwriterQuery)
 	if err != nil {
@@ -160,14 +128,6 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 			log.Debugf("unknown desc name: %s, skip", name)
 			continue
 		}
-	}
-
-	conn.Close()
-
-	// Update user-defined metrics.
-	err = updateAllDescSets(config, c.custom, ch)
-	if err != nil {
-		return err
 	}
 
 	return nil
