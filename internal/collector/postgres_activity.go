@@ -51,7 +51,6 @@ type postgresActivityCollector struct {
 	inflight   typedDesc
 	vacuums    typedDesc
 	re         queryRegexp // regexps for queries classification
-	custom     []typedDescSet
 }
 
 // NewPostgresActivityCollector returns a new Collector exposing postgres databases stats.
@@ -59,24 +58,6 @@ type postgresActivityCollector struct {
 // 1. https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ACTIVITY-VIEW
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
 func NewPostgresActivityCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	// This instance of builtinSubsystems just used for detecting collisions with user-defined metrics.
-	// This must be always synchronized with metric descriptors in returned value.
-	builtinSubsystems := model.Subsystems{
-		"activity": {
-			Metrics: model.Metrics{
-				{ShortName: "wait_events_in_flight"},
-				{ShortName: "connections_in_flight"},
-				{ShortName: "connections_all_in_flight"},
-				{ShortName: "max_seconds"},
-				{ShortName: "prepared_transactions_in_flight"},
-				{ShortName: "queries_in_flight"},
-				{ShortName: "vacuums_in_flight"},
-			},
-		},
-	}
-
-	removeCollisions(builtinSubsystems, settings.Subsystems)
-
 	return &postgresActivityCollector{
 		waitEvents: typedDesc{
 			desc: prometheus.NewDesc(
@@ -127,8 +108,7 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels, settings model.
 				[]string{"type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
-		re:     newQueryRegexp(),
-		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
+		re: newQueryRegexp(),
 	}, nil
 }
 
@@ -249,12 +229,6 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// vacuums
 	for k, v := range stats.vacuumOps {
 		ch <- c.vacuums.mustNewConstMetric(v, k)
-	}
-
-	// Update user-defined metrics.
-	err = updateAllDescSets(config, c.custom, ch)
-	if err != nil {
-		return err
 	}
 
 	return nil
