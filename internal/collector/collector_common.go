@@ -29,12 +29,18 @@ type typedDesc struct {
 	labels []string
 }
 
-// mustNewConstMetric is the wrapper on prometheus.MustNewConstMetric
-func (d *typedDesc) mustNewConstMetric(value float64, labels ...string) prometheus.Metric {
+// newConstMetric is the wrapper on prometheus.NewConstMetric
+func (d *typedDesc) newConstMetric(value float64, labels ...string) prometheus.Metric {
 	if d.factor != 0 {
 		value *= d.factor
 	}
-	return prometheus.MustNewConstMetric(d.desc, d.valueType, value, labels...)
+
+	m, err := prometheus.NewConstMetric(d.desc, d.valueType, value, labels...)
+	if err != nil {
+		log.Errorf("create const metric failed: %s; skip. Failed metric descriptor: '%s'", err, d.desc.String())
+	}
+
+	return m
 }
 
 // typedDescSet unions metrics in a set, which could be collected using query.
@@ -331,7 +337,7 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 				continue
 			}
 
-			ch <- desc.mustNewConstMetric(value, labelValues...)
+			ch <- desc.newConstMetric(value, labelValues...)
 		}
 	}
 }
@@ -392,7 +398,7 @@ func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string,
 		return
 	}
 
-	ch <- desc.mustNewConstMetric(value, labelValues...)
+	ch <- desc.newConstMetric(value, labelValues...)
 }
 
 // needMultipleUpdate returns true if databases regexp has been found.

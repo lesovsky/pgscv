@@ -58,19 +58,19 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 	for _, stat := range stats {
 		// avoid zero-value metric spam
 		if stat.tablespace > 0 {
-			ch <- c.conflicts.mustNewConstMetric(stat.tablespace, stat.datname, "tablespace")
+			ch <- c.conflicts.newConstMetric(stat.tablespace, stat.datname, "tablespace")
 		}
 		if stat.lock > 0 {
-			ch <- c.conflicts.mustNewConstMetric(stat.lock, stat.datname, "lock")
+			ch <- c.conflicts.newConstMetric(stat.lock, stat.datname, "lock")
 		}
 		if stat.snapshot > 0 {
-			ch <- c.conflicts.mustNewConstMetric(stat.snapshot, stat.datname, "snapshot")
+			ch <- c.conflicts.newConstMetric(stat.snapshot, stat.datname, "snapshot")
 		}
 		if stat.bufferpin > 0 {
-			ch <- c.conflicts.mustNewConstMetric(stat.bufferpin, stat.datname, "bufferpin")
+			ch <- c.conflicts.newConstMetric(stat.bufferpin, stat.datname, "bufferpin")
 		}
 		if stat.deadlock > 0 {
-			ch <- c.conflicts.mustNewConstMetric(stat.deadlock, stat.datname, "deadlock")
+			ch <- c.conflicts.newConstMetric(stat.deadlock, stat.datname, "deadlock")
 		}
 	}
 

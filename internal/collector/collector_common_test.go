@@ -13,6 +13,22 @@ import (
 	"testing"
 )
 
+func Test_newConstMetric(t *testing.T) {
+	d := typedDesc{
+		desc: prometheus.NewDesc(
+			prometheus.BuildFQName("postgres", "archiver", "archived_total"),
+			"Test description.",
+			[]string{"L1", "L2"}, nil,
+		), valueType: prometheus.CounterValue,
+		factor: .001,
+	}
+	m := d.newConstMetric(1, "L1", "L2")
+	assert.NotNil(t, m)
+
+	m = d.newConstMetric(1, "L1", "L2", "L3")
+	assert.Nil(t, m)
+}
+
 func Test_newDeskSetsFromSubsystems(t *testing.T) {
 	subsystems := map[string]model.MetricsSubsystem{
 		// This should be in the output

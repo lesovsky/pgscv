@@ -247,63 +247,63 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		// Note: pg_stat_statements.total_exec_time (and .total_time) includes blk_read_time and blk_write_time implicitly.
 		// Remember that when creating metrics.
 
-		ch <- c.query.mustNewConstMetric(1, stat.usename, stat.datname, stat.md5hash, query)
+		ch <- c.query.newConstMetric(1, stat.usename, stat.datname, stat.md5hash, query)
 
-		ch <- c.calls.mustNewConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash)
-		ch <- c.rows.mustNewConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
+		ch <- c.calls.newConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash)
+		ch <- c.rows.newConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
 
 		// total = planning + execution; execution already includes io time.
-		ch <- c.allTimes.mustNewConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash)
-		ch <- c.times.mustNewConstMetric(stat.totalPlanTime, stat.usename, stat.datname, stat.md5hash, "planning")
+		ch <- c.allTimes.newConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash)
+		ch <- c.times.newConstMetric(stat.totalPlanTime, stat.usename, stat.datname, stat.md5hash, "planning")
 
 		// execution time = execution - io times.
-		ch <- c.times.mustNewConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
+		ch <- c.times.newConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
 		if stat.blkReadTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkReadTime, stat.usename, stat.datname, stat.md5hash, "ioread")
+			ch <- c.times.newConstMetric(stat.blkReadTime, stat.usename, stat.datname, stat.md5hash, "ioread")
 		}
 		if stat.blkWriteTime > 0 {
-			ch <- c.times.mustNewConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
+			ch <- c.times.newConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.sharedHit.mustNewConstMetric(stat.sharedBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedHit.newConstMetric(stat.sharedBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.sharedRead.mustNewConstMetric(stat.sharedBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedRead.newConstMetric(stat.sharedBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.sharedDirtied.mustNewConstMetric(stat.sharedBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedDirtied.newConstMetric(stat.sharedBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.sharedWritten.mustNewConstMetric(stat.sharedBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedWritten.newConstMetric(stat.sharedBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.localHit.mustNewConstMetric(stat.localBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localHit.newConstMetric(stat.localBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.localRead.mustNewConstMetric(stat.localBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localRead.newConstMetric(stat.localBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.localDirtied.mustNewConstMetric(stat.localBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localDirtied.newConstMetric(stat.localBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.localWritten.mustNewConstMetric(stat.localBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localWritten.newConstMetric(stat.localBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.tempRead.mustNewConstMetric(stat.tempBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.tempRead.newConstMetric(stat.tempBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.tempWritten.mustNewConstMetric(stat.tempBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.tempWritten.newConstMetric(stat.tempBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.walRecords > 0 {
-			ch <- c.walRecords.mustNewConstMetric(stat.walRecords, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walRecords.newConstMetric(stat.walRecords, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.walFPI > 0 {
-			ch <- c.walFPI.mustNewConstMetric(stat.walFPI*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walFPI.newConstMetric(stat.walFPI*blockSize, stat.usename, stat.datname, stat.md5hash)
 		}
 		if stat.walBytes > 0 {
-			ch <- c.walBytes.mustNewConstMetric(stat.walBytes, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walBytes.newConstMetric(stat.walBytes, stat.usename, stat.datname, stat.md5hash)
 		}
 	}
 

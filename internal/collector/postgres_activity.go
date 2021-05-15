@@ -144,7 +144,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	for k, v := range stats.waitEvents {
 		// 'key' is the pair of wait_event_type/wait_event - split them and use as label values.
 		if labels := strings.Split(k, "/"); len(labels) >= 2 {
-			ch <- c.waitEvents.mustNewConstMetric(v, labels[0], labels[1])
+			ch <- c.waitEvents.newConstMetric(v, labels[0], labels[1])
 		} else {
 			log.Warnf("create wait_event activity failed: invalid input '%s'; skip", k)
 		}
@@ -153,20 +153,20 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// connection states
 	// totals doesn't account waitings because they have 'active' state.
 	var total = stats.active + stats.idle + stats.idlexact + stats.other
-	ch <- c.statesAll.mustNewConstMetric(total)
-	ch <- c.states.mustNewConstMetric(stats.active, "active")
-	ch <- c.states.mustNewConstMetric(stats.idle, "idle")
-	ch <- c.states.mustNewConstMetric(stats.idlexact, "idlexact")
-	ch <- c.states.mustNewConstMetric(stats.other, "other")
-	ch <- c.states.mustNewConstMetric(stats.waiting, "waiting")
+	ch <- c.statesAll.newConstMetric(total)
+	ch <- c.states.newConstMetric(stats.active, "active")
+	ch <- c.states.newConstMetric(stats.idle, "idle")
+	ch <- c.states.newConstMetric(stats.idlexact, "idlexact")
+	ch <- c.states.newConstMetric(stats.other, "other")
+	ch <- c.states.newConstMetric(stats.waiting, "waiting")
 
 	// prepared xacts
-	ch <- c.prepared.mustNewConstMetric(stats.prepared)
+	ch <- c.prepared.newConstMetric(stats.prepared)
 
 	// max duration of user's idle_xacts per usename/datname.
 	for k, v := range stats.maxIdleUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "user")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "idlexact", "user")
 		} else {
 			log.Warnf("create max idlexact user activity failed: invalid input '%s'; skip", k)
 		}
@@ -175,7 +175,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of maintenance's idle_xacts per usename/datname.
 	for k, v := range stats.maxIdleMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "idlexact", "maintenance")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "idlexact", "maintenance")
 		} else {
 			log.Warnf("create max idlexact maintenance activity failed: invalid input '%s'; skip", k)
 		}
@@ -184,7 +184,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of users running activity per usename/datname.
 	for k, v := range stats.maxRunUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "user")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "user")
 		} else {
 			log.Warnf("create max running user activity failed: invalid input '%s'; skip", k)
 		}
@@ -193,7 +193,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of maintenance running activity per usename/datname.
 	for k, v := range stats.maxRunMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "running", "maintenance")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "maintenance")
 		} else {
 			log.Warnf("create max running maintenance activity failed: invalid input '%s'; skip", k)
 		}
@@ -202,7 +202,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of users waiting activity per usename/datname.
 	for k, v := range stats.maxWaitUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "user")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "waiting", "user")
 		} else {
 			log.Warnf("create max waiting user activity failed: invalid input '%s'; skip", k)
 		}
@@ -211,24 +211,24 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// max duration of maintenance waiting activity per usename/datname.
 	for k, v := range stats.maxWaitMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.mustNewConstMetric(v, names[0], names[1], "waiting", "maintenance")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "waiting", "maintenance")
 		} else {
 			log.Warnf("create max waiting maintenance activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
 	// in flight queries
-	ch <- c.inflight.mustNewConstMetric(stats.querySelect, "select")
-	ch <- c.inflight.mustNewConstMetric(stats.queryMod, "mod")
-	ch <- c.inflight.mustNewConstMetric(stats.queryDdl, "ddl")
-	ch <- c.inflight.mustNewConstMetric(stats.queryMaint, "maintenance")
-	ch <- c.inflight.mustNewConstMetric(stats.queryWith, "with")
-	ch <- c.inflight.mustNewConstMetric(stats.queryCopy, "copy")
-	ch <- c.inflight.mustNewConstMetric(stats.queryOther, "other")
+	ch <- c.inflight.newConstMetric(stats.querySelect, "select")
+	ch <- c.inflight.newConstMetric(stats.queryMod, "mod")
+	ch <- c.inflight.newConstMetric(stats.queryDdl, "ddl")
+	ch <- c.inflight.newConstMetric(stats.queryMaint, "maintenance")
+	ch <- c.inflight.newConstMetric(stats.queryWith, "with")
+	ch <- c.inflight.newConstMetric(stats.queryCopy, "copy")
+	ch <- c.inflight.newConstMetric(stats.queryOther, "other")
 
 	// vacuums
 	for k, v := range stats.vacuumOps {
-		ch <- c.vacuums.mustNewConstMetric(v, k)
+		ch <- c.vacuums.newConstMetric(v, k)
 	}
 
 	return nil

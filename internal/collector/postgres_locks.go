@@ -48,7 +48,7 @@ func (c *postgresLocksCollector) Update(config Config, ch chan<- prometheus.Metr
 	stats := parsePostgresLocksStats(res)
 
 	for mode, value := range stats {
-		ch <- c.modes.mustNewConstMetric(value, mode)
+		ch <- c.modes.newConstMetric(value, mode)
 	}
 
 	return nil

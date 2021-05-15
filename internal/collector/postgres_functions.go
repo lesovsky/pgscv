@@ -86,9 +86,9 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 		stats := parsePostgresFunctionsStats(res, c.labelNames)
 
 		for _, stat := range stats {
-			ch <- c.calls.mustNewConstMetric(stat.calls, stat.datname, stat.schemaname, stat.funcname)
-			ch <- c.totaltime.mustNewConstMetric(stat.totaltime, stat.datname, stat.schemaname, stat.funcname)
-			ch <- c.selftime.mustNewConstMetric(stat.selftime, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.calls.newConstMetric(stat.calls, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.totaltime.newConstMetric(stat.totaltime, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.selftime.newConstMetric(stat.selftime, stat.datname, stat.schemaname, stat.funcname)
 		}
 	}
 

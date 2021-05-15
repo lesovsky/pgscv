@@ -105,25 +105,25 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 	for name, desc := range c.descs {
 		switch name {
 		case "checkpoints":
-			ch <- desc.mustNewConstMetric(stats.ckptTimed, "timed")
-			ch <- desc.mustNewConstMetric(stats.ckptReq, "req")
+			ch <- desc.newConstMetric(stats.ckptTimed, "timed")
+			ch <- desc.newConstMetric(stats.ckptReq, "req")
 		case "checkpoint_time":
-			ch <- desc.mustNewConstMetric(stats.ckptWriteTime, "write")
-			ch <- desc.mustNewConstMetric(stats.ckptSyncTime, "sync")
+			ch <- desc.newConstMetric(stats.ckptWriteTime, "write")
+			ch <- desc.newConstMetric(stats.ckptSyncTime, "sync")
 		case "checkpoint_time_all":
-			ch <- desc.mustNewConstMetric(stats.ckptWriteTime + stats.ckptSyncTime)
+			ch <- desc.newConstMetric(stats.ckptWriteTime + stats.ckptSyncTime)
 		case "maxwritten_clean":
-			ch <- desc.mustNewConstMetric(stats.bgwrMaxWritten)
+			ch <- desc.newConstMetric(stats.bgwrMaxWritten)
 		case "written_bytes":
-			ch <- desc.mustNewConstMetric(stats.ckptBuffers*blockSize, "checkpointer")
-			ch <- desc.mustNewConstMetric(stats.bgwrBuffers*blockSize, "bgwriter")
-			ch <- desc.mustNewConstMetric(stats.backendBuffers*blockSize, "backend")
+			ch <- desc.newConstMetric(stats.ckptBuffers*blockSize, "checkpointer")
+			ch <- desc.newConstMetric(stats.bgwrBuffers*blockSize, "bgwriter")
+			ch <- desc.newConstMetric(stats.backendBuffers*blockSize, "backend")
 		case "buffers_backend_fsync":
-			ch <- desc.mustNewConstMetric(stats.backendFsync)
+			ch <- desc.newConstMetric(stats.backendFsync)
 		case "alloc_bytes":
-			ch <- desc.mustNewConstMetric(stats.backendAllocated * blockSize)
+			ch <- desc.newConstMetric(stats.backendAllocated * blockSize)
 		case "stats_age_seconds":
-			ch <- desc.mustNewConstMetric(stats.statsAgeSeconds)
+			ch <- desc.newConstMetric(stats.statsAgeSeconds)
 		default:
 			log.Debugf("unknown desc name: %s, skip", name)
 			continue

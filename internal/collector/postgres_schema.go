@@ -162,7 +162,7 @@ func collectSystemCatalogSize(conn *store.DB, ch chan<- prometheus.Metric, desc 
 	}
 
 	if size > 0 {
-		ch <- desc.mustNewConstMetric(size, datname)
+		ch <- desc.newConstMetric(size, datname)
 	}
 }
 
@@ -192,7 +192,7 @@ func collectSchemaNonPKTables(conn *store.DB, ch chan<- prometheus.Metric, desc 
 			log.Warnf("incorrect table FQ name: %s; skip", t)
 			continue
 		}
-		ch <- desc.mustNewConstMetric(1, datname, parts[0], parts[1])
+		ch <- desc.newConstMetric(1, datname, parts[0], parts[1])
 	}
 }
 
@@ -249,7 +249,7 @@ func collectSchemaInvalidIndexes(conn *store.DB, ch chan<- prometheus.Metric, de
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(value, datname, schemaname, relname, indexrelname)
+		ch <- desc.newConstMetric(value, datname, schemaname, relname, indexrelname)
 	}
 }
 
@@ -289,7 +289,7 @@ func collectSchemaNonIndexedFK(conn *store.DB, ch chan<- prometheus.Metric, desc
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(1, datname, schemaname, relname, colnames, constraint, referenced)
+		ch <- desc.newConstMetric(1, datname, schemaname, relname, colnames, constraint, referenced)
 	}
 }
 
@@ -337,7 +337,7 @@ func collectSchemaRedundantIndexes(conn *store.DB, ch chan<- prometheus.Metric, 
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(value, datname, schemaname, relname, indexrelname, indexdef, redundantdef)
+		ch <- desc.newConstMetric(value, datname, schemaname, relname, indexrelname, indexdef, redundantdef)
 	}
 }
 
@@ -385,7 +385,7 @@ func collectSchemaSequences(conn *store.DB, ch chan<- prometheus.Metric, desc ty
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(value, datname, schemaname, seqname)
+		ch <- desc.newConstMetric(value, datname, schemaname, seqname)
 	}
 }
 
@@ -425,7 +425,7 @@ func collectSchemaFKDatatypeMismatch(conn *store.DB, ch chan<- prometheus.Metric
 			continue
 		}
 
-		ch <- desc.mustNewConstMetric(1, datname, schemaname, relname, colname, refschemaname, refrelname, refcolname)
+		ch <- desc.newConstMetric(1, datname, schemaname, relname, colname, refschemaname, refrelname, refcolname)
 	}
 }
 

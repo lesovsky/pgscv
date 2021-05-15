@@ -80,10 +80,10 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 		return nil
 	}
 
-	ch <- c.archived.mustNewConstMetric(stats.archived)
-	ch <- c.failed.mustNewConstMetric(stats.failed)
-	ch <- c.sinceArchivedSeconds.mustNewConstMetric(stats.sinceArchivedSeconds)
-	ch <- c.archivingLag.mustNewConstMetric(stats.lagFiles * float64(config.WalSegmentSize))
+	ch <- c.archived.newConstMetric(stats.archived)
+	ch <- c.failed.newConstMetric(stats.failed)
+	ch <- c.sinceArchivedSeconds.newConstMetric(stats.sinceArchivedSeconds)
+	ch <- c.archivingLag.newConstMetric(stats.lagFiles * float64(config.WalSegmentSize))
 
 	return nil
 }

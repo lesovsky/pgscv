@@ -117,8 +117,8 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	if err != nil {
 		log.Warnf("get recovery state failed: %s; skip", err)
 	} else {
-		ch <- c.recovery.mustNewConstMetric(float64(recovery))
-		ch <- c.wal.mustNewConstMetric(float64(walBytes))
+		ch <- c.recovery.newConstMetric(float64(recovery))
+		ch <- c.wal.newConstMetric(float64(walBytes))
 	}
 
 	// Get replication stats.
@@ -132,31 +132,31 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 
 	for _, stat := range stats {
 		if value, ok := stat.values["pending_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
+			ch <- c.lagbytes.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "pending")
 		}
 		if value, ok := stat.values["write_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
+			ch <- c.lagbytes.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
 		}
 		if value, ok := stat.values["flush_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
+			ch <- c.lagbytes.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
 		}
 		if value, ok := stat.values["replay_lag_bytes"]; ok {
-			ch <- c.lagbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+			ch <- c.lagbytes.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
 		}
 		if value, ok := stat.values["write_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
+			ch <- c.lagseconds.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "write")
 		}
 		if value, ok := stat.values["flush_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
+			ch <- c.lagseconds.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "flush")
 		}
 		if value, ok := stat.values["replay_lag_seconds"]; ok {
-			ch <- c.lagseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
+			ch <- c.lagseconds.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state, "replay")
 		}
 		if value, ok := stat.values["total_lag_bytes"]; ok {
-			ch <- c.lagtotalbytes.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
+			ch <- c.lagtotalbytes.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
 		}
 		if value, ok := stat.values["total_lag_seconds"]; ok {
-			ch <- c.lagtotalseconds.mustNewConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
+			ch <- c.lagtotalseconds.newConstMetric(value, stat.clientaddr, stat.usename, stat.applicationName, stat.state)
 		}
 	}
 

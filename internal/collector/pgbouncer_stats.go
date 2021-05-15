@@ -72,13 +72,13 @@ func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Met
 	stats := parsePgbouncerStatsStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		ch <- c.xacts.mustNewConstMetric(stat.xacts, stat.database)
-		ch <- c.queries.mustNewConstMetric(stat.queries, stat.database)
-		ch <- c.bytes.mustNewConstMetric(stat.received, stat.database, "received")
-		ch <- c.bytes.mustNewConstMetric(stat.sent, stat.database, "sent")
-		ch <- c.time.mustNewConstMetric(stat.xacttime, stat.database, "running", "xact")
-		ch <- c.time.mustNewConstMetric(stat.querytime, stat.database, "running", "query")
-		ch <- c.time.mustNewConstMetric(stat.waittime, stat.database, "waiting", "none")
+		ch <- c.xacts.newConstMetric(stat.xacts, stat.database)
+		ch <- c.queries.newConstMetric(stat.queries, stat.database)
+		ch <- c.bytes.newConstMetric(stat.received, stat.database, "received")
+		ch <- c.bytes.newConstMetric(stat.sent, stat.database, "sent")
+		ch <- c.time.newConstMetric(stat.xacttime, stat.database, "running", "xact")
+		ch <- c.time.newConstMetric(stat.querytime, stat.database, "running", "query")
+		ch <- c.time.newConstMetric(stat.waittime, stat.database, "waiting", "none")
 	}
 
 	return nil

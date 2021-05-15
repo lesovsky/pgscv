@@ -219,69 +219,69 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 		for _, stat := range stats {
 			// scan stats
-			ch <- c.seqscan.mustNewConstMetric(stat.seqscan, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.seqtupread.mustNewConstMetric(stat.seqtupread, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.idxscan.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.idxtupfetch.mustNewConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.seqscan.newConstMetric(stat.seqscan, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.seqtupread.newConstMetric(stat.seqtupread, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.idxscan.newConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.idxtupfetch.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname)
 
 			// tuples stats
-			ch <- c.tupInserted.mustNewConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupUpdated.mustNewConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupDeleted.mustNewConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupHotUpdated.mustNewConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupInserted.newConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupUpdated.newConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupDeleted.newConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupHotUpdated.newConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname)
 
 			// tuples total stats
-			ch <- c.tupLive.mustNewConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupDead.mustNewConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupModified.mustNewConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupLive.newConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupDead.newConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupModified.newConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname)
 
 			// maintenance stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
 			if stat.lastvacuum > 0 {
-				ch <- c.maintLastVacuum.mustNewConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
+				ch <- c.maintLastVacuum.newConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
 			}
 			if stat.lastanalyze > 0 {
-				ch <- c.maintLastAnalyze.mustNewConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
+				ch <- c.maintLastAnalyze.newConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
 			}
 			if stat.vacuum > 0 {
-				ch <- c.maintenance.mustNewConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
+				ch <- c.maintenance.newConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
 			}
 			if stat.autovacuum > 0 {
-				ch <- c.maintenance.mustNewConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
+				ch <- c.maintenance.newConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
 			}
 			if stat.analyze > 0 {
-				ch <- c.maintenance.mustNewConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
+				ch <- c.maintenance.newConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
 			}
 			if stat.autoanalyze > 0 {
-				ch <- c.maintenance.mustNewConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
+				ch <- c.maintenance.newConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
 			}
 
 			// io stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
 			if stat.heapread > 0 {
-				ch <- c.io.mustNewConstMetric(stat.heapread, stat.datname, stat.schemaname, stat.relname, "heap", "false")
+				ch <- c.io.newConstMetric(stat.heapread, stat.datname, stat.schemaname, stat.relname, "heap", "false")
 			}
 			if stat.heaphit > 0 {
-				ch <- c.io.mustNewConstMetric(stat.heaphit, stat.datname, stat.schemaname, stat.relname, "heap", "true")
+				ch <- c.io.newConstMetric(stat.heaphit, stat.datname, stat.schemaname, stat.relname, "heap", "true")
 			}
 			if stat.idxread > 0 {
-				ch <- c.io.mustNewConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, "idx", "false")
+				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, "idx", "false")
 			}
 			if stat.idxhit > 0 {
-				ch <- c.io.mustNewConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, "idx", "true")
+				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, "idx", "true")
 			}
 			if stat.toastread > 0 {
-				ch <- c.io.mustNewConstMetric(stat.toastread, stat.datname, stat.schemaname, stat.relname, "toast", "false")
+				ch <- c.io.newConstMetric(stat.toastread, stat.datname, stat.schemaname, stat.relname, "toast", "false")
 			}
 			if stat.toasthit > 0 {
-				ch <- c.io.mustNewConstMetric(stat.toasthit, stat.datname, stat.schemaname, stat.relname, "toast", "true")
+				ch <- c.io.newConstMetric(stat.toasthit, stat.datname, stat.schemaname, stat.relname, "toast", "true")
 			}
 			if stat.tidxread > 0 {
-				ch <- c.io.mustNewConstMetric(stat.tidxread, stat.datname, stat.schemaname, stat.relname, "tidx", "false")
+				ch <- c.io.newConstMetric(stat.tidxread, stat.datname, stat.schemaname, stat.relname, "tidx", "false")
 			}
 			if stat.tidxhit > 0 {
-				ch <- c.io.mustNewConstMetric(stat.tidxhit, stat.datname, stat.schemaname, stat.relname, "tidx", "true")
+				ch <- c.io.newConstMetric(stat.tidxhit, stat.datname, stat.schemaname, stat.relname, "tidx", "true")
 			}
 
-			ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname)
 		}
 	}
 

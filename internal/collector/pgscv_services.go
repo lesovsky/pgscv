@@ -24,7 +24,7 @@ func NewPgscvServicesCollector(labels prometheus.Labels, _ model.CollectorSettin
 
 // Update method is used for sending pgscvServicesCollector's metrics.
 func (c *pgscvServicesCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	ch <- c.service.mustNewConstMetric(1, config.ServiceType)
+	ch <- c.service.newConstMetric(1, config.ServiceType)
 
 	return nil
 }

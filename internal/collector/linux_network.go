@@ -41,8 +41,8 @@ func (c *networkCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 	stats := parseInterfaceAddresses(addresses)
 
-	ch <- c.publicAddresses.mustNewConstMetric(float64(stats["public"]))
-	ch <- c.privateAddresses.mustNewConstMetric(float64(stats["private"]))
+	ch <- c.publicAddresses.newConstMetric(float64(stats["public"]))
+	ch <- c.privateAddresses.newConstMetric(float64(stats["private"]))
 
 	return nil
 }

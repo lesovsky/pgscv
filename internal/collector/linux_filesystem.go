@@ -67,14 +67,14 @@ func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric)
 		device := truncateDeviceName(s.mount.device)
 
 		// bytes; free = avail + reserved; total = used + free
-		ch <- c.bytesTotal.mustNewConstMetric(s.size, device, s.mount.mountpoint, s.mount.fstype)
-		ch <- c.bytes.mustNewConstMetric(s.avail, device, s.mount.mountpoint, s.mount.fstype, "avail")
-		ch <- c.bytes.mustNewConstMetric(s.free-s.avail, device, s.mount.mountpoint, s.mount.fstype, "reserved")
-		ch <- c.bytes.mustNewConstMetric(s.size-s.free, device, s.mount.mountpoint, s.mount.fstype, "used")
+		ch <- c.bytesTotal.newConstMetric(s.size, device, s.mount.mountpoint, s.mount.fstype)
+		ch <- c.bytes.newConstMetric(s.avail, device, s.mount.mountpoint, s.mount.fstype, "avail")
+		ch <- c.bytes.newConstMetric(s.free-s.avail, device, s.mount.mountpoint, s.mount.fstype, "reserved")
+		ch <- c.bytes.newConstMetric(s.size-s.free, device, s.mount.mountpoint, s.mount.fstype, "used")
 		// files (inodes)
-		ch <- c.filesTotal.mustNewConstMetric(s.files, device, s.mount.mountpoint, s.mount.fstype)
-		ch <- c.files.mustNewConstMetric(s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "free")
-		ch <- c.files.mustNewConstMetric(s.files-s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "used")
+		ch <- c.filesTotal.newConstMetric(s.files, device, s.mount.mountpoint, s.mount.fstype)
+		ch <- c.files.newConstMetric(s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "free")
+		ch <- c.files.newConstMetric(s.files-s.filesfree, device, s.mount.mountpoint, s.mount.fstype, "used")
 	}
 
 	return nil

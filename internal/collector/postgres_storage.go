@@ -136,9 +136,9 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 		stats := parsePostgresTempFileInflght(res)
 
 		for _, stat := range stats {
-			ch <- c.tempFiles.mustNewConstMetric(stat.tempfiles, stat.tablespace)
-			ch <- c.tempBytes.mustNewConstMetric(stat.tempbytes, stat.tablespace)
-			ch <- c.tempFilesMaxAge.mustNewConstMetric(stat.tempmaxage, stat.tablespace)
+			ch <- c.tempFiles.newConstMetric(stat.tempfiles, stat.tablespace)
+			ch <- c.tempBytes.newConstMetric(stat.tempbytes, stat.tablespace)
+			ch <- c.tempFilesMaxAge.newConstMetric(stat.tempmaxage, stat.tablespace)
 		}
 	}
 
@@ -149,23 +149,23 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	}
 
 	// Data directory
-	ch <- c.datadirBytes.mustNewConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath)
+	ch <- c.datadirBytes.newConstMetric(dirstats.datadirSizeBytes, dirstats.datadirDevice, dirstats.datadirMountpoint, dirstats.datadirPath)
 
 	for _, ts := range tblspcStats {
-		ch <- c.tblspcBytes.mustNewConstMetric(ts.size, ts.name, ts.device, ts.mountpoint, ts.path)
+		ch <- c.tblspcBytes.newConstMetric(ts.size, ts.name, ts.device, ts.mountpoint, ts.path)
 	}
 
 	// WAL directory
-	ch <- c.waldirBytes.mustNewConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
-	ch <- c.waldirFiles.mustNewConstMetric(dirstats.waldirFilesCount, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
+	ch <- c.waldirBytes.newConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
+	ch <- c.waldirFiles.newConstMetric(dirstats.waldirFilesCount, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
 
 	// Log directory
-	ch <- c.logdirBytes.mustNewConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
-	ch <- c.logdirFiles.mustNewConstMetric(dirstats.logdirFilesCount, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+	ch <- c.logdirBytes.newConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+	ch <- c.logdirFiles.newConstMetric(dirstats.logdirFilesCount, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
 
 	// Temp directory
 	if config.ServerVersionNum >= PostgresV12 {
-		ch <- c.tmpfilesBytes.mustNewConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp")
+		ch <- c.tmpfilesBytes.newConstMetric(dirstats.tmpfilesSizeBytes, "temp", "temp", "temp")
 	}
 
 	return nil

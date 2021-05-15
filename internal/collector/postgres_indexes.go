@@ -109,21 +109,21 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 
 		for _, stat := range stats {
 			// always send idx scan metrics and indexes size
-			ch <- c.indexes.mustNewConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname, stat.key)
-			ch <- c.sizes.mustNewConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname, stat.indexname)
+			ch <- c.indexes.newConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname, stat.key)
+			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname, stat.indexname)
 
 			// avoid metrics spamming and send metrics only if they greater than zero.
 			if stat.idxtupread > 0 {
-				ch <- c.tuples.mustNewConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
+				ch <- c.tuples.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
 			}
 			if stat.idxtupfetch > 0 {
-				ch <- c.tuples.mustNewConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname, stat.indexname, "fetch")
+				ch <- c.tuples.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname, stat.indexname, "fetch")
 			}
 			if stat.idxread > 0 {
-				ch <- c.io.mustNewConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "false")
+				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "false")
 			}
 			if stat.idxhit > 0 {
-				ch <- c.io.mustNewConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "true")
+				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "true")
 			}
 		}
 	}

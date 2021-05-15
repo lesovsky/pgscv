@@ -96,24 +96,24 @@ func (c *cpuCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	}
 
 	// Collected time represents summary time spent by ALL cpu cores.
-	ch <- c.cpu.mustNewConstMetric(stat.user, "user")
-	ch <- c.cpu.mustNewConstMetric(stat.nice, "nice")
-	ch <- c.cpu.mustNewConstMetric(stat.system, "system")
-	ch <- c.cpu.mustNewConstMetric(stat.idle, "idle")
-	ch <- c.cpu.mustNewConstMetric(stat.iowait, "iowait")
-	ch <- c.cpu.mustNewConstMetric(stat.irq, "irq")
-	ch <- c.cpu.mustNewConstMetric(stat.softirq, "softirq")
-	ch <- c.cpu.mustNewConstMetric(stat.steal, "steal")
+	ch <- c.cpu.newConstMetric(stat.user, "user")
+	ch <- c.cpu.newConstMetric(stat.nice, "nice")
+	ch <- c.cpu.newConstMetric(stat.system, "system")
+	ch <- c.cpu.newConstMetric(stat.idle, "idle")
+	ch <- c.cpu.newConstMetric(stat.iowait, "iowait")
+	ch <- c.cpu.newConstMetric(stat.irq, "irq")
+	ch <- c.cpu.newConstMetric(stat.softirq, "softirq")
+	ch <- c.cpu.newConstMetric(stat.steal, "steal")
 
-	ch <- c.cpuAll.mustNewConstMetric(stat.user + stat.nice + stat.system + stat.idle + stat.iowait + stat.irq + stat.softirq + stat.steal)
+	ch <- c.cpuAll.newConstMetric(stat.user + stat.nice + stat.system + stat.idle + stat.iowait + stat.irq + stat.softirq + stat.steal)
 
 	// Guest CPU is also accounted for in stat.user and stat.nice, expose these as separate metrics.
-	ch <- c.cpuGuest.mustNewConstMetric(stat.guest, "user")
-	ch <- c.cpuGuest.mustNewConstMetric(stat.guestnice, "nice")
+	ch <- c.cpuGuest.newConstMetric(stat.guest, "user")
+	ch <- c.cpuGuest.newConstMetric(stat.guestnice, "nice")
 
 	// Up and idle time values from /proc/uptime. Idle time accounted as summary for all cpu cores.
-	ch <- c.uptime.mustNewConstMetric(uptime)
-	ch <- c.idletime.mustNewConstMetric(idletime)
+	ch <- c.uptime.newConstMetric(uptime)
+	ch <- c.idletime.newConstMetric(idletime)
 
 	return nil
 }

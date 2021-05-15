@@ -67,8 +67,8 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	}
 
 	// MemUsed and SwapUsed are composite metrics and not present in /proc/meminfo.
-	ch <- c.memused.mustNewConstMetric(meminfo["MemTotal"] - meminfo["MemFree"] - meminfo["Buffers"] - meminfo["Cached"])
-	ch <- c.swapused.mustNewConstMetric(meminfo["SwapTotal"] - meminfo["SwapFree"])
+	ch <- c.memused.newConstMetric(meminfo["MemTotal"] - meminfo["MemFree"] - meminfo["Buffers"] - meminfo["Cached"])
+	ch <- c.swapused.newConstMetric(meminfo["SwapTotal"] - meminfo["SwapFree"])
 
 	// Processing vmstat stats.
 	for param, value := range vmstat {

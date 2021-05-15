@@ -143,17 +143,17 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 			mergedTotal = stat[1] + stat[5]
 			bytesTotal = stat[2] + stat[6]
 			secondsTotal = stat[3] + stat[7]
-			ch <- c.completed.mustNewConstMetric(stat[0], dev, "read")
-			ch <- c.merged.mustNewConstMetric(stat[1], dev, "read")
-			ch <- c.bytes.mustNewConstMetric(stat[2], dev, "read")
-			ch <- c.times.mustNewConstMetric(stat[3], dev, "read")
-			ch <- c.completed.mustNewConstMetric(stat[4], dev, "write")
-			ch <- c.merged.mustNewConstMetric(stat[5], dev, "write")
-			ch <- c.bytes.mustNewConstMetric(stat[6], dev, "write")
-			ch <- c.times.mustNewConstMetric(stat[7], dev, "write")
-			ch <- c.ionow.mustNewConstMetric(stat[8], dev)
-			ch <- c.iotime.mustNewConstMetric(stat[9], dev)
-			ch <- c.iotimeweighted.mustNewConstMetric(stat[10], dev)
+			ch <- c.completed.newConstMetric(stat[0], dev, "read")
+			ch <- c.merged.newConstMetric(stat[1], dev, "read")
+			ch <- c.bytes.newConstMetric(stat[2], dev, "read")
+			ch <- c.times.newConstMetric(stat[3], dev, "read")
+			ch <- c.completed.newConstMetric(stat[4], dev, "write")
+			ch <- c.merged.newConstMetric(stat[5], dev, "write")
+			ch <- c.bytes.newConstMetric(stat[6], dev, "write")
+			ch <- c.times.newConstMetric(stat[7], dev, "write")
+			ch <- c.ionow.newConstMetric(stat[8], dev)
+			ch <- c.iotime.newConstMetric(stat[9], dev)
+			ch <- c.iotimeweighted.newConstMetric(stat[10], dev)
 		}
 
 		// for kernels 4.18+
@@ -162,25 +162,25 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 			mergedTotal += stat[12]
 			bytesTotal += stat[13]
 			secondsTotal += stat[14]
-			ch <- c.completed.mustNewConstMetric(stat[11], dev, "discard")
-			ch <- c.merged.mustNewConstMetric(stat[12], dev, "discard")
-			ch <- c.bytes.mustNewConstMetric(stat[13], dev, "discard")
-			ch <- c.times.mustNewConstMetric(stat[14], dev, "discard")
+			ch <- c.completed.newConstMetric(stat[11], dev, "discard")
+			ch <- c.merged.newConstMetric(stat[12], dev, "discard")
+			ch <- c.bytes.newConstMetric(stat[13], dev, "discard")
+			ch <- c.times.newConstMetric(stat[14], dev, "discard")
 		}
 
 		// for kernels 5.5+
 		if len(stat) >= 17 {
 			completedTotal += stat[15]
 			secondsTotal += stat[16]
-			ch <- c.completed.mustNewConstMetric(stat[15], dev, "flush")
-			ch <- c.times.mustNewConstMetric(stat[16], dev, "flush")
+			ch <- c.completed.newConstMetric(stat[15], dev, "flush")
+			ch <- c.times.newConstMetric(stat[16], dev, "flush")
 		}
 
 		// Send accumulated totals.
-		ch <- c.completedAll.mustNewConstMetric(completedTotal, dev)
-		ch <- c.mergedAll.mustNewConstMetric(mergedTotal, dev)
-		ch <- c.bytesAll.mustNewConstMetric(bytesTotal, dev)
-		ch <- c.timesAll.mustNewConstMetric(secondsTotal, dev)
+		ch <- c.completedAll.newConstMetric(completedTotal, dev)
+		ch <- c.mergedAll.newConstMetric(mergedTotal, dev)
+		ch <- c.bytesAll.newConstMetric(bytesTotal, dev)
+		ch <- c.timesAll.newConstMetric(secondsTotal, dev)
 	}
 
 	// Collect storages properties.
@@ -189,7 +189,7 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 		log.Warnf("get storage devices properties failed: %s; skip", err)
 	} else {
 		for _, s := range storages {
-			ch <- c.storages.mustNewConstMetric(1, s.device, s.rotational, s.scheduler)
+			ch <- c.storages.newConstMetric(1, s.device, s.rotational, s.scheduler)
 		}
 	}
 

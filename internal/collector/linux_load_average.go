@@ -50,9 +50,9 @@ func (c *loadaverageCollector) Update(_ Config, ch chan<- prometheus.Metric) err
 		return fmt.Errorf("get load average stats failed: %s", err)
 	}
 
-	ch <- c.load1.mustNewConstMetric(stats[0])
-	ch <- c.load5.mustNewConstMetric(stats[1])
-	ch <- c.load15.mustNewConstMetric(stats[2])
+	ch <- c.load1.newConstMetric(stats[0])
+	ch <- c.load5.newConstMetric(stats[1])
+	ch <- c.load15.newConstMetric(stats[2])
 
 	return nil
 }

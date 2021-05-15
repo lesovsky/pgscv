@@ -73,9 +73,9 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 	for k, v := range settings {
 		// If value could be converted to numeric, send it as value. For string values use "1".
 		if f, err := strconv.ParseFloat(v, 64); err != nil {
-			ch <- c.settings.mustNewConstMetric(1, k, v)
+			ch <- c.settings.newConstMetric(1, k, v)
 		} else {
-			ch <- c.settings.mustNewConstMetric(f, k, v)
+			ch <- c.settings.newConstMetric(f, k, v)
 		}
 	}
 
@@ -92,13 +92,13 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 		}
 
 		for _, p := range dbSettings {
-			ch <- c.dbSettings.mustNewConstMetric(1, p.name, p.mode, p.size)
+			ch <- c.dbSettings.newConstMetric(1, p.name, p.mode, p.size)
 
 			if f, err := strconv.ParseFloat(p.size, 64); err != nil {
 				log.Warnf("invalid input, parse '%s' failed: %s; skip", p.size, err)
 				continue
 			} else {
-				ch <- c.poolSize.mustNewConstMetric(f, p.name)
+				ch <- c.poolSize.newConstMetric(f, p.name)
 			}
 		}
 	}

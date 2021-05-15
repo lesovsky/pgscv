@@ -61,7 +61,7 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 	settings := parsePostgresSettings(res)
 
 	for _, s := range settings {
-		ch <- c.settings.mustNewConstMetric(s.value, s.name, s.setting, s.unit, s.vartype, "main")
+		ch <- c.settings.newConstMetric(s.value, s.name, s.setting, s.unit, s.vartype, "main")
 	}
 
 	query = `SELECT name, setting FROM pg_show_all_settings() WHERE name IN ('config_file','hba_file','ident_file','data_directory')`
@@ -73,7 +73,7 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 	files := parsePostgresFiles(res)
 
 	for _, f := range files {
-		ch <- c.files.mustNewConstMetric(1, f.guc, f.mode, f.path)
+		ch <- c.files.newConstMetric(1, f.guc, f.mode, f.path)
 	}
 
 	return nil

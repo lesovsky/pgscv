@@ -136,35 +136,35 @@ func (c *postgresLogsCollector) Update(config Config, ch chan<- prometheus.Metri
 	// Totals.
 	c.totals.mu.RLock()
 	for label, value := range c.totals.store {
-		ch <- c.messagesTotal.mustNewConstMetric(value, label)
+		ch <- c.messagesTotal.newConstMetric(value, label)
 	}
 	c.totals.mu.RUnlock()
 
 	// PANIC messages.
 	c.panics.mu.RLock()
 	for msg, value := range c.panics.store {
-		ch <- c.panicMessages.mustNewConstMetric(value, msg)
+		ch <- c.panicMessages.newConstMetric(value, msg)
 	}
 	c.panics.mu.RUnlock()
 
 	// FATAL messages.
 	c.fatals.mu.RLock()
 	for msg, value := range c.fatals.store {
-		ch <- c.fatalMessages.mustNewConstMetric(value, msg)
+		ch <- c.fatalMessages.newConstMetric(value, msg)
 	}
 	c.fatals.mu.RUnlock()
 
 	// ERROR messages.
 	c.errors.mu.RLock()
 	for msg, value := range c.errors.store {
-		ch <- c.errorMessages.mustNewConstMetric(value, msg)
+		ch <- c.errorMessages.newConstMetric(value, msg)
 	}
 	c.errors.mu.RUnlock()
 
 	// WARNING messages.
 	c.warnings.mu.RLock()
 	for msg, value := range c.warnings.store {
-		ch <- c.warningMessages.mustNewConstMetric(value, msg)
+		ch <- c.warningMessages.newConstMetric(value, msg)
 	}
 	c.warnings.mu.RUnlock()
 

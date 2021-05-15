@@ -60,24 +60,24 @@ func (c *netdevCollector) Update(config Config, ch chan<- prometheus.Metric) err
 		}
 
 		// recv
-		ch <- c.bytes.mustNewConstMetric(stat[0], device, "recv")
-		ch <- c.packets.mustNewConstMetric(stat[1], device, "recv")
-		ch <- c.events.mustNewConstMetric(stat[2], device, "recv", "errs")
-		ch <- c.events.mustNewConstMetric(stat[3], device, "recv", "drop")
-		ch <- c.events.mustNewConstMetric(stat[4], device, "recv", "fifo")
-		ch <- c.events.mustNewConstMetric(stat[5], device, "recv", "frame")
-		ch <- c.events.mustNewConstMetric(stat[6], device, "recv", "compressed")
-		ch <- c.events.mustNewConstMetric(stat[7], device, "recv", "multicast")
+		ch <- c.bytes.newConstMetric(stat[0], device, "recv")
+		ch <- c.packets.newConstMetric(stat[1], device, "recv")
+		ch <- c.events.newConstMetric(stat[2], device, "recv", "errs")
+		ch <- c.events.newConstMetric(stat[3], device, "recv", "drop")
+		ch <- c.events.newConstMetric(stat[4], device, "recv", "fifo")
+		ch <- c.events.newConstMetric(stat[5], device, "recv", "frame")
+		ch <- c.events.newConstMetric(stat[6], device, "recv", "compressed")
+		ch <- c.events.newConstMetric(stat[7], device, "recv", "multicast")
 
 		// sent
-		ch <- c.bytes.mustNewConstMetric(stat[8], device, "sent")
-		ch <- c.packets.mustNewConstMetric(stat[9], device, "sent")
-		ch <- c.events.mustNewConstMetric(stat[10], device, "sent", "errs")
-		ch <- c.events.mustNewConstMetric(stat[11], device, "sent", "drop")
-		ch <- c.events.mustNewConstMetric(stat[12], device, "sent", "fifo")
-		ch <- c.events.mustNewConstMetric(stat[13], device, "sent", "colls")
-		ch <- c.events.mustNewConstMetric(stat[14], device, "sent", "carrier")
-		ch <- c.events.mustNewConstMetric(stat[15], device, "sent", "compressed")
+		ch <- c.bytes.newConstMetric(stat[8], device, "sent")
+		ch <- c.packets.newConstMetric(stat[9], device, "sent")
+		ch <- c.events.newConstMetric(stat[10], device, "sent", "errs")
+		ch <- c.events.newConstMetric(stat[11], device, "sent", "drop")
+		ch <- c.events.newConstMetric(stat[12], device, "sent", "fifo")
+		ch <- c.events.newConstMetric(stat[13], device, "sent", "colls")
+		ch <- c.events.newConstMetric(stat[14], device, "sent", "carrier")
+		ch <- c.events.newConstMetric(stat[15], device, "sent", "compressed")
 	}
 
 	return nil

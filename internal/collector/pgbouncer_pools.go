@@ -80,14 +80,14 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 
 	// Process pools stats.
 	for _, stat := range poolsStats {
-		ch <- c.conns.mustNewConstMetric(stat.clActive, stat.user, stat.database, stat.mode, "cl_active")
-		ch <- c.conns.mustNewConstMetric(stat.clWaiting, stat.user, stat.database, stat.mode, "cl_waiting")
-		ch <- c.conns.mustNewConstMetric(stat.svActive, stat.user, stat.database, stat.mode, "sv_active")
-		ch <- c.conns.mustNewConstMetric(stat.svIdle, stat.user, stat.database, stat.mode, "sv_idle")
-		ch <- c.conns.mustNewConstMetric(stat.svUsed, stat.user, stat.database, stat.mode, "sv_used")
-		ch <- c.conns.mustNewConstMetric(stat.svTested, stat.user, stat.database, stat.mode, "sv_tested")
-		ch <- c.conns.mustNewConstMetric(stat.svLogin, stat.user, stat.database, stat.mode, "sv_login")
-		ch <- c.maxwait.mustNewConstMetric(stat.maxWait, stat.user, stat.database, stat.mode)
+		ch <- c.conns.newConstMetric(stat.clActive, stat.user, stat.database, stat.mode, "cl_active")
+		ch <- c.conns.newConstMetric(stat.clWaiting, stat.user, stat.database, stat.mode, "cl_waiting")
+		ch <- c.conns.newConstMetric(stat.svActive, stat.user, stat.database, stat.mode, "sv_active")
+		ch <- c.conns.newConstMetric(stat.svIdle, stat.user, stat.database, stat.mode, "sv_idle")
+		ch <- c.conns.newConstMetric(stat.svUsed, stat.user, stat.database, stat.mode, "sv_used")
+		ch <- c.conns.newConstMetric(stat.svTested, stat.user, stat.database, stat.mode, "sv_tested")
+		ch <- c.conns.newConstMetric(stat.svLogin, stat.user, stat.database, stat.mode, "sv_login")
+		ch <- c.maxwait.newConstMetric(stat.maxWait, stat.user, stat.database, stat.mode)
 	}
 
 	// Process client connections stats.
@@ -100,7 +100,7 @@ func (c *pgbouncerPoolsCollector) Update(config Config, ch chan<- prometheus.Met
 
 		user, database, address := vals[0], vals[1], vals[2]
 
-		ch <- c.clients.mustNewConstMetric(v, user, database, address)
+		ch <- c.clients.newConstMetric(v, user, database, address)
 	}
 
 	return nil
