@@ -282,6 +282,11 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 			}
 
 			for i, resColname := range colnames { // walk through column names from data row
+				// Skip NULL values.
+				if !row[i].Valid {
+					continue
+				}
+
 				// Check for value.
 				if descColname == resColname && !valueOK {
 					var err error
@@ -343,6 +348,11 @@ func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string,
 	}
 
 	for i, colname := range colnames {
+		// Skip NULL values.
+		if !row[i].Valid {
+			continue
+		}
+
 		// Check for value.
 		if colname == desc.value {
 			var err error

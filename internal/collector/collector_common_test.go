@@ -377,10 +377,11 @@ func Test_updateMetrics(t *testing.T) {
 
 func Test_updateMultipleMetrics(t *testing.T) {
 	row := []sql.NullString{
+		{String: "", Valid: false},                                                               // NULL value
 		{String: "852", Valid: true}, {String: "456", Valid: true}, {String: "753", Valid: true}, // ins, upd, del
 		{String: "example", Valid: true}, // relname
 	}
-	colnames := []string{"inserted", "updated", "deleted", "relname"}
+	colnames := []string{"nullable", "inserted", "updated", "deleted", "relname"}
 
 	testcases := []struct {
 		desc         typedDesc
@@ -473,9 +474,9 @@ func Test_updateMultipleMetrics(t *testing.T) {
 
 func Test_updateSingleMetric(t *testing.T) {
 	row := []sql.NullString{
-		{String: "123", Valid: true}, {String: "987654", Valid: true}, {String: "example", Valid: true},
+		{String: "123", Valid: true}, {String: "987654", Valid: true}, {String: "example", Valid: true}, {String: "", Valid: false},
 	}
-	colnames := []string{"seq_scan", "idx_scan", "relname"}
+	colnames := []string{"seq_scan", "idx_scan", "relname", "nullable"}
 
 	testcases := []struct {
 		desc         typedDesc
