@@ -10,41 +10,23 @@ import (
 
 const (
 	postgresDatabaseConflictsQuery = "SELECT datname," +
-		"nullif(confl_tablespace, 0) AS tablespace," +
-		"nullif(confl_lock, 0) AS lock," +
-		"nullif(confl_snapshot, 0) AS snapshot," +
-		"nullif(confl_bufferpin, 0) AS bufferpin," +
-		"nullif(confl_deadlock, 0) AS deadlock " +
+		"nullif(confl_tablespace, 0) AS confl_tablespace," +
+		"nullif(confl_lock, 0) AS confl_lock," +
+		"nullif(confl_snapshot, 0) AS confl_snapshot," +
+		"nullif(confl_bufferpin, 0) AS confl_bufferpin," +
+		"nullif(confl_deadlock, 0) AS confl_deadlock " +
 		"FROM pg_stat_database_conflicts"
 )
 
 type postgresConflictsCollector struct {
 	labelNames []string
 	conflicts  typedDesc
-	custom     []typedDescSet
 }
 
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
 func NewPostgresConflictsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	// This instance of builtinSubsystems just used for detecting collisions with user-defined metrics.
-	// This must be always synchronized with metric descriptors in returned value.
-	builtinSubsystems := model.Subsystems{
-		"recovery": {
-			Metrics: model.Metrics{
-				{ShortName: "datname"},
-				{ShortName: "tablespace"},
-				{ShortName: "lock"},
-				{ShortName: "snapshot"},
-				{ShortName: "bufferpin"},
-				{ShortName: "deadlock"},
-			},
-		},
-	}
-
-	removeCollisions(builtinSubsystems, settings.Subsystems)
-
-	labelNames := []string{"datname", "conflict"}
+	var labelNames = []string{"datname", "reason"}
 
 	return &postgresConflictsCollector{
 		labelNames: labelNames,
@@ -55,7 +37,6 @@ func NewPostgresConflictsCollector(constLabels prometheus.Labels, settings model
 				labelNames, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
-		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil
 }
 
@@ -65,28 +46,32 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 
 	res, err := conn.Query(postgresDatabaseConflictsQuery)
 	if err != nil {
 		return err
 	}
 
-	conn.Close()
-
 	stats := parsePostgresConflictStats(res, c.labelNames)
 
 	for _, stat := range stats {
-		ch <- c.conflicts.mustNewConstMetric(stat.tablespace, stat.datname, "tablespace")
-		ch <- c.conflicts.mustNewConstMetric(stat.lock, stat.datname, "lock")
-		ch <- c.conflicts.mustNewConstMetric(stat.snapshot, stat.datname, "snapshot")
-		ch <- c.conflicts.mustNewConstMetric(stat.bufferpin, stat.datname, "bufferpin")
-		ch <- c.conflicts.mustNewConstMetric(stat.deadlock, stat.datname, "deadlock")
-	}
-
-	// Update user-defined metrics.
-	err = updateAllDescSets(config, c.custom, ch)
-	if err != nil {
-		return err
+		// avoid zero-value metric spam
+		if stat.tablespace > 0 {
+			ch <- c.conflicts.mustNewConstMetric(stat.tablespace, stat.datname, "tablespace")
+		}
+		if stat.lock > 0 {
+			ch <- c.conflicts.mustNewConstMetric(stat.lock, stat.datname, "lock")
+		}
+		if stat.snapshot > 0 {
+			ch <- c.conflicts.mustNewConstMetric(stat.snapshot, stat.datname, "snapshot")
+		}
+		if stat.bufferpin > 0 {
+			ch <- c.conflicts.mustNewConstMetric(stat.bufferpin, stat.datname, "bufferpin")
+		}
+		if stat.deadlock > 0 {
+			ch <- c.conflicts.mustNewConstMetric(stat.deadlock, stat.datname, "deadlock")
+		}
 	}
 
 	return nil
