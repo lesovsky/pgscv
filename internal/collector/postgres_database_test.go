@@ -43,7 +43,7 @@ func Test_parsePostgresDatabasesStats(t *testing.T) {
 				Nrows: 2,
 				Ncols: 18,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")},
+					{Name: []byte("database")},
 					{Name: []byte("xact_commit")}, {Name: []byte("xact_rollback")}, {Name: []byte("blks_read")}, {Name: []byte("blks_hit")},
 					{Name: []byte("tup_returned")}, {Name: []byte("tup_fetched")}, {Name: []byte("tup_inserted")}, {Name: []byte("tup_updated")}, {Name: []byte("tup_deleted")},
 					{Name: []byte("conflicts")}, {Name: []byte("temp_files")}, {Name: []byte("temp_bytes")}, {Name: []byte("deadlocks")},
@@ -68,13 +68,13 @@ func Test_parsePostgresDatabasesStats(t *testing.T) {
 			},
 			want: map[string]postgresDatabaseStat{
 				"testdb1": {
-					datname: "testdb1", xactcommit: 100, xactrollback: 5, blksread: 10000, blkshit: 845785,
+					database: "testdb1", xactcommit: 100, xactrollback: 5, blksread: 10000, blkshit: 845785,
 					tupreturned: 758, tupfetched: 542, tupinserted: 452, tupupdated: 174, tupdeleted: 125,
 					conflicts: 33, tempfiles: 41, tempbytes: 85642585, deadlocks: 25,
 					blkreadtime: 542542, blkwritetime: 150150, sizebytes: 485254752, statsage: 4589,
 				},
 				"testdb2": {
-					datname: "testdb2", xactcommit: 254, xactrollback: 41, blksread: 4853, blkshit: 48752,
+					database: "testdb2", xactcommit: 254, xactrollback: 41, blksread: 4853, blkshit: 48752,
 					tupreturned: 7856, tupfetched: 4254, tupinserted: 894, tupupdated: 175, tupdeleted: 245,
 					conflicts: 26, tempfiles: 84, tempbytes: 125784686, deadlocks: 11,
 					blkreadtime: 458751, blkwritetime: 235578, sizebytes: 856964774, statsage: 6896,
@@ -85,7 +85,7 @@ func Test_parsePostgresDatabasesStats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parsePostgresDatabasesStats(tc.res, []string{"datname"})
+			got := parsePostgresDatabasesStats(tc.res, []string{"database"})
 			assert.EqualValues(t, tc.want, got)
 		})
 	}

@@ -10,11 +10,12 @@ import (
 
 const (
 	databaseQuery = "SELECT " +
-		"COALESCE(datname, '__shared__') AS datname, " +
+		"datname AS database, " +
 		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
 		"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
 		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
-		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate)"
+		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate) " +
+		"OR datname IS NULL"
 
 	xidLimitQuery = "SELECT 'database' AS src, 2147483647 - greatest(max(age(datfrozenxid)), max(age(coalesce(nullif(datminmxid, 1), datfrozenxid)))) AS to_limit FROM pg_database " +
 		"UNION SELECT 'prepared_xacts' AS src, 2147483647 - coalesce(max(age(transaction)), 0) AS to_limit FROM pg_prepared_xacts " +
@@ -40,92 +41,92 @@ type postgresDatabasesCollector struct {
 // NewPostgresDatabasesCollector returns a new Collector exposing postgres databases stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-VIEW
 func NewPostgresDatabasesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var databaseLabelNames = []string{"datname"}
+	var labels = []string{"database"}
 
 	return &postgresDatabasesCollector{
-		labelNames: databaseLabelNames,
+		labelNames: labels,
 		commits: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "xact_commits_total"),
 				"Total number of transactions had been commited.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		rollbacks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "xact_rollbacks_total"),
 				"Total number of transactions had been rolled back.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		conflicts: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "conflicts_total"),
 				"Total number of recovery conflicts occurred.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		deadlocks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "deadlocks_total"),
 				"Total number of deadlocks occurred.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		blocks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "blocks_total"),
 				"Total number of disk blocks had been accessed by each type of access.",
-				[]string{"datname", "access"}, constLabels,
+				[]string{"database", "access"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		tuples: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "tuples_total"),
 				"Total number of rows processed by each type of operation.",
-				[]string{"datname", "op"}, constLabels,
+				[]string{"database", "tuples"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		tempbytes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "temp_bytes_total"),
 				"Total amount of data written to temporary files by queries.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		tempfiles: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "temp_files_total"),
 				"Total number of temporary files created by queries.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		blockstime: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "blk_time_seconds"),
 				"Time spent accessing data file blocks by backends in this database in each access type, in seconds.",
-				[]string{"datname", "type"}, constLabels,
+				[]string{"database", "type"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		sizes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "size_bytes"),
 				"Total size of the database, in bytes.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		statsage: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "stats_age_seconds"),
 				"The age of the activity statistics, in seconds.",
-				databaseLabelNames, constLabels,
+				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 		xidlimit: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "xacts", "left_before_wraparound"),
 				"The number of transactions left before force shutdown due to XID wraparound.",
-				[]string{"xid"}, constLabels,
+				[]string{"xid_from"}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
 	}, nil
@@ -154,24 +155,24 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	xidStats := parsePostgresXidLimitStats(res)
 
 	for _, stat := range stats {
-		ch <- c.commits.newConstMetric(stat.xactcommit, stat.datname)
-		ch <- c.rollbacks.newConstMetric(stat.xactrollback, stat.datname)
-		ch <- c.conflicts.newConstMetric(stat.conflicts, stat.datname)
-		ch <- c.deadlocks.newConstMetric(stat.deadlocks, stat.datname)
-		ch <- c.blocks.newConstMetric(stat.blksread, stat.datname, "read")
-		ch <- c.blocks.newConstMetric(stat.blkshit, stat.datname, "hit")
-		ch <- c.tuples.newConstMetric(stat.tupreturned, stat.datname, "returned")
-		ch <- c.tuples.newConstMetric(stat.tupfetched, stat.datname, "fetched")
-		ch <- c.tuples.newConstMetric(stat.tupinserted, stat.datname, "inserted")
-		ch <- c.tuples.newConstMetric(stat.tupupdated, stat.datname, "updated")
-		ch <- c.tuples.newConstMetric(stat.tupdeleted, stat.datname, "deleted")
+		ch <- c.commits.newConstMetric(stat.xactcommit, stat.database)
+		ch <- c.rollbacks.newConstMetric(stat.xactrollback, stat.database)
+		ch <- c.conflicts.newConstMetric(stat.conflicts, stat.database)
+		ch <- c.deadlocks.newConstMetric(stat.deadlocks, stat.database)
+		ch <- c.blocks.newConstMetric(stat.blksread, stat.database, "read")
+		ch <- c.blocks.newConstMetric(stat.blkshit, stat.database, "hit")
+		ch <- c.tuples.newConstMetric(stat.tupreturned, stat.database, "returned")
+		ch <- c.tuples.newConstMetric(stat.tupfetched, stat.database, "fetched")
+		ch <- c.tuples.newConstMetric(stat.tupinserted, stat.database, "inserted")
+		ch <- c.tuples.newConstMetric(stat.tupupdated, stat.database, "updated")
+		ch <- c.tuples.newConstMetric(stat.tupdeleted, stat.database, "deleted")
 
-		ch <- c.tempbytes.newConstMetric(stat.tempbytes, stat.datname)
-		ch <- c.tempfiles.newConstMetric(stat.tempfiles, stat.datname)
-		ch <- c.blockstime.newConstMetric(stat.blkreadtime, stat.datname, "read")
-		ch <- c.blockstime.newConstMetric(stat.blkwritetime, stat.datname, "write")
-		ch <- c.sizes.newConstMetric(stat.sizebytes, stat.datname)
-		ch <- c.statsage.newConstMetric(stat.statsage, stat.datname)
+		ch <- c.tempbytes.newConstMetric(stat.tempbytes, stat.database)
+		ch <- c.tempfiles.newConstMetric(stat.tempfiles, stat.database)
+		ch <- c.blockstime.newConstMetric(stat.blkreadtime, stat.database, "read")
+		ch <- c.blockstime.newConstMetric(stat.blkwritetime, stat.database, "write")
+		ch <- c.sizes.newConstMetric(stat.sizebytes, stat.database)
+		ch <- c.statsage.newConstMetric(stat.statsage, stat.database)
 	}
 
 	ch <- c.xidlimit.newConstMetric(xidStats.database, "pg_database")
@@ -183,7 +184,7 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 
 // postgresDatabaseStat represents per-database stats based on pg_stat_database.
 type postgresDatabaseStat struct {
-	datname      string
+	database     string
 	xactcommit   float64
 	xactrollback float64
 	blksread     float64
@@ -216,13 +217,13 @@ func parsePostgresDatabasesStats(r *model.PGResult, labelNames []string) map[str
 		// collect label values
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				stat.datname = row[i].String
+			case "database":
+				stat.database = row[i].String
 			}
 		}
 
 		// Define a map key as a database name.
-		databaseFQName := stat.datname
+		databaseFQName := stat.database
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		stats[databaseFQName] = stat
