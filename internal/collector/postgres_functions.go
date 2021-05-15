@@ -1,73 +1,178 @@
 package collector
 
 import (
+	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
+	"strconv"
+	"strings"
 )
 
-const postgresFunctionsQuery = "SELECT schemaname, funcname, calls, " +
-	"total_time * 0.001 AS total_time, self_time * 0.001 AS self_time " +
-	"FROM pg_stat_user_functions"
+const postgresFunctionsQuery = "SELECT current_database() AS datname, schemaname, funcname, calls, total_time, self_time FROM pg_stat_user_functions"
 
 type postgresFunctionsCollector struct {
-	builtin []typedDescSet
-	custom  []typedDescSet
+	calls      typedDesc
+	totaltime  typedDesc
+	selftime   typedDesc
+	labelNames []string
 }
 
 // NewPostgresFunctionsCollector returns a new Collector exposing postgres SQL functions stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-USER-FUNCTIONS-VIEW
 func NewPostgresFunctionsCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
-	builtinSubsystems := model.Subsystems{
-		"function": {
-			Databases: ".+", // collect metrics from all databases
-			Query:     postgresFunctionsQuery,
-			Metrics: model.Metrics{
-				{
-					ShortName:   "calls_total",
-					Usage:       "COUNTER",
-					Value:       "calls",
-					Labels:      []string{"schemaname", "funcname"},
-					Description: "Total number of times functions had been called.",
-				},
-				{
-					ShortName:   "total_time_seconds",
-					Usage:       "COUNTER",
-					Value:       "total_time",
-					Labels:      []string{"schemaname", "funcname"},
-					Description: "Total time spent in function and all other functions called by it, in seconds.",
-				},
-				{
-					ShortName:   "self_time_seconds",
-					Usage:       "COUNTER",
-					Value:       "self_time",
-					Labels:      []string{"schemaname", "funcname"},
-					Description: "Total time spent in function itself, not including other functions called by it, in seconds.",
-				},
-			},
-		},
-	}
-
-	removeCollisions(builtinSubsystems, settings.Subsystems)
+	var labelNames = []string{"datname", "schemaname", "funcname"}
 
 	return &postgresFunctionsCollector{
-		builtin: newDeskSetsFromSubsystems("postgres", builtinSubsystems, constLabels),
-		custom:  newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
+		labelNames: labelNames,
+		calls: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "function", "calls_total"),
+				"Total number of times functions had been called.",
+				labelNames, constLabels,
+			), valueType: prometheus.CounterValue,
+		},
+		totaltime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "function", "total_time_seconds"),
+				"Total time spent in function and all other functions called by it, in seconds.",
+				labelNames, constLabels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
+		selftime: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "function", "self_time_seconds"),
+				"Total time spent in function itself, not including other functions called by it, in seconds.",
+				labelNames, constLabels,
+			), valueType: prometheus.CounterValue, factor: .001,
+		},
 	}, nil
 }
 
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	// Update builtin metrics.
-	err := updateAllDescSets(config, c.builtin, ch)
+	conn, err := store.New(config.ConnString)
 	if err != nil {
 		return err
 	}
 
-	// Update user-defined metrics.
-	err = updateAllDescSets(config, c.custom, ch)
+	databases, err := listDatabases(conn)
 	if err != nil {
 		return err
+	}
+
+	conn.Close()
+
+	pgconfig, err := pgx.ParseConfig(config.ConnString)
+	if err != nil {
+		return err
+	}
+
+	for _, d := range databases {
+		pgconfig.Database = d
+		conn, err := store.NewWithConfig(pgconfig)
+		if err != nil {
+			return err
+		}
+
+		res, err := conn.Query(postgresFunctionsQuery)
+		conn.Close()
+		if err != nil {
+			log.Warnf("get functions stat of database %s failed: %s", d, err)
+			continue
+		}
+
+		stats := parsePostgresFunctionsStats(res, c.labelNames)
+
+		for _, stat := range stats {
+			ch <- c.calls.mustNewConstMetric(stat.calls, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.totaltime.mustNewConstMetric(stat.totaltime, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.selftime.mustNewConstMetric(stat.selftime, stat.datname, stat.schemaname, stat.funcname)
+		}
 	}
 
 	return nil
+}
+
+// postgresFunctionStat represents Postgres function stats based pg_stat_user_functions.
+type postgresFunctionStat struct {
+	datname    string
+	schemaname string
+	funcname   string
+	calls      float64
+	totaltime  float64
+	selftime   float64
+}
+
+// parsePostgresFunctionsStats parses PGResult and return struct with stats values.
+func parsePostgresFunctionsStats(r *model.PGResult, labelNames []string) map[string]postgresFunctionStat {
+	log.Debug("parse postgres user functions stats")
+
+	var stats = make(map[string]postgresFunctionStat)
+
+	// process row by row
+	for _, row := range r.Rows {
+		stat := postgresFunctionStat{}
+
+		// collect label values
+		for i, colname := range r.Colnames {
+			switch string(colname.Name) {
+			case "datname":
+				stat.datname = row[i].String
+			case "schemaname":
+				stat.schemaname = row[i].String
+			case "funcname":
+				stat.funcname = row[i].String
+			}
+		}
+
+		// Create a function name consisting of trio database/user/queryid
+		functionFQName := strings.Join([]string{stat.datname, stat.schemaname, stat.funcname}, "/")
+
+		// Put stats with labels (but with no data values yet) into stats store.
+		stats[functionFQName] = stat
+
+		// fetch data values from columns
+		for i, colname := range r.Colnames {
+			// skip columns if its value used as a label
+			if stringsContains(labelNames, string(colname.Name)) {
+				log.Debugf("skip label mapped column '%s'", string(colname.Name))
+				continue
+			}
+
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
+
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+				continue
+			}
+
+			// Run column-specific logic
+			switch string(colname.Name) {
+			case "calls":
+				s := stats[functionFQName]
+				s.calls = v
+				stats[functionFQName] = s
+			case "total_time":
+				s := stats[functionFQName]
+				s.totaltime = v
+				stats[functionFQName] = s
+			case "self_time":
+				s := stats[functionFQName]
+				s.selftime = v
+				stats[functionFQName] = s
+			default:
+				log.Debugf("unsupported pg_stat_user_functions stat column: %s, skip", string(colname.Name))
+				continue
+			}
+		}
+	}
+
+	return stats
 }
