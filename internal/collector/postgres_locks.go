@@ -9,22 +9,49 @@ import (
 )
 
 const (
-	postgresLocksQuery = "SELECT mode, count(*) FROM pg_locks GROUP BY mode"
+	locksQuery = "SELECT " +
+		"count(*) FILTER (WHERE mode = 'AccessShareLock') AS access_share_lock, " +
+		"count(*) FILTER (WHERE mode = 'RowShareLock') AS row_share_lock, " +
+		"count(*) FILTER (WHERE mode = 'RowExclusiveLock') AS row_exclusive_lock, " +
+		"count(*) FILTER (WHERE mode = 'ShareUpdateExclusiveLock') AS share_update_exclusive_lock, " +
+		"count(*) FILTER (WHERE mode = 'ShareLock') AS share_lock, " +
+		"count(*) FILTER (WHERE mode = 'ShareRowExclusiveLock') AS share_row_exclusive_lock, " +
+		"count(*) FILTER (WHERE mode = 'ExclusiveLock') AS exclusive_lock, " +
+		"count(*) FILTER (WHERE mode = 'AccessExclusiveLock') AS access_exclusive_lock, " +
+		"count(*) FILTER (WHERE not granted) AS not_granted, " +
+		"count(*) AS total " +
+		"FROM pg_locks"
 )
 
 // postgresLocksCollector is a collector with locks related metrics descriptors.
 type postgresLocksCollector struct {
-	modes typedDesc
+	locks      typedDesc
+	locksAll   typedDesc
+	notgranted typedDesc
 }
 
 // NewPostgresLocksCollector creates new postgresLocksCollector.
 func NewPostgresLocksCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresLocksCollector{
-		modes: typedDesc{
+		locks: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "locks", "in_flight"),
 				"Number of in-flight locks held by active processes in each mode.",
 				[]string{"mode"}, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		locksAll: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "locks", "all_in_flight"),
+				"Total number of all in-flight locks held by active processes.",
+				nil, constLabels,
+			), valueType: prometheus.GaugeValue,
+		},
+		notgranted: typedDesc{
+			desc: prometheus.NewDesc(
+				prometheus.BuildFQName("postgres", "locks", "not_granted_in_flight"),
+				"Number of in-flight not granted locks held by active processes.",
+				nil, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 	}, nil
@@ -39,7 +66,7 @@ func (c *postgresLocksCollector) Update(config Config, ch chan<- prometheus.Metr
 	defer conn.Close()
 
 	// get pg_stat_activity stats
-	res, err := conn.Query(postgresLocksQuery)
+	res, err := conn.Query(locksQuery)
 	if err != nil {
 		return err
 	}
@@ -47,42 +74,81 @@ func (c *postgresLocksCollector) Update(config Config, ch chan<- prometheus.Metr
 	// parse pg_stat_activity stats
 	stats := parsePostgresLocksStats(res)
 
-	for mode, value := range stats {
-		ch <- c.modes.newConstMetric(value, mode)
-	}
+	ch <- c.locks.newConstMetric(stats.accessShareLock, "AccessShareLock")
+	ch <- c.locks.newConstMetric(stats.rowShareLock, "RowShareLock")
+	ch <- c.locks.newConstMetric(stats.rowExclusiveLock, "RowExclusiveLock")
+	ch <- c.locks.newConstMetric(stats.shareUpdateExclusiveLock, "ShareUpdateExclusiveLock")
+	ch <- c.locks.newConstMetric(stats.shareLock, "ShareLock")
+	ch <- c.locks.newConstMetric(stats.shareRowExclusiveLock, "ShareRowExclusiveLock")
+	ch <- c.locks.newConstMetric(stats.exclusiveLock, "ExclusiveLock")
+	ch <- c.locks.newConstMetric(stats.accessExclusiveLock, "AccessExclusiveLock")
+	ch <- c.notgranted.newConstMetric(stats.notGranted)
+	ch <- c.locksAll.newConstMetric(stats.total)
 
 	return nil
 }
 
-// parsePostgresLocksStats parses result returned from Postgres and return stats map.
-func parsePostgresLocksStats(r *model.PGResult) map[string]float64 {
+// locksStat describes locks statistics.
+type locksStat struct {
+	accessShareLock          float64
+	rowShareLock             float64
+	rowExclusiveLock         float64
+	shareUpdateExclusiveLock float64
+	shareLock                float64
+	shareRowExclusiveLock    float64
+	exclusiveLock            float64
+	accessExclusiveLock      float64
+	notGranted               float64
+	total                    float64
+}
+
+// parsePostgresLocksStats parses result returned from Postgres and return locks stats.
+func parsePostgresLocksStats(r *model.PGResult) locksStat {
 	log.Debug("parse postgres locks stats")
 
-	stats := map[string]float64{
-		"AccessShareLock":          0,
-		"RowShareLock":             0,
-		"RowExclusiveLock":         0,
-		"ShareUpdateExclusiveLock": 0,
-		"ShareLock":                0,
-		"ShareRowExclusiveLock":    0,
-		"ExclusiveLock":            0,
-		"AccessExclusiveLock":      0,
-	}
+	stats := locksStat{}
 
 	for _, row := range r.Rows {
-		if len(row) != 2 {
-			log.Warn("invalid input: wrong number of columns, skip")
+		for i, colname := range r.Colnames {
+			// Skip empty (NULL) values.
+			if !row[i].Valid {
+				continue
+			}
+
+			// Get data value and convert it to float64 used by Prometheus.
+			v, err := strconv.ParseFloat(row[i].String, 64)
+			if err != nil {
+				log.Errorf("invalid input, parse '%s' failed: %s; skip", row[i].String, err)
+				continue
+			}
+
+			// Update stats struct
+			switch string(colname.Name) {
+			case "access_share_lock":
+				stats.accessShareLock = v
+			case "row_share_lock":
+				stats.rowShareLock = v
+			case "row_exclusive_lock":
+				stats.rowExclusiveLock = v
+			case "share_update_exclusive_lock":
+				stats.shareUpdateExclusiveLock = v
+			case "share_lock":
+				stats.shareLock = v
+			case "share_row_exclusive_lock":
+				stats.shareRowExclusiveLock = v
+			case "exclusive_lock":
+				stats.exclusiveLock = v
+			case "access_exclusive_lock":
+				stats.accessExclusiveLock = v
+			case "not_granted":
+				stats.notGranted = v
+			case "total":
+				stats.total = v
+			default:
+				log.Debugf("unsupported pg_locks stat column: %s, skip", string(colname.Name))
+				continue
+			}
 		}
-
-		mode := row[0].String
-
-		v, err := strconv.ParseFloat(row[1].String, 64)
-		if err != nil {
-			log.Errorf("invalid input, parse '%s' failed: %s; skip", row[1].String, err)
-			continue
-		}
-
-		stats[mode] = v
 	}
 
 	return stats

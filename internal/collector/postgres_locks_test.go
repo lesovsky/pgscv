@@ -12,6 +12,8 @@ func TestPostgresLocksCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"postgres_locks_in_flight",
+			"postgres_locks_all_in_flight",
+			"postgres_locks_not_granted_in_flight",
 		},
 		collector: NewPostgresLocksCollector,
 		service:   model.ServiceTypePostgresql,
@@ -24,30 +26,34 @@ func Test_parsePostgresLocksStats(t *testing.T) {
 	var testcases = []struct {
 		name string
 		res  *model.PGResult
-		want map[string]float64
+		want locksStat
 	}{
 		{
 			name: "normal output",
 			res: &model.PGResult{
-				Nrows:    4,
-				Ncols:    2,
-				Colnames: []pgproto3.FieldDescription{{Name: []byte("mode")}, {Name: []byte("count")}},
+				Nrows: 1,
+				Ncols: 10,
+				Colnames: []pgproto3.FieldDescription{
+					{Name: []byte("access_share_lock")}, {Name: []byte("row_share_lock")},
+					{Name: []byte("row_exclusive_lock")}, {Name: []byte("share_update_exclusive_lock")},
+					{Name: []byte("share_lock")}, {Name: []byte("share_row_exclusive_lock")},
+					{Name: []byte("exclusive_lock")}, {Name: []byte("access_exclusive_lock")},
+					{Name: []byte("not_granted")}, {Name: []byte("total")},
+				},
 				Rows: [][]sql.NullString{
-					{{String: "RowExclusiveLock", Valid: true}, {String: "150", Valid: true}},
-					{{String: "RowShareLock", Valid: true}, {String: "100", Valid: true}},
-					{{String: "ExclusiveLock", Valid: true}, {String: "50", Valid: true}},
-					{{String: "AccessShareLock", Valid: true}, {String: "2000", Valid: true}},
+					{
+						{String: "11", Valid: true}, {String: "5", Valid: true},
+						{String: "4", Valid: true}, {String: "8", Valid: true},
+						{String: "7", Valid: true}, {String: "9", Valid: true},
+						{String: "1", Valid: true}, {String: "2", Valid: true},
+						{String: "6", Valid: true}, {String: "47", Valid: true},
+					},
 				},
 			},
-			want: map[string]float64{
-				"AccessShareLock":          2000,
-				"RowShareLock":             100,
-				"RowExclusiveLock":         150,
-				"ShareUpdateExclusiveLock": 0,
-				"ShareLock":                0,
-				"ShareRowExclusiveLock":    0,
-				"ExclusiveLock":            50,
-				"AccessExclusiveLock":      0,
+			want: locksStat{
+				accessShareLock: 11, rowShareLock: 5, rowExclusiveLock: 4, shareUpdateExclusiveLock: 8,
+				shareLock: 7, shareRowExclusiveLock: 9, exclusiveLock: 1, accessExclusiveLock: 2,
+				notGranted: 6, total: 47,
 			},
 		},
 	}
