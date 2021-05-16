@@ -66,8 +66,8 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels, _ model.Coll
 		},
 		wal: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "wal", "bytes_total"),
-				"Total amount of WAL generated or received, in bytes.",
+				prometheus.BuildFQName("postgres", "wal", "written_bytes_total"),
+				"Total amount of WAL written (or received in case of standby), in bytes.",
 				[]string{}, constLabels,
 			), valueType: prometheus.CounterValue,
 		},
