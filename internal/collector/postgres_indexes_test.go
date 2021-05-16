@@ -35,7 +35,7 @@ func Test_parsePostgresIndexStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 9,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("schemaname")}, {Name: []byte("relname")}, {Name: []byte("indexrelname")},
+					{Name: []byte("database")}, {Name: []byte("schema")}, {Name: []byte("table")}, {Name: []byte("index")},
 					{Name: []byte("idx_scan")}, {Name: []byte("idx_tup_read")}, {Name: []byte("idx_tup_fetch")},
 					{Name: []byte("idx_blks_read")}, {Name: []byte("idx_blks_hit")},
 				},
@@ -48,7 +48,7 @@ func Test_parsePostgresIndexStats(t *testing.T) {
 			},
 			want: map[string]postgresIndexStat{
 				"testdb/testschema/testrelname/testindex": {
-					datname: "testdb", schemaname: "testschema", relname: "testrelname", indexname: "testindex",
+					database: "testdb", schema: "testschema", table: "testrelname", index: "testindex",
 					idxscan: 5842, idxtupread: 84572, idxtupfetch: 485, idxread: 4128, idxhit: 847,
 				},
 			},

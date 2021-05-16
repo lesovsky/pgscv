@@ -69,7 +69,7 @@ func NewPostgresStorageCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "tablespace_directory", "bytes"),
 				"The size of Postgres tablespace directory, in bytes.",
-				[]string{"tblspc", "device", "mountpoint", "path"}, constLabels,
+				[]string{"tablespace", "device", "mountpoint", "path"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		waldirBytes: typedDesc{

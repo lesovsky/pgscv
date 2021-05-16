@@ -15,7 +15,7 @@ import (
 
 const (
 	// postgresStatementsQuery12 defines query for querying statements metrics for PG12 and older.
-	postgresStatementsQuery12 = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
+	postgresStatementsQuery12 = "SELECT d.datname AS database, pg_get_userbyid(p.userid) AS user, p.queryid, " +
 		"p.query, p.calls, p.rows, p.total_time, p.blk_read_time, p.blk_write_time, " +
 		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
 		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
@@ -26,7 +26,7 @@ const (
 
 	// postgresStatementsQueryLatest defines query for querying statements metrics.
 	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
-	postgresStatementsQueryLatest = "SELECT d.datname AS datname, pg_get_userbyid(p.userid) AS usename, p.queryid, " +
+	postgresStatementsQueryLatest = "SELECT d.datname AS database, pg_get_userbyid(p.userid) AS user, p.queryid, " +
 		"p.query, p.calls, p.rows, p.total_exec_time, p.total_plan_time, p.blk_read_time, p.blk_write_time, " +
 		"nullif(p.shared_blks_hit, 0) AS shared_blks_hit, nullif(p.shared_blks_read, 0) AS shared_blks_read, " +
 		"nullif(p.shared_blks_dirtied, 0) AS shared_blks_dirtied, nullif(p.shared_blks_written, 0) AS shared_blks_written, " +
@@ -68,7 +68,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "query_info"),
 				"Labeled info about statements has been executed.",
-				[]string{"usename", "datname", "md5", "query"}, constLabels,
+				[]string{"user", "database", "md5", "query"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -76,7 +76,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "calls_total"),
 				"Total number of times statement has been executed.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -84,7 +84,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "rows_total"),
 				"Total number of rows retrieved or affected by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -92,21 +92,21 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "time_seconds_total"),
 				"Time spent by the statement in each mode, in seconds.",
-				[]string{"usename", "datname", "md5", "mode"}, constLabels,
+				[]string{"user", "database", "md5", "mode"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		allTimes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "time_seconds_all_total"),
 				"Total time spent by the statement, in seconds.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
 		sharedHit: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "shared_hit_bytes_total"),
 				"Total number of bytes found in shared buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -114,7 +114,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "shared_read_bytes_total"),
 				"Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -122,7 +122,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "shared_dirtied_bytes_total"),
 				"Total number of bytes dirtied in shared buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -130,7 +130,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "shared_written_bytes_total"),
 				"Total number of bytes written to shared buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -138,7 +138,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "local_hit_bytes_total"),
 				"Total number of bytes found in local buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -146,7 +146,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "local_read_bytes_total"),
 				"Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -154,7 +154,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "local_dirtied_bytes_total"),
 				"Total number of bytes dirtied in local buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -162,7 +162,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "local_written_bytes_total"),
 				"Total number of bytes written to local buffers by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -170,7 +170,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "temp_read_bytes_total"),
 				"Total number of bytes read from temporary files by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -178,7 +178,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "temp_written_bytes_total"),
 				"Total number of bytes written to temporary files by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -186,7 +186,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "wal_records_total"),
 				"Total number of WAL records generated by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -194,7 +194,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "wal_fpi_bytes_total"),
 				"Total number of WAL full-page images generated by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -202,7 +202,7 @@ func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.Colle
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "statements", "wal_bytes_total"),
 				"Total number of WAL bytes (not including FPI) generated by the statement.",
-				[]string{"usename", "datname", "md5"}, constLabels,
+				[]string{"user", "database", "md5"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -232,7 +232,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	conn.Close()
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresStatementsStats(res, c.chain, []string{"usename", "datname", "queryid", "query"})
+	stats := parsePostgresStatementsStats(res, c.chain, []string{"user", "database", "queryid", "query"})
 
 	blockSize := float64(config.BlockSize)
 
@@ -247,63 +247,63 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		// Note: pg_stat_statements.total_exec_time (and .total_time) includes blk_read_time and blk_write_time implicitly.
 		// Remember that when creating metrics.
 
-		ch <- c.query.newConstMetric(1, stat.usename, stat.datname, stat.md5hash, query)
+		ch <- c.query.newConstMetric(1, stat.user, stat.database, stat.md5hash, query)
 
-		ch <- c.calls.newConstMetric(stat.calls, stat.usename, stat.datname, stat.md5hash)
-		ch <- c.rows.newConstMetric(stat.rows, stat.usename, stat.datname, stat.md5hash)
+		ch <- c.calls.newConstMetric(stat.calls, stat.user, stat.database, stat.md5hash)
+		ch <- c.rows.newConstMetric(stat.rows, stat.user, stat.database, stat.md5hash)
 
 		// total = planning + execution; execution already includes io time.
-		ch <- c.allTimes.newConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.usename, stat.datname, stat.md5hash)
-		ch <- c.times.newConstMetric(stat.totalPlanTime, stat.usename, stat.datname, stat.md5hash, "planning")
+		ch <- c.allTimes.newConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.user, stat.database, stat.md5hash)
+		ch <- c.times.newConstMetric(stat.totalPlanTime, stat.user, stat.database, stat.md5hash, "planning")
 
 		// execution time = execution - io times.
-		ch <- c.times.newConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.usename, stat.datname, stat.md5hash, "executing")
+		ch <- c.times.newConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.user, stat.database, stat.md5hash, "executing")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
 		if stat.blkReadTime > 0 {
-			ch <- c.times.newConstMetric(stat.blkReadTime, stat.usename, stat.datname, stat.md5hash, "ioread")
+			ch <- c.times.newConstMetric(stat.blkReadTime, stat.user, stat.database, stat.md5hash, "ioread")
 		}
 		if stat.blkWriteTime > 0 {
-			ch <- c.times.newConstMetric(stat.blkWriteTime, stat.usename, stat.datname, stat.md5hash, "iowrite")
+			ch <- c.times.newConstMetric(stat.blkWriteTime, stat.user, stat.database, stat.md5hash, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.sharedHit.newConstMetric(stat.sharedBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedHit.newConstMetric(stat.sharedBlksHit*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.sharedRead.newConstMetric(stat.sharedBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedRead.newConstMetric(stat.sharedBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.sharedDirtied.newConstMetric(stat.sharedBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedDirtied.newConstMetric(stat.sharedBlksDirtied*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.sharedWritten.newConstMetric(stat.sharedBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.sharedWritten.newConstMetric(stat.sharedBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.localHit.newConstMetric(stat.localBlksHit*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localHit.newConstMetric(stat.localBlksHit*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.localRead.newConstMetric(stat.localBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localRead.newConstMetric(stat.localBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.localDirtied.newConstMetric(stat.localBlksDirtied*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localDirtied.newConstMetric(stat.localBlksDirtied*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.localWritten.newConstMetric(stat.localBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.localWritten.newConstMetric(stat.localBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.tempRead.newConstMetric(stat.tempBlksRead*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.tempRead.newConstMetric(stat.tempBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.tempWritten.newConstMetric(stat.tempBlksWritten*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.tempWritten.newConstMetric(stat.tempBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.walRecords > 0 {
-			ch <- c.walRecords.newConstMetric(stat.walRecords, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walRecords.newConstMetric(stat.walRecords, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.walFPI > 0 {
-			ch <- c.walFPI.newConstMetric(stat.walFPI*blockSize, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walFPI.newConstMetric(stat.walFPI*blockSize, stat.user, stat.database, stat.md5hash)
 		}
 		if stat.walBytes > 0 {
-			ch <- c.walBytes.newConstMetric(stat.walBytes, stat.usename, stat.datname, stat.md5hash)
+			ch <- c.walBytes.newConstMetric(stat.walBytes, stat.user, stat.database, stat.md5hash)
 		}
 	}
 
@@ -312,8 +312,8 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 
 // postgresStatementsStat represents stats values for single statement based on pg_stat_statements.
 type postgresStatementStat struct {
-	datname           string
-	usename           string
+	database          string
+	user              string
 	queryid           string
 	query             string
 	md5hash           string
@@ -344,18 +344,18 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 
 	var stats = make(map[string]postgresStatementStat)
 
-	// process row by row - on every row construct 'statement' using datname/usename/queryHash trio. Next process other row's
+	// process row by row - on every row construct 'statement' using database/user/queryHash trio. Next process other row's
 	// fields and collect stats for constructed 'statement'.
 	for _, row := range r.Rows {
-		var datname, usename, queryid, query, md5hash string
+		var database, user, queryid, query, md5hash string
 
 		// collect label values
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				datname = row[i].String
-			case "usename":
-				usename = row[i].String
+			case "database":
+				database = row[i].String
+			case "user":
+				user = row[i].String
 			case "queryid":
 				queryid = row[i].String
 			case "query":
@@ -365,11 +365,11 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 		}
 
 		// Create a statement name consisting of trio database/user/queryHash
-		statement := strings.Join([]string{datname, usename, md5hash}, "/")
+		statement := strings.Join([]string{database, user, md5hash}, "/")
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		if _, ok := stats[statement]; !ok {
-			stats[statement] = postgresStatementStat{datname: datname, usename: usename, queryid: queryid, query: query, md5hash: md5hash}
+			stats[statement] = postgresStatementStat{database: database, user: user, queryid: queryid, query: query, md5hash: md5hash}
 		}
 
 		// fetch data values from columns

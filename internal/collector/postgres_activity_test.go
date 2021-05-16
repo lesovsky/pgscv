@@ -40,8 +40,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				Nrows: 10,
 				Ncols: 8,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("usename")},
-					{Name: []byte("datname")},
+					{Name: []byte("user")},
+					{Name: []byte("database")},
 					{Name: []byte("state")},
 					{Name: []byte("wait_event_type")},
 					{Name: []byte("wait_event")},
@@ -122,8 +122,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				Nrows: 10,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("usename")},
-					{Name: []byte("datname")},
+					{Name: []byte("user")},
+					{Name: []byte("database")},
 					{Name: []byte("state")},
 					{Name: []byte("wait_event_type")},
 					{Name: []byte("wait_event")},
@@ -172,8 +172,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 6,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("usename")},
-					{Name: []byte("datname")},
+					{Name: []byte("user")},
+					{Name: []byte("database")},
 					{Name: []byte("state")},
 					{Name: []byte("waiting")},
 					{Name: []byte("since_start_seconds")},

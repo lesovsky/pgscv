@@ -53,7 +53,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 18,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("usename")}, {Name: []byte("query")},
+					{Name: []byte("database")}, {Name: []byte("user")}, {Name: []byte("query")},
 					{Name: []byte("calls")}, {Name: []byte("rows")},
 					{Name: []byte("total_time")}, {Name: []byte("blk_read_time")}, {Name: []byte("blk_write_time")},
 					{Name: []byte("shared_blks_hit")}, {Name: []byte("shared_blks_read")}, {Name: []byte("shared_blks_dirtied")}, {Name: []byte("shared_blks_written")},
@@ -73,7 +73,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 			},
 			want: map[string]postgresStatementStat{
 				"testdb/testuser/c5ae4e2c19d733cda381b2dc24db57d7": {
-					datname: "testdb", usename: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
+					database: "testdb", user: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
 					calls: 1000, rows: 2000,
 					totalExecTime: 30000, blkReadTime: 6000, blkWriteTime: 4000,
 					sharedBlksHit: 100, sharedBlksRead: 110, sharedBlksDirtied: 120, sharedBlksWritten: 130,
@@ -88,7 +88,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 22,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("usename")}, {Name: []byte("query")},
+					{Name: []byte("database")}, {Name: []byte("user")}, {Name: []byte("query")},
 					{Name: []byte("calls")}, {Name: []byte("rows")},
 					{Name: []byte("total_exec_time")}, {Name: []byte("total_plan_time")}, {Name: []byte("blk_read_time")}, {Name: []byte("blk_write_time")},
 					{Name: []byte("shared_blks_hit")}, {Name: []byte("shared_blks_read")}, {Name: []byte("shared_blks_dirtied")}, {Name: []byte("shared_blks_written")},
@@ -110,7 +110,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 			},
 			want: map[string]postgresStatementStat{
 				"testdb/testuser/c5ae4e2c19d733cda381b2dc24db57d7": {
-					datname: "testdb", usename: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
+					database: "testdb", user: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
 					calls: 1000, rows: 2000,
 					totalExecTime: 30000, totalPlanTime: 100, blkReadTime: 6000, blkWriteTime: 4000,
 					sharedBlksHit: 100, sharedBlksRead: 110, sharedBlksDirtied: 120, sharedBlksWritten: 130,
@@ -125,7 +125,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 20,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("usename")}, {Name: []byte("query")},
+					{Name: []byte("database")}, {Name: []byte("user")}, {Name: []byte("query")},
 					{Name: []byte("calls")}, {Name: []byte("rows")},
 					{Name: []byte("total_exec_time")}, {Name: []byte("total_plan_time")}, {Name: []byte("blk_read_time")}, {Name: []byte("blk_write_time")}, {Name: []byte("min_time")},
 					{Name: []byte("shared_blks_hit")}, {Name: []byte("shared_blks_read")}, {Name: []byte("shared_blks_dirtied")}, {Name: []byte("shared_blks_written")},
@@ -143,7 +143,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 			},
 			want: map[string]postgresStatementStat{
 				"testdb/testuser/c5ae4e2c19d733cda381b2dc24db57d7": {
-					datname: "testdb", usename: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
+					database: "testdb", user: "testuser", md5hash: "c5ae4e2c19d733cda381b2dc24db57d7", query: "SELECT test",
 					calls: 1000, rows: 2000,
 					totalExecTime: 30000, totalPlanTime: 100, blkReadTime: 6000, blkWriteTime: 4000,
 					sharedBlksHit: 0, sharedBlksRead: 0, sharedBlksDirtied: 0, sharedBlksWritten: 0,
@@ -159,7 +159,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 22,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("datname")}, {Name: []byte("usename")}, {Name: []byte("query")},
+					{Name: []byte("database")}, {Name: []byte("user")}, {Name: []byte("query")},
 					{Name: []byte("calls")}, {Name: []byte("rows")},
 					{Name: []byte("total_exec_time")}, {Name: []byte("total_plan_time")}, {Name: []byte("blk_read_time")}, {Name: []byte("blk_write_time")},
 					{Name: []byte("shared_blks_hit")}, {Name: []byte("shared_blks_read")}, {Name: []byte("shared_blks_dirtied")}, {Name: []byte("shared_blks_written")},
@@ -199,7 +199,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 			},
 			want: map[string]postgresStatementStat{
 				"testdb/testuser/095f2345f262d090a83ff1ac64ca8c76": {
-					datname: "testdb", usename: "testuser", md5hash: "095f2345f262d090a83ff1ac64ca8c76", query: "SELECT ?",
+					database: "testdb", user: "testuser", md5hash: "095f2345f262d090a83ff1ac64ca8c76", query: "SELECT ?",
 					calls: 2000, rows: 4000,
 					totalExecTime: 60000, totalPlanTime: 300, blkReadTime: 12000, blkWriteTime: 8000,
 					sharedBlksHit: 200, sharedBlksRead: 220, sharedBlksDirtied: 240, sharedBlksWritten: 260,
@@ -207,7 +207,7 @@ func Test_parsePostgresStatementsStats(t *testing.T) {
 					tempBlksRead: 1400, tempBlksWritten: 1420, walRecords: 1440, walFPI: 1460, walBytes: 1480,
 				},
 				"testdb/testuser/6fc7663c0674ba2b5e0239d56eddf235": {
-					datname: "testdb", usename: "testuser", md5hash: "6fc7663c0674ba2b5e0239d56eddf235", query: "SELECT '?'",
+					database: "testdb", user: "testuser", md5hash: "6fc7663c0674ba2b5e0239d56eddf235", query: "SELECT '?'",
 					calls: 1000, rows: 2000,
 					totalExecTime: 30000, totalPlanTime: 300, blkReadTime: 6000, blkWriteTime: 4000,
 					sharedBlksHit: 100, sharedBlksRead: 110, sharedBlksDirtied: 120, sharedBlksWritten: 130,

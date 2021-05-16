@@ -16,7 +16,7 @@ func TestPostgresSchemaCollector_Update(t *testing.T) {
 			"postgres_schema_invalid_indexes_bytes",
 			"postgres_schema_non_indexed_fkeys",
 			"postgres_schema_redundant_indexes_bytes",
-			"postgres_schema_seq_exhaustion_ratio",
+			"postgres_schema_sequence_exhaustion_ratio",
 			"postgres_schema_mistyped_fkeys",
 		},
 		collector: NewPostgresSchemasCollector,

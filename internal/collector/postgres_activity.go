@@ -13,14 +13,14 @@ import (
 
 const (
 	postgresActivityQuery95 = "SELECT " +
-		"coalesce(usename, 'system') AS usename, coalesce(datname, 'none') AS datname, state, waiting, " +
+		"coalesce(usename, 'system') AS user, coalesce(datname, 'none') AS database, state, waiting, " +
 		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
 		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
 		"left(query, 32) as query " +
 		"FROM pg_stat_activity"
 
 	postgresActivityQueryLatest = "SELECT " +
-		"coalesce(usename, backend_type) AS usename, coalesce(datname, 'none') AS datname, state, wait_event_type, wait_event, " +
+		"coalesce(usename, backend_type) AS user, coalesce(datname, 'none') AS database, state, wait_event_type, wait_event, " +
 		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
 		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
 		"left(query, 32) as query " +
@@ -84,7 +84,7 @@ func NewPostgresActivityCollector(constLabels prometheus.Labels, _ model.Collect
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "activity", "max_seconds"),
 				"Longest activity for each user, database and activity type.",
-				[]string{"usename", "datname", "state", "type"}, constLabels,
+				[]string{"user", "database", "state", "type"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		prepared: typedDesc{
@@ -163,7 +163,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	// prepared xacts
 	ch <- c.prepared.newConstMetric(stats.prepared)
 
-	// max duration of user's idle_xacts per usename/datname.
+	// max duration of user's idle_xacts per user/database.
 	for k, v := range stats.maxIdleUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "idlexact", "user")
@@ -172,7 +172,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of maintenance's idle_xacts per usename/datname.
+	// max duration of maintenance's idle_xacts per user/database.
 	for k, v := range stats.maxIdleMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "idlexact", "maintenance")
@@ -181,7 +181,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of users running activity per usename/datname.
+	// max duration of users running activity per user/database.
 	for k, v := range stats.maxRunUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "user")
@@ -190,7 +190,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of maintenance running activity per usename/datname.
+	// max duration of maintenance running activity per user/database.
 	for k, v := range stats.maxRunMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "maintenance")
@@ -199,7 +199,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of users waiting activity per usename/datname.
+	// max duration of users waiting activity per user/database.
 	for k, v := range stats.maxWaitUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "waiting", "user")
@@ -208,7 +208,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of maintenance waiting activity per usename/datname.
+	// max duration of maintenance waiting activity per user/database.
 	for k, v := range stats.maxWaitMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
 			ch <- c.activity.newConstMetric(v, names[0], names[1], "waiting", "maintenance")
@@ -374,36 +374,36 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 				// Consider type of activity depending on 'state' column.
 				stateIdx := colindexes["state"]
 				eventIdx := colindexes[waitColumnName]
-				usenameIdx := colindexes["usename"]
-				datnameIdx := colindexes["datname"]
+				userIdx := colindexes["user"]
+				databaseIdx := colindexes["database"]
 				queryIdx := colindexes["query"]
 
 				if row[stateIdx].Valid && row[queryIdx].Valid {
 					value := row[i].String
-					usename := row[usenameIdx].String
-					datname := row[datnameIdx].String
+					user := row[userIdx].String
+					database := row[databaseIdx].String
 					state := row[stateIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
 					if state == stIdleXact || state == stIdleXactAborted {
-						stats.updateMaxIdletimeDuration(value, usename, datname, state, query)
+						stats.updateMaxIdletimeDuration(value, user, database, state, query)
 					} else {
-						stats.updateMaxRuntimeDuration(value, usename, datname, state, event, query)
+						stats.updateMaxRuntimeDuration(value, user, database, state, event, query)
 					}
 				}
 			case "since_change_seconds":
 				eventIdx := colindexes[waitColumnName]
-				usenameIdx := colindexes["usename"]
-				datnameIdx := colindexes["datname"]
+				userIdx := colindexes["user"]
+				databaseIdx := colindexes["database"]
 				queryIdx := colindexes["query"]
 
 				if row[eventIdx].Valid && row[queryIdx].Valid {
 					value := row[i].String
-					usename := row[usenameIdx].String
-					datname := row[datnameIdx].String
+					user := row[userIdx].String
+					database := row[databaseIdx].String
 					event := row[eventIdx].String
 					query := row[queryIdx].String
-					stats.updateMaxWaittimeDuration(value, usename, datname, event, query)
+					stats.updateMaxWaittimeDuration(value, user, database, event, query)
 				}
 			case "query":
 				stateIdx := colindexes["state"]

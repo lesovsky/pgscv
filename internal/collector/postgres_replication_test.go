@@ -38,7 +38,7 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 				Nrows: 1,
 				Ncols: 14,
 				Colnames: []pgproto3.FieldDescription{
-					{Name: []byte("pid")}, {Name: []byte("client_addr")}, {Name: []byte("usename")}, {Name: []byte("application_name")}, {Name: []byte("state")},
+					{Name: []byte("pid")}, {Name: []byte("client_addr")}, {Name: []byte("user")}, {Name: []byte("application_name")}, {Name: []byte("state")},
 					{Name: []byte("pending_lag_bytes")}, {Name: []byte("write_lag_bytes")}, {Name: []byte("flush_lag_bytes")},
 					{Name: []byte("replay_lag_bytes")}, {Name: []byte("total_lag_bytes")}, {Name: []byte("write_lag_seconds")},
 					{Name: []byte("flush_lag_seconds")}, {Name: []byte("replay_lag_seconds")}, {Name: []byte("total_lag_seconds")},
@@ -61,14 +61,14 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 			},
 			want: map[string]postgresReplicationStat{
 				"123456": {
-					pid: "123456", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "testapp", state: "teststate",
+					pid: "123456", clientaddr: "127.0.0.1", user: "testuser", applicationName: "testapp", state: "teststate",
 					values: map[string]float64{
 						"pending_lag_bytes": 100, "write_lag_bytes": 200, "flush_lag_bytes": 300, "replay_lag_bytes": 400, "total_lag_bytes": 500,
 						"write_lag_seconds": 600, "flush_lag_seconds": 700, "replay_lag_seconds": 800, "total_lag_seconds": 2100,
 					},
 				},
 				"101010": {
-					pid: "101010", clientaddr: "127.0.0.1", usename: "testuser", applicationName: "pg_receivewal", state: "teststate",
+					pid: "101010", clientaddr: "127.0.0.1", user: "testuser", applicationName: "pg_receivewal", state: "teststate",
 					values: map[string]float64{
 						"pending_lag_bytes": 4257, "write_lag_bytes": 8452, "flush_lag_bytes": 5785,
 						"write_lag_seconds": 2458, "flush_lag_seconds": 7871, "replay_lag_seconds": 6896, "total_lag_seconds": 17225,
@@ -80,7 +80,7 @@ func Test_parsePostgresReplicationStats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			got := parsePostgresReplicationStats(tc.res, []string{"client_addr", "usename", "application_name", "state", "type"})
+			got := parsePostgresReplicationStats(tc.res, []string{"client_addr", "user", "application_name", "state", "type"})
 			assert.EqualValues(t, tc.want, got)
 		})
 	}

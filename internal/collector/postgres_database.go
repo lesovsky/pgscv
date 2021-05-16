@@ -48,7 +48,7 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels, _ model.Collec
 		commits: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "database", "xact_commits_total"),
-				"Total number of transactions had been commited.",
+				"Total number of transactions had been committed.",
 				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},

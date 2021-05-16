@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	userIndexesQuery = "SELECT current_database() AS datname, schemaname, relname, indexrelname, (i.indisprimary OR i.indisunique) AS key," +
+	userIndexesQuery = "SELECT current_database() AS database, schemaname AS schema, relname AS table, indexrelname AS index, (i.indisprimary OR i.indisunique) AS key," +
 		"idx_scan, idx_tup_read, idx_tup_fetch, idx_blks_read, idx_blks_hit,pg_relation_size(s1.indexrelid) AS size_bytes " +
 		"FROM pg_stat_user_indexes s1 " +
 		"JOIN pg_statio_user_indexes s2 USING (schemaname, relname, indexrelname) " +
@@ -33,7 +33,7 @@ type postgresIndexesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
 func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labels = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
+	var labels = []string{"database", "schema", "table", "index", "key"}
 
 	return &postgresIndexesCollector{
 		labelNames: labels,
@@ -49,7 +49,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "tuples_total"),
 				"Total number of index entries processed by scans.",
-				[]string{"datname", "schemaname", "relname", "indexrelname", "tuples"}, constLabels,
+				[]string{"database", "schema", "table", "index", "tuples"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -57,7 +57,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index_io", "blocks_total"),
 				"Total number of indexes' blocks processed.",
-				[]string{"datname", "schemaname", "relname", "indexrelname", "access"}, constLabels,
+				[]string{"database", "schema", "table", "index", "access"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -65,7 +65,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "size_bytes"),
 				"Total size of the index, in bytes.",
-				[]string{"datname", "schemaname", "relname", "indexrelname"}, constLabels,
+				[]string{"database", "schema", "table", "index"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -109,21 +109,21 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 
 		for _, stat := range stats {
 			// always send idx scan metrics and indexes size
-			ch <- c.indexes.newConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname, stat.indexname, stat.key)
-			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname, stat.indexname)
+			ch <- c.indexes.newConstMetric(stat.idxscan, stat.database, stat.schema, stat.table, stat.index, stat.key)
+			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.database, stat.schema, stat.table, stat.index)
 
 			// avoid metrics spamming and send metrics only if they greater than zero.
 			if stat.idxtupread > 0 {
-				ch <- c.tuples.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
+				ch <- c.tuples.newConstMetric(stat.idxread, stat.database, stat.schema, stat.table, stat.index, "read")
 			}
 			if stat.idxtupfetch > 0 {
-				ch <- c.tuples.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname, stat.indexname, "fetched")
+				ch <- c.tuples.newConstMetric(stat.idxtupfetch, stat.database, stat.schema, stat.table, stat.index, "fetched")
 			}
 			if stat.idxread > 0 {
-				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
+				ch <- c.io.newConstMetric(stat.idxread, stat.database, stat.schema, stat.table, stat.index, "read")
 			}
 			if stat.idxhit > 0 {
-				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "hit")
+				ch <- c.io.newConstMetric(stat.idxhit, stat.database, stat.schema, stat.table, stat.index, "hit")
 			}
 		}
 	}
@@ -133,10 +133,10 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 
 // postgresIndexStat is per-index store for metrics related to how indexes are accessed.
 type postgresIndexStat struct {
-	datname     string
-	schemaname  string
-	relname     string
-	indexname   string
+	database    string
+	schema      string
+	table       string
+	index       string
 	key         string
 	idxscan     float64
 	idxtupread  float64
@@ -158,21 +158,21 @@ func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]
 		index := postgresIndexStat{}
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				index.datname = row[i].String
-			case "schemaname":
-				index.schemaname = row[i].String
-			case "relname":
-				index.relname = row[i].String
-			case "indexrelname":
-				index.indexname = row[i].String
+			case "database":
+				index.database = row[i].String
+			case "schema":
+				index.schema = row[i].String
+			case "table":
+				index.table = row[i].String
+			case "index":
+				index.index = row[i].String
 			case "key":
 				index.key = row[i].String
 			}
 		}
 
 		// create a index name consisting of quartet database/schema/table/index
-		indexname = strings.Join([]string{index.datname, index.schemaname, index.relname, index.indexname}, "/")
+		indexname = strings.Join([]string{index.database, index.schema, index.table, index.index}, "/")
 
 		stats[indexname] = index
 

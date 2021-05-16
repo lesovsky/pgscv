@@ -29,7 +29,7 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "system_catalog_bytes"),
 				"Number of bytes occupied by system catalog.",
-				[]string{"datname"}, constLabels,
+				[]string{"database"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -37,7 +37,7 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "non_pk_tables"),
 				"Labeled information about tables with no primary or unique key constraints.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				[]string{"database", "schema", "table"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -45,7 +45,7 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "invalid_indexes_bytes"),
 				"Number of bytes occupied by invalid indexes.",
-				[]string{"datname", "schemaname", "relname", "indexrelname"}, constLabels,
+				[]string{"database", "schema", "table", "index"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -53,7 +53,7 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "non_indexed_fkeys"),
 				"Number of non-indexed FOREIGN key constraints.",
-				[]string{"datname", "schemaname", "relname", "colnames", "constraint", "referenced"}, constLabels,
+				[]string{"database", "schema", "table", "columns", "constraint", "referenced"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -61,15 +61,15 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "redundant_indexes_bytes"),
 				"Number of bytes occupied by redundant indexes.",
-				[]string{"datname", "schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}, constLabels,
+				[]string{"database", "schema", "table", "index", "indexdef", "redundantdef"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
 		sequences: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "seq_exhaustion_ratio"),
+				prometheus.BuildFQName("postgres", "schema", "sequence_exhaustion_ratio"),
 				"Sequences usage percentage accordingly to attached column, in percent.",
-				[]string{"datname", "schemaname", "seqname"}, constLabels,
+				[]string{"database", "schema", "sequence"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -77,7 +77,7 @@ func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "schema", "mistyped_fkeys"),
 				"Number of foreign key constraints with different data type.",
-				[]string{"datname", "schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}, constLabels,
+				[]string{"database", "schema", "table", "column", "refschema", "reftable", "refcolumn"}, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -198,7 +198,7 @@ func collectSchemaNonPKTables(conn *store.DB, ch chan<- prometheus.Metric, desc 
 
 // getSchemaNonPKTables searches tables with no PRIMARY or UNIQUE keys in the database and return its names.
 func getSchemaNonPKTables(conn *store.DB) ([]string, error) {
-	var query = "SELECT n.nspname AS schemaname, c.relname AS relname " +
+	var query = "SELECT n.nspname AS schema, c.relname AS table " +
 		"FROM pg_class c JOIN pg_namespace n ON c.relnamespace = n.oid " +
 		"WHERE NOT EXISTS (SELECT 1 FROM pg_index i WHERE c.oid = i.indrelid AND (i.indisprimary OR i.indisunique)) " +
 		"AND c.relkind = 'r' AND n.nspname NOT IN ('pg_catalog', 'information_schema', 'pg_toast')"
@@ -229,33 +229,33 @@ func getSchemaNonPKTables(conn *store.DB) ([]string, error) {
 
 // collectSchemaInvalidIndexes collects metrics related to invalid indexes.
 func collectSchemaInvalidIndexes(conn *store.DB, ch chan<- prometheus.Metric, desc typedDesc) {
-	datname := conn.Conn().Config().Database
+	database := conn.Conn().Config().Database
 	stats, err := getSchemaInvalidIndexes(conn)
 	if err != nil {
-		log.Errorf("get invalid indexes stats of database %s failed: %s; skip", datname, err)
+		log.Errorf("get invalid indexes stats of database %s failed: %s; skip", database, err)
 		return
 	}
 
 	for k, s := range stats {
 		var (
-			schemaname   = s.labels["schemaname"]
-			relname      = s.labels["relname"]
-			indexrelname = s.labels["indexrelname"]
-			value        = s.values["bytes"]
+			schema = s.labels["schema"]
+			table  = s.labels["table"]
+			index  = s.labels["index"]
+			value  = s.values["bytes"]
 		)
 
-		if schemaname == "" || relname == "" || indexrelname == "" {
+		if schema == "" || table == "" || index == "" {
 			log.Warnf("incomplete invalid index FQ name: %s; skip", k)
 			continue
 		}
 
-		ch <- desc.newConstMetric(value, datname, schemaname, relname, indexrelname)
+		ch <- desc.newConstMetric(value, database, schema, table, index)
 	}
 }
 
 // getSchemaInvalidIndexes searches invalid indexes in the database and return its names if such indexes have been found.
 func getSchemaInvalidIndexes(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = "SELECT c1.relnamespace::regnamespace::text AS schemaname, c2.relname AS relname, c1.relname AS indexrelname, " +
+	var query = "SELECT c1.relnamespace::regnamespace::text AS schema, c2.relname AS table, c1.relname AS index, " +
 		"pg_relation_size(c1.relname::regclass) AS bytes " +
 		"FROM pg_index i JOIN pg_class c1 ON i.indexrelid = c1.oid JOIN pg_class c2 ON i.indrelid = c2.oid WHERE NOT i.indisvalid"
 	res, err := conn.Query(query)
@@ -263,40 +263,40 @@ func getSchemaInvalidIndexes(conn *store.DB) (map[string]postgresGenericStat, er
 		return nil, err
 	}
 
-	return parsePostgresGenericStats(res, []string{"schemaname", "relname", "indexrelname"}), nil
+	return parsePostgresGenericStats(res, []string{"schema", "table", "index"}), nil
 }
 
 // collectSchemaNonIndexedFK collects metrics related to non indexed foreign key constraints.
 func collectSchemaNonIndexedFK(conn *store.DB, ch chan<- prometheus.Metric, desc typedDesc) {
-	datname := conn.Conn().Config().Database
+	database := conn.Conn().Config().Database
 	stats, err := getSchemaNonIndexedFK(conn)
 	if err != nil {
-		log.Errorf("get non-indexed fkeys stats of database %s failed: %s; skip", datname, err)
+		log.Errorf("get non-indexed fkeys stats of database %s failed: %s; skip", database, err)
 		return
 	}
 
 	for k, s := range stats {
 		var (
-			schemaname = s.labels["schemaname"]
-			relname    = s.labels["relname"]
-			colnames   = s.labels["colnames"]
+			schema     = s.labels["schema"]
+			table      = s.labels["table"]
+			columns    = s.labels["columns"]
 			constraint = s.labels["constraint"]
 			referenced = s.labels["referenced"]
 		)
 
-		if schemaname == "" || relname == "" || colnames == "" || constraint == "" || referenced == "" {
+		if schema == "" || table == "" || columns == "" || constraint == "" || referenced == "" {
 			log.Warnf("incomplete non-indexed foreign key constraint name: %s; skip", k)
 			continue
 		}
 
-		ch <- desc.newConstMetric(1, datname, schemaname, relname, colnames, constraint, referenced)
+		ch <- desc.newConstMetric(1, database, schema, table, columns, constraint, referenced)
 	}
 }
 
 // getSchemaNonIndexedFK searches non indexes foreign key constraints and return its names.
 func getSchemaNonIndexedFK(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = "SELECT c.connamespace::regnamespace::text AS schemaname, s.relname AS relname, " +
-		"string_agg(a.attname, ',' ORDER BY x.n) AS colnames, c.conname AS constraint, " +
+	var query = "SELECT c.connamespace::regnamespace::text AS schema, s.relname AS table, " +
+		"string_agg(a.attname, ',' ORDER BY x.n) AS columns, c.conname AS constraint, " +
 		"c.confrelid::regclass::text AS referenced " +
 		"FROM pg_constraint c CROSS JOIN LATERAL unnest(c.conkey) WITH ORDINALITY AS x(attnum, n) " +
 		"JOIN pg_attribute a ON a.attnum = x.attnum AND a.attrelid = c.conrelid " +
@@ -310,41 +310,41 @@ func getSchemaNonIndexedFK(conn *store.DB) (map[string]postgresGenericStat, erro
 		return nil, err
 	}
 
-	return parsePostgresGenericStats(res, []string{"schemaname", "relname", "colnames", "constraint", "referenced"}), nil
+	return parsePostgresGenericStats(res, []string{"schema", "table", "columns", "constraint", "referenced"}), nil
 }
 
 // collectSchemaRedundantIndexes collects metrics related to invalid indexes
 func collectSchemaRedundantIndexes(conn *store.DB, ch chan<- prometheus.Metric, desc typedDesc) {
-	datname := conn.Conn().Config().Database
+	database := conn.Conn().Config().Database
 	stats, err := getSchemaRedundantIndexes(conn)
 	if err != nil {
-		log.Errorf("get redundant indexes stats of database %s failed: %s; skip", datname, err)
+		log.Errorf("get redundant indexes stats of database %s failed: %s; skip", database, err)
 		return
 	}
 
 	for k, s := range stats {
 		var (
-			schemaname   = s.labels["schemaname"]
-			relname      = s.labels["relname"]
-			indexrelname = s.labels["indexrelname"]
+			schema       = s.labels["schema"]
+			table        = s.labels["table"]
+			index        = s.labels["index"]
 			indexdef     = s.labels["indexdef"]
 			redundantdef = s.labels["redundantdef"]
 			value        = s.values["bytes"]
 		)
 
-		if schemaname == "" || relname == "" || indexrelname == "" || indexdef == "" || redundantdef == "" {
+		if schema == "" || table == "" || index == "" || indexdef == "" || redundantdef == "" {
 			log.Warnf("incomplete redundant index name: %s; skip", k)
 			continue
 		}
 
-		ch <- desc.newConstMetric(value, datname, schemaname, relname, indexrelname, indexdef, redundantdef)
+		ch <- desc.newConstMetric(value, database, schema, table, index, indexdef, redundantdef)
 	}
 }
 
 // getSchemaRedundantIndexes searches redundant indexes and returns its sizes
 func getSchemaRedundantIndexes(conn *store.DB) (map[string]postgresGenericStat, error) {
 	var query = "WITH index_data AS (SELECT *, string_to_array(indkey::text,' ') AS key_array, array_length(string_to_array(indkey::text,' '),1) AS nkeys FROM pg_index) " +
-		"SELECT c1.relnamespace::regnamespace::text AS schemaname, c1.relname AS relname, c2.relname AS indexrelname, " +
+		"SELECT c1.relnamespace::regnamespace::text AS schema, c1.relname AS table, c2.relname AS index, " +
 		"pg_get_indexdef(i1.indexrelid) AS indexdef, pg_get_indexdef(i2.indexrelid) AS redundantdef, " +
 		"pg_relation_size(i2.indexrelid) AS bytes " +
 		"FROM index_data AS i1 JOIN index_data AS i2 ON i1.indrelid = i2.indrelid AND i1.indexrelid<>i2.indexrelid " +
@@ -361,78 +361,78 @@ func getSchemaRedundantIndexes(conn *store.DB) (map[string]postgresGenericStat, 
 		return nil, err
 	}
 
-	return parsePostgresGenericStats(res, []string{"schemaname", "relname", "indexrelname", "indexdef", "redundantdef"}), nil
+	return parsePostgresGenericStats(res, []string{"schema", "table", "index", "indexdef", "redundantdef"}), nil
 }
 
 // collectSchemaSequences collects metrics related to sequences attached to poor-typed columns.
 func collectSchemaSequences(conn *store.DB, ch chan<- prometheus.Metric, desc typedDesc) {
-	datname := conn.Conn().Config().Database
+	database := conn.Conn().Config().Database
 	stats, err := getSchemaSequences(conn)
 	if err != nil {
-		log.Errorf("get sequences stats of database %s failed: %s; skip", datname, err)
+		log.Errorf("get sequences stats of database %s failed: %s; skip", database, err)
 		return
 	}
 
 	for k, s := range stats {
 		var (
-			schemaname = s.labels["schemaname"]
-			seqname    = s.labels["seqname"]
-			value      = s.values["ratio"]
+			schema   = s.labels["schema"]
+			sequence = s.labels["sequence"]
+			value    = s.values["ratio"]
 		)
 
-		if schemaname == "" || seqname == "" {
+		if schema == "" || sequence == "" {
 			log.Warnf("incomplete sequence FQ name: %s; skip", k)
 			continue
 		}
 
-		ch <- desc.newConstMetric(value, datname, schemaname, seqname)
+		ch <- desc.newConstMetric(value, database, schema, sequence)
 	}
 }
 
 // getSchemaSequences searches sequences attached to the poor-typed columns with risk of exhaustion.
 func getSchemaSequences(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = `SELECT schemaname, sequencename AS seqname, coalesce(last_value, 0) / max_value::float AS ratio FROM pg_sequences`
+	var query = `SELECT schemaname AS schema, sequencename AS sequence, coalesce(last_value, 0) / max_value::float AS ratio FROM pg_sequences`
 
 	res, err := conn.Query(query)
 	if err != nil {
 		return nil, err
 	}
 
-	return parsePostgresGenericStats(res, []string{"schemaname", "seqname"}), nil
+	return parsePostgresGenericStats(res, []string{"schema", "sequence"}), nil
 }
 
 // collectSchemaFKDatatypeMismatch collects metrics related to foreign key constraints with different data types.
 func collectSchemaFKDatatypeMismatch(conn *store.DB, ch chan<- prometheus.Metric, desc typedDesc) {
-	datname := conn.Conn().Config().Database
+	database := conn.Conn().Config().Database
 	stats, err := getSchemaFKDatatypeMismatch(conn)
 	if err != nil {
-		log.Errorf("get foreign keys data types stats of database %s failed: %s; skip", datname, err)
+		log.Errorf("get foreign keys data types stats of database %s failed: %s; skip", database, err)
 		return
 	}
 
 	for k, s := range stats {
 		var (
-			schemaname    = s.labels["schemaname"]
-			relname       = s.labels["relname"]
-			colname       = s.labels["colname"]
-			refschemaname = s.labels["refschemaname"]
-			refrelname    = s.labels["refrelname"]
-			refcolname    = s.labels["refcolname"]
+			schema    = s.labels["schema"]
+			table     = s.labels["table"]
+			column    = s.labels["column"]
+			refschema = s.labels["refschema"]
+			reftable  = s.labels["reftable"]
+			refcolumn = s.labels["refcolumn"]
 		)
 
-		if schemaname == "" || relname == "" || colname == "" || refschemaname == "" || refrelname == "" || refcolname == "" {
-			log.Warnf("incomplete FQ name %s in database %s; skip", k, datname)
+		if schema == "" || table == "" || column == "" || refschema == "" || reftable == "" || refcolumn == "" {
+			log.Warnf("incomplete FQ name %s in database %s; skip", k, database)
 			continue
 		}
 
-		ch <- desc.newConstMetric(1, datname, schemaname, relname, colname, refschemaname, refrelname, refcolname)
+		ch <- desc.newConstMetric(1, database, schema, table, column, refschema, reftable, refcolumn)
 	}
 }
 
 // getSchemaFKDatatypeMismatch searches foreign key constraints with different data types.
 func getSchemaFKDatatypeMismatch(conn *store.DB) (map[string]postgresGenericStat, error) {
-	var query = "SELECT c1.relnamespace::regnamespace::text AS schemaname, c1.relname AS relname, a1.attname||'::'||t1.typname AS colname, " +
-		"c2.relnamespace::regnamespace::text AS refschemaname, c2.relname AS refrelname, a2.attname||'::'||t2.typname AS refcolname " +
+	var query = "SELECT c1.relnamespace::regnamespace::text AS schema, c1.relname AS table, a1.attname||'::'||t1.typname AS column, " +
+		"c2.relnamespace::regnamespace::text AS refschema, c2.relname AS reftable, a2.attname||'::'||t2.typname AS refcolumn " +
 		"FROM pg_constraint JOIN pg_class c1 ON c1.oid = conrelid JOIN pg_class c2 ON c2.oid = confrelid " +
 		"JOIN pg_attribute a1 ON a1.attnum = conkey[1] AND a1.attrelid = conrelid " +
 		"JOIN pg_attribute a2 ON a2.attnum = confkey[1] AND a2.attrelid = confrelid " +
@@ -445,5 +445,5 @@ func getSchemaFKDatatypeMismatch(conn *store.DB) (map[string]postgresGenericStat
 		return nil, err
 	}
 
-	return parsePostgresGenericStats(res, []string{"schemaname", "relname", "colname", "refschemaname", "refrelname", "refcolname"}), nil
+	return parsePostgresGenericStats(res, []string{"schema", "table", "column", "refschema", "reftable", "refcolumn"}), nil
 }

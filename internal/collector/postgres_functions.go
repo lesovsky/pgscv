@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const postgresFunctionsQuery = "SELECT current_database() AS datname, schemaname, funcname, calls, total_time, self_time FROM pg_stat_user_functions"
+const postgresFunctionsQuery = "SELECT current_database() AS database, schemaname AS schema, funcname AS function, calls, total_time, self_time FROM pg_stat_user_functions"
 
 type postgresFunctionsCollector struct {
 	calls      typedDesc
@@ -22,7 +22,7 @@ type postgresFunctionsCollector struct {
 // NewPostgresFunctionsCollector returns a new Collector exposing postgres SQL functions stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-USER-FUNCTIONS-VIEW
 func NewPostgresFunctionsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labelNames = []string{"datname", "schemaname", "funcname"}
+	var labelNames = []string{"database", "schema", "function"}
 
 	return &postgresFunctionsCollector{
 		labelNames: labelNames,
@@ -86,9 +86,9 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 		stats := parsePostgresFunctionsStats(res, c.labelNames)
 
 		for _, stat := range stats {
-			ch <- c.calls.newConstMetric(stat.calls, stat.datname, stat.schemaname, stat.funcname)
-			ch <- c.totaltime.newConstMetric(stat.totaltime, stat.datname, stat.schemaname, stat.funcname)
-			ch <- c.selftime.newConstMetric(stat.selftime, stat.datname, stat.schemaname, stat.funcname)
+			ch <- c.calls.newConstMetric(stat.calls, stat.database, stat.schema, stat.function)
+			ch <- c.totaltime.newConstMetric(stat.totaltime, stat.database, stat.schema, stat.function)
+			ch <- c.selftime.newConstMetric(stat.selftime, stat.database, stat.schema, stat.function)
 		}
 	}
 
@@ -97,12 +97,12 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 
 // postgresFunctionStat represents Postgres function stats based pg_stat_user_functions.
 type postgresFunctionStat struct {
-	datname    string
-	schemaname string
-	funcname   string
-	calls      float64
-	totaltime  float64
-	selftime   float64
+	database  string
+	schema    string
+	function  string
+	calls     float64
+	totaltime float64
+	selftime  float64
 }
 
 // parsePostgresFunctionsStats parses PGResult and return struct with stats values.
@@ -118,17 +118,17 @@ func parsePostgresFunctionsStats(r *model.PGResult, labelNames []string) map[str
 		// collect label values
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				stat.datname = row[i].String
-			case "schemaname":
-				stat.schemaname = row[i].String
-			case "funcname":
-				stat.funcname = row[i].String
+			case "database":
+				stat.database = row[i].String
+			case "schema":
+				stat.schema = row[i].String
+			case "function":
+				stat.function = row[i].String
 			}
 		}
 
-		// Create a function name consisting of trio database/user/queryid
-		functionFQName := strings.Join([]string{stat.datname, stat.schemaname, stat.funcname}, "/")
+		// Create a function name consisting of trio database/schema/function
+		functionFQName := strings.Join([]string{stat.database, stat.schema, stat.function}, "/")
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		stats[functionFQName] = stat

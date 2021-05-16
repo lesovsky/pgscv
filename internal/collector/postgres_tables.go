@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	userTablesQuery = "SELECT current_database() AS datname, s1.schemaname, s1.relname, " +
+	userTablesQuery = "SELECT current_database() AS database, s1.schemaname AS schema, s1.relname AS table, " +
 		"seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, " +
 		"n_mod_since_analyze, extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds, " +
 		"extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds, " +
@@ -47,15 +47,15 @@ type postgresTablesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-TABLES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-TABLES-VIEW
 func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var tablesLabelNames = []string{"datname", "schemaname", "relname"}
+	var labels = []string{"database", "schema", "table"}
 
 	return &postgresTablesCollector{
-		labelNames: tablesLabelNames,
+		labelNames: labels,
 		seqscan: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
 				"The total number of sequential scans have been done.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -63,7 +63,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "seq_tup_read_total"),
 				"The total number of tuples have been read by sequential scans.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -71,7 +71,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "idx_scan_total"),
 				"Total number of index scans initiated on this table.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -79,7 +79,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "idx_tup_fetch_total"),
 				"Total number of live rows fetched by index scans.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -87,7 +87,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_inserted_total"),
 				"Total number of tuples (rows) have been inserted in the table.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -95,7 +95,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_updated_total"),
 				"Total number of tuples (rows) have been updated in the table (including HOT).",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -103,7 +103,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_hot_updated_total"),
 				"Total number of tuples (rows) have been updated in the table.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -111,7 +111,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_deleted_total"),
 				"Total number of tuples (rows) have been deleted in the table.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -119,7 +119,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_live_total"),
 				"Estimated total number of live tuples in the table.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -127,7 +127,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_dead_total"),
 				"Estimated total number of dead tuples in the table.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -135,7 +135,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "tuples_modified_total"),
 				"Estimated total number of modified tuples in the table since last vacuum.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -143,7 +143,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "last_vacuum_seconds"),
 				"Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -151,7 +151,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "last_analyze_seconds"),
 				"Total time since table was analyzed manually or automatically, in seconds.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -159,7 +159,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "maintenance_total"),
 				"Total number of times this table has been maintained by each type of maintenance operation.",
-				[]string{"datname", "schemaname", "relname", "type"}, constLabels,
+				[]string{"database", "schema", "table", "type"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -167,7 +167,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table_io", "blocks_total"),
 				"Total number of table's blocks processed.",
-				[]string{"datname", "schemaname", "relname", "type", "cache_hit"}, constLabels,
+				[]string{"database", "schema", "table", "type", "access"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -175,7 +175,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "table", "size_bytes"),
 				"Total size of the table, in bytes.",
-				[]string{"datname", "schemaname", "relname"}, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.GaugeValue,
 		},
@@ -219,69 +219,69 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 		for _, stat := range stats {
 			// scan stats
-			ch <- c.seqscan.newConstMetric(stat.seqscan, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.seqtupread.newConstMetric(stat.seqtupread, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.idxscan.newConstMetric(stat.idxscan, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.idxtupfetch.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.seqscan.newConstMetric(stat.seqscan, stat.database, stat.schema, stat.table)
+			ch <- c.seqtupread.newConstMetric(stat.seqtupread, stat.database, stat.schema, stat.table)
+			ch <- c.idxscan.newConstMetric(stat.idxscan, stat.database, stat.schema, stat.table)
+			ch <- c.idxtupfetch.newConstMetric(stat.idxtupfetch, stat.database, stat.schema, stat.table)
 
 			// tuples stats
-			ch <- c.tupInserted.newConstMetric(stat.inserted, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupUpdated.newConstMetric(stat.updated, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupDeleted.newConstMetric(stat.deleted, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupHotUpdated.newConstMetric(stat.hotUpdated, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupInserted.newConstMetric(stat.inserted, stat.database, stat.schema, stat.table)
+			ch <- c.tupUpdated.newConstMetric(stat.updated, stat.database, stat.schema, stat.table)
+			ch <- c.tupDeleted.newConstMetric(stat.deleted, stat.database, stat.schema, stat.table)
+			ch <- c.tupHotUpdated.newConstMetric(stat.hotUpdated, stat.database, stat.schema, stat.table)
 
 			// tuples total stats
-			ch <- c.tupLive.newConstMetric(stat.live, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupDead.newConstMetric(stat.dead, stat.datname, stat.schemaname, stat.relname)
-			ch <- c.tupModified.newConstMetric(stat.modified, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.tupLive.newConstMetric(stat.live, stat.database, stat.schema, stat.table)
+			ch <- c.tupDead.newConstMetric(stat.dead, stat.database, stat.schema, stat.table)
+			ch <- c.tupModified.newConstMetric(stat.modified, stat.database, stat.schema, stat.table)
 
 			// maintenance stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
 			if stat.lastvacuum > 0 {
-				ch <- c.maintLastVacuum.newConstMetric(stat.lastvacuum, stat.datname, stat.schemaname, stat.relname)
+				ch <- c.maintLastVacuum.newConstMetric(stat.lastvacuum, stat.database, stat.schema, stat.table)
 			}
 			if stat.lastanalyze > 0 {
-				ch <- c.maintLastAnalyze.newConstMetric(stat.lastanalyze, stat.datname, stat.schemaname, stat.relname)
+				ch <- c.maintLastAnalyze.newConstMetric(stat.lastanalyze, stat.database, stat.schema, stat.table)
 			}
 			if stat.vacuum > 0 {
-				ch <- c.maintenance.newConstMetric(stat.vacuum, stat.datname, stat.schemaname, stat.relname, "vacuum")
+				ch <- c.maintenance.newConstMetric(stat.vacuum, stat.database, stat.schema, stat.table, "vacuum")
 			}
 			if stat.autovacuum > 0 {
-				ch <- c.maintenance.newConstMetric(stat.autovacuum, stat.datname, stat.schemaname, stat.relname, "autovacuum")
+				ch <- c.maintenance.newConstMetric(stat.autovacuum, stat.database, stat.schema, stat.table, "autovacuum")
 			}
 			if stat.analyze > 0 {
-				ch <- c.maintenance.newConstMetric(stat.analyze, stat.datname, stat.schemaname, stat.relname, "analyze")
+				ch <- c.maintenance.newConstMetric(stat.analyze, stat.database, stat.schema, stat.table, "analyze")
 			}
 			if stat.autoanalyze > 0 {
-				ch <- c.maintenance.newConstMetric(stat.autoanalyze, stat.datname, stat.schemaname, stat.relname, "autoanalyze")
+				ch <- c.maintenance.newConstMetric(stat.autoanalyze, stat.database, stat.schema, stat.table, "autoanalyze")
 			}
 
 			// io stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
 			if stat.heapread > 0 {
-				ch <- c.io.newConstMetric(stat.heapread, stat.datname, stat.schemaname, stat.relname, "heap", "false")
+				ch <- c.io.newConstMetric(stat.heapread, stat.database, stat.schema, stat.table, "heap", "read")
 			}
 			if stat.heaphit > 0 {
-				ch <- c.io.newConstMetric(stat.heaphit, stat.datname, stat.schemaname, stat.relname, "heap", "true")
+				ch <- c.io.newConstMetric(stat.heaphit, stat.database, stat.schema, stat.table, "heap", "hit")
 			}
 			if stat.idxread > 0 {
-				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, "idx", "false")
+				ch <- c.io.newConstMetric(stat.idxread, stat.database, stat.schema, stat.table, "idx", "read")
 			}
 			if stat.idxhit > 0 {
-				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, "idx", "true")
+				ch <- c.io.newConstMetric(stat.idxhit, stat.database, stat.schema, stat.table, "idx", "hit")
 			}
 			if stat.toastread > 0 {
-				ch <- c.io.newConstMetric(stat.toastread, stat.datname, stat.schemaname, stat.relname, "toast", "false")
+				ch <- c.io.newConstMetric(stat.toastread, stat.database, stat.schema, stat.table, "toast", "read")
 			}
 			if stat.toasthit > 0 {
-				ch <- c.io.newConstMetric(stat.toasthit, stat.datname, stat.schemaname, stat.relname, "toast", "true")
+				ch <- c.io.newConstMetric(stat.toasthit, stat.database, stat.schema, stat.table, "toast", "hit")
 			}
 			if stat.tidxread > 0 {
-				ch <- c.io.newConstMetric(stat.tidxread, stat.datname, stat.schemaname, stat.relname, "tidx", "false")
+				ch <- c.io.newConstMetric(stat.tidxread, stat.database, stat.schema, stat.table, "tidx", "read")
 			}
 			if stat.tidxhit > 0 {
-				ch <- c.io.newConstMetric(stat.tidxhit, stat.datname, stat.schemaname, stat.relname, "tidx", "true")
+				ch <- c.io.newConstMetric(stat.tidxhit, stat.database, stat.schema, stat.table, "tidx", "hit")
 			}
 
-			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.datname, stat.schemaname, stat.relname)
+			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.database, stat.schema, stat.table)
 		}
 	}
 
@@ -290,9 +290,9 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 // postgresTableStat is per-table store for metrics related to how tables are accessed.
 type postgresTableStat struct {
-	datname     string
-	schemaname  string
-	relname     string
+	database    string
+	schema      string
+	table       string
 	seqscan     float64
 	seqtupread  float64
 	idxscan     float64
@@ -333,17 +333,17 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 		table := postgresTableStat{}
 		for i, colname := range r.Colnames {
 			switch string(colname.Name) {
-			case "datname":
-				table.datname = row[i].String
-			case "schemaname":
-				table.schemaname = row[i].String
-			case "relname":
-				table.relname = row[i].String
+			case "database":
+				table.database = row[i].String
+			case "schema":
+				table.schema = row[i].String
+			case "table":
+				table.table = row[i].String
 			}
 		}
 
 		// create a table name consisting of trio database/schema/table
-		tablename = strings.Join([]string{table.datname, table.schemaname, table.relname}, "/")
+		tablename = strings.Join([]string{table.database, table.schema, table.table}, "/")
 
 		stats[tablename] = table
 
