@@ -223,18 +223,16 @@ func Test_validateCollectorSettings(t *testing.T) {
 				"example/example": {
 					Subsystems: map[string]model.MetricsSubsystem{
 						"example1": {
-							Query: "SELECT 'label1' as l1, 1 as v1",
+							Query: "SELECT 'L1' as label1, 1 as value1",
 							Metrics: model.Metrics{
-								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
-								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+								{ShortName: "v1", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "description"},
 							},
 						},
 						"example2": {
-							Query: "SELECT 'label1' as l1, 1 as v1, 2 as v2",
+							Query: "SELECT 'L2' as label2, 1 as value1, 2 as value2",
 							Metrics: model.Metrics{
-								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
-								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
-								{ShortName: "v2", Usage: "GAUGE", Description: "v2 description"},
+								{ShortName: "v1", Usage: "COUNTER", Value: "value1", Labels: []string{"label2"}, Description: "description"},
+								{ShortName: "v2", Usage: "GAUGE", Value: "value2", Labels: []string{"label2"}, Description: "description"},
 							},
 						},
 					},
@@ -242,10 +240,9 @@ func Test_validateCollectorSettings(t *testing.T) {
 				"example/example2": {
 					Subsystems: map[string]model.MetricsSubsystem{
 						"example1": {
-							Query: "SELECT 'label1' as l1, 1 as v1",
+							Query: "SELECT 'L1' as label1, 1 as value1",
 							Metrics: model.Metrics{
-								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
-								{ShortName: "v1", Usage: "COUNTER", Description: "v1 description"},
+								{ShortName: "v1", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "description"},
 							},
 						},
 					},
@@ -270,22 +267,7 @@ func Test_validateCollectorSettings(t *testing.T) {
 					Subsystems: map[string]model.MetricsSubsystem{
 						"example1": {
 							Metrics: model.Metrics{
-								{ShortName: "l1", Usage: "LABEL", Description: "l1 description"},
-							},
-						},
-					},
-				},
-			},
-		},
-		{
-			valid: false, // Invalid name for label
-			settings: map[string]model.CollectorSettings{
-				"example/example": {
-					Subsystems: map[string]model.MetricsSubsystem{
-						"example1": {
-							Query: "SELECT 'label1' as l1, 1 as v1",
-							Metrics: model.Metrics{
-								{ShortName: "inva:lid", Usage: "LABEL", Description: "l1 description"},
+								{ShortName: "l1", Usage: "COUNTER", Value: "value1", Description: "description"},
 							},
 						},
 					},
@@ -298,9 +280,9 @@ func Test_validateCollectorSettings(t *testing.T) {
 				"example/example": {
 					Subsystems: map[string]model.MetricsSubsystem{
 						"example1": {
-							Query: "SELECT 'label1' as l1, 1 as v1",
+							Query: "SELECT 'L1' as label1, 1 as value1",
 							Metrics: model.Metrics{
-								{ShortName: "inva:lid", Usage: "COUNTER", Description: "v1 description"},
+								{ShortName: "inva:lid", Usage: "COUNTER", Value: "value1", Labels: []string{"label1"}, Description: "v1 description"},
 							},
 						},
 					},
@@ -315,7 +297,7 @@ func Test_validateCollectorSettings(t *testing.T) {
 						"example1": {
 							Query: "SELECT 'label1' as l1, 1 as v1",
 							Metrics: model.Metrics{
-								{ShortName: "v1", Usage: "COUNTER"},
+								{ShortName: "v1", Usage: "COUNTER", Value: "v1"},
 							},
 						},
 					},
@@ -330,7 +312,7 @@ func Test_validateCollectorSettings(t *testing.T) {
 						"example1": {
 							Query: "SELECT 'label1' as l1, 1 as v1",
 							Metrics: model.Metrics{
-								{ShortName: "v1", Usage: "INVALID"},
+								{ShortName: "v1", Value: "v1", Usage: "INVALID"},
 							},
 						},
 					},
@@ -344,6 +326,36 @@ func Test_validateCollectorSettings(t *testing.T) {
 					Subsystems: map[string]model.MetricsSubsystem{
 						"example1": {
 							Databases: "[",
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // No value, nor labeled_values
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'L1' as label1, 1 as value1",
+							Metrics: model.Metrics{
+								{ShortName: "v1", Usage: "COUNTER", Labels: []string{"label1"}, Description: "description"},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			valid: false, // No value, nor labeled_values
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Subsystems: map[string]model.MetricsSubsystem{
+						"example1": {
+							Query: "SELECT 'L1' as label1, 1 as value1",
+							Metrics: model.Metrics{
+								{ShortName: "v1", Usage: "COUNTER", Value: "value1", LabeledValues: map[string][]string{"value1": {"test"}}, Labels: []string{"label1"}, Description: "description"},
+							},
 						},
 					},
 				},

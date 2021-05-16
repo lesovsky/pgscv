@@ -169,27 +169,31 @@ func validateCollectorSettings(cs model.CollectorsSettings) error {
 				return fmt.Errorf("invalid subsystem name: %s", ssName)
 			}
 
-			// Validate databases regexp
+			// Validate databases regexp.
 			_, err := regexp.Compile(subsys.Databases)
 			if err != nil {
 				return fmt.Errorf("databases invalid regular expression specified: %s", err)
 			}
 
+			// Query must be specified if any metrics.
 			if len(subsys.Metrics) > 0 && subsys.Query == "" {
-				return fmt.Errorf("query is not specified for: %s", ssName)
+				return fmt.Errorf("query is not specified for subsystem '%s' metrics", ssName)
 			}
 
 			// Validate metrics level
-			reLabel := regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
 			reMetric := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 			for _, m := range subsys.Metrics {
+				if m.Value == "" && m.LabeledValues == nil {
+					return fmt.Errorf("value or labeled_values should be specified for metric '%s'", m.ShortName)
+				}
+
+				if m.Value != "" && m.LabeledValues != nil {
+					return fmt.Errorf("value and labeled_values cannot be used together for metric '%s'", m.ShortName)
+				}
+
 				usage := m.Usage
 				switch usage {
-				case "LABEL":
-					if !reLabel.MatchString(m.ShortName) {
-						return fmt.Errorf("invalid label name '%s'", m.ShortName)
-					}
 				case "COUNTER", "GAUGE":
 					if !reMetric.MatchString(m.ShortName) {
 						return fmt.Errorf("invalid metric name '%s'", m.ShortName)
