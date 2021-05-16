@@ -33,15 +33,15 @@ type postgresIndexesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
 func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var tablesLabelNames = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
+	var labels = []string{"datname", "schemaname", "relname", "indexrelname", "key"}
 
 	return &postgresIndexesCollector{
-		labelNames: tablesLabelNames,
+		labelNames: labels,
 		indexes: typedDesc{
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "scans_total"),
 				"Total number of index scans initiated.",
-				tablesLabelNames, constLabels,
+				labels, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -49,7 +49,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index", "tuples_total"),
 				"Total number of index entries processed by scans.",
-				[]string{"datname", "schemaname", "relname", "indexrelname", "op"}, constLabels,
+				[]string{"datname", "schemaname", "relname", "indexrelname", "tuples"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -57,7 +57,7 @@ func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.Collecto
 			desc: prometheus.NewDesc(
 				prometheus.BuildFQName("postgres", "index_io", "blocks_total"),
 				"Total number of indexes' blocks processed.",
-				[]string{"datname", "schemaname", "relname", "indexrelname", "cache_hit"}, constLabels,
+				[]string{"datname", "schemaname", "relname", "indexrelname", "access"}, constLabels,
 			),
 			valueType: prometheus.CounterValue,
 		},
@@ -117,13 +117,13 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 				ch <- c.tuples.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
 			}
 			if stat.idxtupfetch > 0 {
-				ch <- c.tuples.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname, stat.indexname, "fetch")
+				ch <- c.tuples.newConstMetric(stat.idxtupfetch, stat.datname, stat.schemaname, stat.relname, stat.indexname, "fetched")
 			}
 			if stat.idxread > 0 {
-				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "false")
+				ch <- c.io.newConstMetric(stat.idxread, stat.datname, stat.schemaname, stat.relname, stat.indexname, "read")
 			}
 			if stat.idxhit > 0 {
-				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "true")
+				ch <- c.io.newConstMetric(stat.idxhit, stat.datname, stat.schemaname, stat.relname, stat.indexname, "hit")
 			}
 		}
 	}
