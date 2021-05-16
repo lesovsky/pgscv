@@ -15,6 +15,7 @@
 - **Bootstrap**. pgSCV can bootstrap itself - it is one-time procedure, during bootstrap pgSCV installs itself into system path, creates minimal required configuration,
   installs systemd unit and starts itself. **Requires root privileges.**
 - **Auto-update**. pgSCV can track new releases and update itself. This feature is mostly useful for Weaponry users. **Requires root privileges.**
+- **User-defined metrics**. pgSCV could be configured in a way to collect metrics defined by user.
 - **Collectors management**. Collectors could be disabled if necessary.
 - **Collectors filters**. Some collectors could be adjusted to skip collecting metrics about unnecessary stuff, like
   block devices, network interfaces, filesystems, etc.
