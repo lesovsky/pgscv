@@ -3,9 +3,28 @@ package store
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
+)
+
+const (
+	// Data types supported by parser of query results.
+	dataTypeBool uint32 = 16
+	// dataTypeChar uint32 = 18 is not supported - its conversion to sql.NullString lead to panic 'pgx' driver.
+	dataTypeName    uint32 = 19
+	dataTypeInt8    uint32 = 20
+	dataTypeInt2    uint32 = 21
+	dataTypeInt4    uint32 = 23
+	dataTypeText    uint32 = 25
+	dataTypeOid     uint32 = 26
+	dataTypeFloat4  uint32 = 700
+	dataTypeFloat8  uint32 = 701
+	dataTypeInet    uint32 = 869
+	dataTypeBpchar  uint32 = 1042
+	dataTypeVarchar uint32 = 1043
+	dataTypeNumeric uint32 = 1700
 )
 
 // DB is the database representation
@@ -69,6 +88,15 @@ func (db *DB) query(query string) (*model.PGResult, error) {
 		nrows    int
 	)
 
+	// Not the all data types could be safely converted into sql.NullString
+	// and conversion errors lead to panic.
+	// Check the data types are safe in returned result.
+	for _, c := range colnames {
+		if !isDataTypeSupported(c.DataTypeOID) {
+			return nil, fmt.Errorf("query '%s', unsupported data type OID: %d", query, c.DataTypeOID)
+		}
+	}
+
 	// Storage used for data extracted from rows.
 	// Scan operation supports only slice of interfaces, 'pointers' slice is the intermediate store where all values written.
 	// Next values from 'pointers' associated with type-strict slice - 'values'. When Scan is writing to the 'pointers' it
@@ -108,5 +136,18 @@ func (db *DB) close() {
 	err := db.Conn().Close(context.Background())
 	if err != nil {
 		log.Warnf("failed to close database connection: %s; ignore", err)
+	}
+}
+
+// isDataTypeSupported tests passed type OID is supported.
+func isDataTypeSupported(t uint32) bool {
+	switch t {
+	case dataTypeName, dataTypeBpchar, dataTypeVarchar, dataTypeText,
+		dataTypeInt2, dataTypeInt4, dataTypeInt8,
+		dataTypeOid, dataTypeFloat4, dataTypeFloat8, dataTypeNumeric,
+		dataTypeBool, dataTypeInet:
+		return true
+	default:
+		return false
 	}
 }

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/jackc/pgx/v4"
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,11 @@ func TestDB_Query(t *testing.T) {
 			valid: true,
 		},
 		{
+			name:  "valid query, with unsupported data type",
+			query: "SELECT 'example' AS v1, 100 AS v2, '0x1111'::bytea AS v3",
+			valid: false,
+		},
+		{
 			name:  "invalid query",
 			query: "invalid",
 			valid: false,
@@ -111,4 +117,38 @@ func TestDB_Close(t *testing.T) {
 	assert.NotNil(t, db)
 
 	db.Close()
+}
+
+func TestExample(t *testing.T) {
+	db := NewTest(t)
+	q := "select relkind::char as relkind from pg_class where relname in ('pg_class')"
+	_, err := db.query(q)
+	fmt.Println(err)
+	//fmt.Println(res.Rows)
+}
+
+func Test_isDataTypeSupported(t *testing.T) {
+	testcases := []struct {
+		t    uint32
+		want bool
+	}{
+		{t: 18, want: false}, // char
+		{t: dataTypeBool, want: true},
+		{t: dataTypeName, want: true},
+		{t: dataTypeInt8, want: true},
+		{t: dataTypeInt2, want: true},
+		{t: dataTypeInt4, want: true},
+		{t: dataTypeText, want: true},
+		{t: dataTypeOid, want: true},
+		{t: dataTypeFloat4, want: true},
+		{t: dataTypeFloat8, want: true},
+		{t: dataTypeInet, want: true},
+		{t: dataTypeVarchar, want: true},
+		{t: dataTypeNumeric, want: true},
+		{t: dataTypeBpchar, want: true},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, isDataTypeSupported(tc.t))
+	}
 }
