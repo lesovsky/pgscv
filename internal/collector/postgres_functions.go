@@ -70,6 +70,11 @@ func (c *postgresFunctionsCollector) Update(config Config, ch chan<- prometheus.
 	}
 
 	for _, d := range databases {
+		// Skip database if not matched to allowed.
+		if config.DatabasesRE != nil && !config.DatabasesRE.MatchString(d) {
+			continue
+		}
+
 		pgconfig.Database = d
 		conn, err := store.NewWithConfig(pgconfig)
 		if err != nil {

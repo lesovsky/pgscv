@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -51,11 +52,13 @@ type Service struct {
 
 // Config defines service's configuration.
 type Config struct {
-	RuntimeMode        int
-	NoTrackMode        bool
-	ConnDefaults       map[string]string `yaml:"defaults"` // Defaults
-	ConnsSettings      ConnsSettings
-	Filters            map[string]filter.Filter
+	RuntimeMode   int
+	NoTrackMode   bool
+	ConnDefaults  map[string]string `yaml:"defaults"` // Defaults
+	ConnsSettings ConnsSettings
+	Filters       map[string]filter.Filter
+	// DatabasesRE defines regexp with databases from which builtin metrics should be collected.
+	DatabasesRE        *regexp.Regexp
 	DisabledCollectors []string
 	// CollectorsSettings defines all collector settings propagated from main YAML configuration.
 	CollectorsSettings model.CollectorsSettings
@@ -364,6 +367,7 @@ func (repo *Repository) setupServices(config Config) error {
 				ConnString:  service.ConnSettings.Conninfo,
 				Filters:     config.Filters,
 				Settings:    config.CollectorsSettings,
+				DatabasesRE: config.DatabasesRE,
 			}
 
 			switch service.ConnSettings.ServiceType {

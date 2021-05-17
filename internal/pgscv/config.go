@@ -39,6 +39,8 @@ type Config struct {
 	Filters               filter.Filters           `yaml:"filters"`
 	DisableCollectors     []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
 	CollectorsSettings    model.CollectorsSettings `yaml:"collectors"`         // Collectors settings propagated from main YAML configuration
+	Databases             string                   `yaml:"databases"`          // Regular expression string specifies databases from which metrics should be collected
+	DatabasesRE           *regexp.Regexp           // Regular expression object compiled from Databases
 }
 
 // NewConfig creates new config based on config file or return default config of config is not exists.
@@ -130,6 +132,13 @@ func (c *Config) Validate() error {
 			}
 		}
 	}
+
+	// Create 'databases' regexp object for builtin metrics.
+	re, err := newDatabasesRegexp(c.Databases)
+	if err != nil {
+		return err
+	}
+	c.DatabasesRE = re
 
 	// Add default filters and compile regexps.
 	if c.Filters == nil {
@@ -225,4 +234,13 @@ func toggleAutoupdate(value string) (string, error) {
 	default:
 		return "", fmt.Errorf("invalid value '%s' for 'autoupdate'", value)
 	}
+}
+
+// newDatabasesRegexp creates new regexp depending on passed string.
+func newDatabasesRegexp(s string) (*regexp.Regexp, error) {
+	if s == "" {
+		s = ".+"
+	}
+
+	return regexp.Compile(s)
 }

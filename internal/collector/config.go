@@ -7,6 +7,7 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -22,6 +23,8 @@ type Config struct {
 	NoTrackMode bool
 	// PostgresServiceConfig defines collector's options specific for Postgres service
 	PostgresServiceConfig
+	// DatabasesRE defines regexp with databases from which builtin metrics should be collected.
+	DatabasesRE *regexp.Regexp
 	// Filters are user-defined regular expressions allow to include/exclude collecting various stats.
 	Filters map[string]filter.Filter
 	// Settings defines collectors settings propagated from main YAML configuration.

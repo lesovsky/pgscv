@@ -195,6 +195,11 @@ func TestConfig_Validate(t *testing.T) {
 			valid: false,
 			in:    &Config{ListenAddress: "127.0.0.1:8080", Filters: map[string]filter.Filter{"test": {Include: "["}}},
 		},
+		{
+			name:  "invalid config: invalid databases string",
+			valid: false,
+			in:    &Config{ListenAddress: "127.0.0.1:8080", Databases: "["},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -392,6 +397,28 @@ func Test_toggleAutoupdate(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		} else {
 			assert.Error(t, err)
+		}
+	}
+}
+
+func Test_newDatabasesRegexp(t *testing.T) {
+	testcases := []struct {
+		valid bool
+		str   string
+	}{
+		{valid: true, str: "example(1|2)"},
+		{valid: true, str: ""},
+		{valid: false, str: "["},
+	}
+
+	for _, tc := range testcases {
+		got, err := newDatabasesRegexp(tc.str)
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.NotNil(t, got)
+		} else {
+			assert.Error(t, err)
+			assert.Nil(t, got)
 		}
 	}
 }
