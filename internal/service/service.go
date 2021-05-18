@@ -300,55 +300,40 @@ func (repo *Repository) lookupServices(config Config) error {
 
 	// walk through the pid list and looking for the processes with appropriate names
 	for _, pid := range pids {
-		proc, err := process.NewProcess(pid)
-		if err != nil {
-			log.Debugf("auto-discovery: failed to create process struct for pid %d: %s; skip", pid, err)
+
+		// Check process, and get its properties.
+		name, cwd, cmdline, skip := checkProcessProperties(pid)
+		if skip {
 			continue
 		}
 
-		name, err := proc.Name()
-		if err != nil {
-			log.Debugf("auto-discovery: no process name for pid %d: %s; skip", pid, err)
-			continue // skip processes with no names
-		}
+		var service Service
+		var err error
 
 		switch name {
 		case "postgres":
-			ppid, _ := proc.Ppid() // error doesn't matter here, even if ppid will be 0 - we're interested in ppid == 1
-			if ppid == 1 {
-				postgres, err := discoverPostgres(proc, config)
-				if err != nil {
-					log.Warnf("auto-discovery [postgres]: discovery failed: %s; skip", err)
-					break
-				}
-
-				// check service in the repo
-				if s := repo.getService(postgres.ServiceID); s.ServiceID == postgres.ServiceID {
-					log.Debugf("auto-discovery [postgres]: service [%s] already in the repository, skip", s.ServiceID)
-					break
-				}
-
-				repo.addService(postgres) // add postgresql service to the repo
-				log.Infof("auto-discovery [postgres]: service added [%s]", postgres.ServiceID)
-			}
+			service, err = discoverPostgres(pid, cwd, config)
 		case "pgbouncer":
-			pgbouncer, err := discoverPgbouncer(proc, config)
-			if err != nil {
-				log.Warnf("auto-discovery [pgbouncer]: discovery failed: %s; skip", err)
-				break
-			}
-
-			// check service in the repo
-			if s := repo.getService(pgbouncer.ServiceID); s.ServiceID == pgbouncer.ServiceID {
-				log.Debugf("auto-discovery [pgbouncer]: service [%s] already in the repository, skip", s.ServiceID)
-				break
-			}
-
-			repo.addService(pgbouncer) // add pgbouncer service to the repo
-			log.Infof("auto-discovery [pgbouncer]: service added [%s]", pgbouncer.ServiceID)
+			service, err = discoverPgbouncer(pid, cmdline, config)
 		default:
-			continue // others are not interesting
+			continue
 		}
+
+		if err != nil {
+			log.Warnf("auto-discovery [%s]: discovery failed: %s; skip", name, err)
+			continue
+		}
+
+		// Check service is not present in the repo.
+		if s := repo.getService(service.ServiceID); s.ServiceID == service.ServiceID {
+			log.Debugf("auto-discovery [%s]: service [%s] already in the repository, skip", name, s.ServiceID)
+			continue
+		}
+
+		// Add postgresql service to the repo.
+		repo.addService(service)
+
+		log.Infof("auto-discovery [%s]: service added [%s]", name, service.ServiceID)
 	}
 	return nil
 }
@@ -444,17 +429,14 @@ func (repo *Repository) healthcheckServices() {
 
 // discoverPostgres reads postmaster.pid stored in data directory.
 // Using postmaster.pid data construct "conninfo" string and test it through making a connection.
-func discoverPostgres(proc *process.Process, config Config) (Service, error) {
-	log.Debugf("auto-discovery [postgres]: analyzing process with pid %d", proc.Pid)
+func discoverPostgres(pid int32, cwd string, config Config) (Service, error) {
+	log.Debugf("auto-discovery [postgres]: analyzing process with pid %d", pid)
 
-	// Postgres at startup change current working directory to the data directory.
+	var err error
+
+	// Postgres always use data directory as current working directory.
 	// Use it for find postmaster.pid.
-	datadirCmdPath, err := proc.Cwd()
-	if err != nil {
-		return Service{}, err
-	}
-
-	connParams, err := newPostgresConnectionParams(datadirCmdPath + "/postmaster.pid")
+	connParams, err := newPostgresConnectionParams(cwd + "/postmaster.pid")
 	if err != nil {
 		return Service{}, err
 	}
@@ -464,10 +446,18 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 	var connString string
 	for _, v := range []bool{true, false} {
 		connString = newPostgresConnectionString(connParams, config.ConnDefaults, v)
-		if err := attemptConnect(connString); err == nil {
-			// no need to continue because connection with created connString was successful
-			break
+		err = attemptConnect(connString)
+		if err != nil {
+			connString = ""
+			continue
 		}
+
+		// no need to continue because connection with created connString was successful
+		break
+	}
+
+	if connString == "" || err != nil {
+		return Service{}, err
 	}
 
 	s := Service{
@@ -476,18 +466,8 @@ func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 		Collector:    nil,
 	}
 
-	log.Debugf("auto-discovery [postgres]: service has been found, pid %d, available through %s", proc.Pid, connString)
+	log.Debugf("auto-discovery [postgres]: service has been found, pid %d, available through %s", pid, connString)
 	return s, nil
-}
-
-// parsePostgresProcessCmdline parses postgres process cmdline for data directory argument
-func parsePostgresProcessCmdline(cmdline []string) (string, error) {
-	for i, arg := range cmdline {
-		if arg == "-D" && len(cmdline) > i+1 {
-			return cmdline[i+1], nil
-		}
-	}
-	return "", fmt.Errorf("data directory argument not found")
 }
 
 // newPostgresConnectionParams reads connection parameters from postmaster.pid
@@ -577,13 +557,8 @@ func newPostgresConnectionString(connParams connectionParams, defaults map[strin
 }
 
 // discoverPgbouncer check passed process is it a Pgbouncer process or not.
-func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
-	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", proc.Pid)
-
-	cmdline, err := proc.Cmdline()
-	if err != nil {
-		return Service{}, err
-	}
+func discoverPgbouncer(pid int32, cmdline string, config Config) (Service, error) {
+	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", pid)
 
 	if len(cmdline) == 0 {
 		return Service{}, fmt.Errorf("empty cmdline")
@@ -610,7 +585,7 @@ func discoverPgbouncer(proc *process.Process, config Config) (Service, error) {
 		Collector:    nil,
 	}
 
-	log.Debugf("auto-discovery: pgbouncer service has been found, pid %d, available through %s:%d", proc.Pid, connParams.listenAddr, connParams.listenPort)
+	log.Debugf("auto-discovery: pgbouncer service has been found, pid %d, available through %s:%d", pid, connParams.listenAddr, connParams.listenPort)
 	return s, nil
 }
 
@@ -736,6 +711,51 @@ func parsePgbouncerCmdline(cmdline string) string {
 		}
 	}
 	return ""
+}
+
+// checkProcessProperties check process properties and returns necessary properties if process valid.
+func checkProcessProperties(pid int32) (string, string, string, bool) {
+	proc, err := process.NewProcess(pid)
+	if err != nil {
+		log.Debugf("auto-discovery: create process object for pid %d failed: %s; skip", pid, err)
+		return "", "", "", true
+	}
+
+	ppid, err := proc.Ppid()
+	if err != nil {
+		log.Debugf("auto-discovery: get parent pid for pid %d failed: %s; skip", pid, err)
+		return "", "", "", true
+	}
+
+	// Skip processes which are not children of init.
+	if ppid != 1 {
+		return "", "", "", true
+	}
+
+	name, err := proc.Name()
+	if err != nil {
+		log.Debugf("auto-discovery: read name for pid %d failed: %s; skip", pid, err)
+		return "", "", "", true
+	}
+
+	// Skip processes which are not Postgres or Pgbouncer.
+	if name != "postgres" && name != "pgbouncer" {
+		return "", "", "", true
+	}
+
+	cwd, err := proc.Cwd()
+	if err != nil {
+		log.Infof("auto-discovery: read cwd for pid %d failed: %s; skip", pid, err)
+		return "", "", "", true
+	}
+
+	cmdline, err := proc.Cmdline()
+	if err != nil {
+		log.Infof("auto-discovery: read cmdline for pid %d failed: %s; skip", pid, err)
+		return "", "", "", true
+	}
+
+	return name, cwd, cmdline, false
 }
 
 // stringsContains returns true if array of strings contains specific string

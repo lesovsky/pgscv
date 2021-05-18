@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
@@ -186,29 +187,6 @@ func Test_healthcheckServices(t *testing.T) {
 	}
 
 	assert.Equal(t, 1, r.totalServices())
-}
-
-func Test_parsePostgresProcessCmdline(t *testing.T) {
-	testCases := []struct {
-		valid    bool
-		payload  []string
-		expected string
-	}{
-		{valid: true, payload: []string{"/bin/postgres", "-D", "/data", "-c", "config_file=/postgresql.conf"}, expected: "/data"},
-		{valid: false, payload: []string{"/bin/true", "-f", "config_file=/postgresql.conf"}},
-		{valid: false, payload: []string{"/bin/true", "-D"}},
-	}
-
-	for _, tc := range testCases {
-		s, err := parsePostgresProcessCmdline(tc.payload)
-		if tc.valid {
-			assert.NoError(t, err)
-			assert.Equal(t, tc.expected, s)
-		} else {
-			assert.Error(t, err)
-			assert.Empty(t, s)
-		}
-	}
 }
 
 func Test_newPostgresConnectionParams(t *testing.T) {
@@ -502,6 +480,29 @@ func Test_parsePgbouncerCmdline(t *testing.T) {
 
 	for _, tc := range testcases {
 		assert.Equal(t, tc.want, parsePgbouncerCmdline(tc.cmdline))
+	}
+}
+
+func Test_checkProcessProperties(t *testing.T) {
+	pids, err := process.Pids()
+	assert.NoError(t, err)
+
+	// add invalid pid
+	pids = append(pids, 0)
+
+	for _, pid := range pids {
+		name, cwd, cmdline, skip := checkProcessProperties(pid)
+
+		switch name {
+		case "postgres":
+			assert.NotEqual(t, "", cwd)
+			assert.False(t, skip)
+		case "pgbouncer":
+			assert.NotEqual(t, "", cmdline)
+			assert.False(t, skip)
+		default:
+			assert.True(t, skip)
+		}
 	}
 }
 
