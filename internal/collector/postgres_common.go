@@ -160,20 +160,3 @@ func listDatabases(db *store.DB) ([]string, error) {
 	}
 	return list, nil
 }
-
-// isExtensionAvailable returns true if extension with specified name exists and available
-func isExtensionAvailable(db *store.DB, name string) bool {
-	log.Debugf("check %s availability", name)
-
-	var exists bool
-	err := db.Conn().
-		QueryRow(context.Background(), "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = $1)", name).
-		Scan(&exists)
-	if err != nil {
-		log.Errorln("failed to check extensions in pg_extension: ", err)
-		return false
-	}
-
-	// Return false if extension is not installed.
-	return exists
-}

@@ -3,6 +3,7 @@ package collector
 import (
 	"bufio"
 	"database/sql"
+	"fmt"
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/model"
@@ -264,11 +265,11 @@ func Test_selectStatementsQuery(t *testing.T) {
 		version int
 		want    string
 	}{
-		{version: PostgresV12, want: postgresStatementsQuery12},
-		{version: PostgresV13, want: postgresStatementsQueryLatest},
+		{version: PostgresV12, want: fmt.Sprintf(postgresStatementsQuery12, "example")},
+		{version: PostgresV13, want: fmt.Sprintf(postgresStatementsQueryLatest, "example")},
 	}
 
 	for _, tc := range testcases {
-		assert.Equal(t, tc.want, selectStatementsQuery(tc.version))
+		assert.Equal(t, tc.want, selectStatementsQuery(tc.version, "example"))
 	}
 }

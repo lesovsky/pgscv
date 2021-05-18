@@ -45,8 +45,10 @@ type PostgresServiceConfig struct {
 	LoggingCollector bool
 	// PgStatStatements defines is pg_stat_statements available in shared_preload_libraries and available for queries
 	PgStatStatements bool
-	// PgStatStatementsSource defines the database name where pg_stat_statements is available
-	PgStatStatementsSource string
+	// PgStatStatementsDatabase defines the database name where pg_stat_statements is available
+	PgStatStatementsDatabase string
+	// PgStatStatementsSchema defines the schema name where pg_stat_statements is installed
+	PgStatStatementsSchema string
 }
 
 // NewPostgresServiceConfig defines new config for Postgres-based collectors
@@ -124,19 +126,104 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		config.LoggingCollector = true
 	}
 
-	// Get shared_preload_libraries (for inspecting enabled extensions).
-	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
+	// Discover pg_stat_statements.
+	exists, database, schema, err := discoverPgStatStatements(connStr)
 	if err != nil {
 		return config, err
 	}
-	if strings.Contains(setting, "pg_stat_statements") {
-		// Enable PgStatStatements, but leave empty PgStatStatementsSource, it will be filled at first execution of collector's Update method.
-		config.PgStatStatements = true
-		config.PgStatStatementsSource = ""
-	} else {
+
+	if !exists {
 		log.Info("pg_stat_statements is not found in shared_preload_libraries, disable pg_stat_statements metrics collection")
 		config.PgStatStatements = false
 	}
 
+	config.PgStatStatements = true
+	config.PgStatStatementsDatabase = database
+	config.PgStatStatementsSchema = schema
+
 	return config, nil
+}
+
+// discoverPgStatStatements discovers pg_stat_statements, what database and schema it is installed.
+func discoverPgStatStatements(connStr string) (bool, string, string, error) {
+	pgconfig, err := pgx.ParseConfig(connStr)
+	if err != nil {
+		return false, "", "", err
+	}
+
+	conn, err := store.NewWithConfig(pgconfig)
+	if err != nil {
+		return false, "", "", err
+	}
+
+	var setting string
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
+	if err != nil {
+		return false, "", "", err
+	}
+
+	// If pg_stat_statements is not enabled globally, no reason to continue.
+	if !strings.Contains(setting, "pg_stat_statements") {
+		conn.Close()
+		return false, "", "", nil
+	}
+
+	// Check for pg_stat_statements in default database specified in connection string.
+	if schema := extensionInstalledSchema(conn, "pg_stat_statements"); schema != "" {
+		conn.Close()
+		return true, conn.Conn().Config().Database, schema, nil
+	}
+
+	// Pessimistic case.
+	// If we're here it means pg_stat_statements is not available
+	// and we have to walk through all database and looking for it.
+
+	// Get databases list from current connection.
+	databases, err := listDatabases(conn)
+	if err != nil {
+		conn.Close()
+		return false, "", "", err
+	}
+
+	// Close connection to current database, it's not interesting anymore.
+	conn.Close()
+
+	// Establish connection to each database in the list and check where pg_stat_statements is installed.
+	for _, d := range databases {
+		pgconfig.Database = d
+		conn, err := store.NewWithConfig(pgconfig)
+		if err != nil {
+			log.Warnf("connect to database '%s' failed: %s; skip", pgconfig.Database, err)
+			continue
+		}
+
+		// If pg_stat_statements found, update source and return connection.
+		if schema := extensionInstalledSchema(conn, "pg_stat_statements"); schema != "" {
+			return true, conn.Conn().Config().Database, schema, nil
+		}
+
+		// Otherwise close connection and go to next database in the list.
+		conn.Close()
+	}
+
+	// No luck.
+	// If we are here it means all database checked and
+	// pg_stat_statements is not found (not installed).
+	return false, "", "", nil
+}
+
+// extensionInstalledSchema returns schema name where extension is installed, or empty if not installed.
+func extensionInstalledSchema(db *store.DB, name string) string {
+	log.Debugf("check %s extension availability", name)
+
+	var schema string
+	err := db.Conn().
+		QueryRow(context.Background(), "SELECT extnamespace::regnamespace FROM pg_extension WHERE extname = $1", name).
+		Scan(&schema)
+	if err != nil && err != pgx.ErrNoRows {
+		log.Errorf("failed to check extensions '%s' in pg_extension: %s", name, err)
+		return ""
+	}
+
+	return schema
 }

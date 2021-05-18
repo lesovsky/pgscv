@@ -110,11 +110,3 @@ func Test_listDatabases(t *testing.T) {
 	assert.Greater(t, len(databases), 0)
 	conn.Close()
 }
-
-func Test_isExtensionAvailable(t *testing.T) {
-	conn := store.NewTest(t)
-
-	assert.True(t, isExtensionAvailable(conn, "plpgsql"))
-	assert.False(t, isExtensionAvailable(conn, "invalid"))
-	conn.Close()
-}

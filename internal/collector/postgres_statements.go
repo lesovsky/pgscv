@@ -22,7 +22,7 @@ const (
 		"nullif(p.local_blks_hit, 0) AS local_blks_hit, nullif(p.local_blks_read, 0) AS local_blks_read, " +
 		"nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written, " +
 		"nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written " +
-		"FROM pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
+		"FROM %s.pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
 
 	// postgresStatementsQueryLatest defines query for querying statements metrics.
 	// 1. use nullif(value, 0) to nullify zero values, NULL are skipped by stats method and metrics wil not be generated.
@@ -34,7 +34,7 @@ const (
 		"nullif(p.local_blks_dirtied, 0) AS local_blks_dirtied, nullif(p.local_blks_written, 0) AS local_blks_written, " +
 		"nullif(p.temp_blks_read, 0) AS temp_blks_read, nullif(p.temp_blks_written, 0) AS temp_blks_written, " +
 		"nullif(p.wal_records, 0) AS wal_records, nullif(p.wal_fpi, 0) AS wal_fpi, nullif(p.wal_bytes, 0) AS wal_bytes " +
-		"FROM pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
+		"FROM %s.pg_stat_statements p JOIN pg_database d ON d.oid=p.dbid"
 )
 
 // postgresStatementsCollector ...
@@ -217,14 +217,25 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		return nil
 	}
 
-	// looking for source database where pg_stat_statements is installed
-	conn, err := NewDBWithPgStatStatements(&config)
+	// pg_stat_statements could be installed in any database. The database with
+	// installed pg_stat_statements is discovered during initial config and stored
+	// in configuration. Create the new connection config using default connection
+	// string, but replace database with installed pg_stat_statements.
+
+	pgconfig, err := pgx.ParseConfig(config.ConnString)
+	if err != nil {
+		return err
+	}
+
+	pgconfig.Database = config.PgStatStatementsDatabase
+
+	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
 		return err
 	}
 
 	// get pg_stat_statements stats
-	res, err := conn.Query(selectStatementsQuery(config.ServerVersionNum))
+	res, err := conn.Query(selectStatementsQuery(config.ServerVersionNum, config.PgStatStatementsSchema))
 	if err != nil {
 		return err
 	}
@@ -532,79 +543,12 @@ func (c normalizationChain) normalize(query string) string {
 	return strings.TrimSpace(stmt)
 }
 
-// NewDBWithPgStatStatements returns connection to the database where pg_stat_statements available for getting stats.
-// Executing this function supposes pg_stat_statements is already available in shared_preload_libraries (checked when
-// setting up service).
-func NewDBWithPgStatStatements(config *Config) (*store.DB, error) {
-	pgconfig, err := pgx.ParseConfig(config.ConnString)
-	if err != nil {
-		return nil, err
-	}
-
-	// Override database name in connection config and use previously found pg_stat_statements source.
-	if config.PgStatStatementsSource != "" {
-		pgconfig.Database = config.PgStatStatementsSource
-	}
-
-	// Establish connection using config.
-	conn, err := store.NewWithConfig(pgconfig)
-	if err != nil {
-		return nil, err
-	}
-
-	// Check for pg_stat_statements.
-	if isExtensionAvailable(conn, "pg_stat_statements") {
-		// Set up pg_stat_statements source. It's unnecessary here, because it's already set on previous execution of that
-		// function in pessimistic case, but do it explicitly.
-		config.PgStatStatementsSource = conn.Conn().Config().Database
-		return conn, nil
-	}
-
-	// Pessimistic case.
-	// If we're here it means pg_stat_statements is not available and we have to walk through all database and looking for it.
-
-	// Drop pg_stat_statements source.
-	config.PgStatStatementsSource = ""
-
-	// Get databases list from current connection.
-	databases, err := listDatabases(conn)
-	if err != nil {
-		conn.Close()
-		return nil, err
-	}
-
-	// Close connection to current database, it's not interesting anymore.
-	conn.Close()
-
-	// Establish connection to each database in the list and check where pg_stat_statements is installed.
-	for _, d := range databases {
-		pgconfig.Database = d
-		conn, err := store.NewWithConfig(pgconfig)
-		if err != nil {
-			log.Warnf("connect to database '%s' failed: %s; skip", pgconfig.Database, err)
-			continue
-		}
-
-		// If pg_stat_statements found, update source and return connection.
-		if isExtensionAvailable(conn, "pg_stat_statements") {
-			config.PgStatStatementsSource = conn.Conn().Config().Database
-			return conn, nil
-		}
-
-		// Otherwise close connection and go to next database in the list.
-		conn.Close()
-	}
-
-	// No luck, if we are here it means all database checked and pg_stat_statements is not found (not installed?)
-	return nil, fmt.Errorf("pg_stat_statements not found")
-}
-
 // selectStatementsQuery returns suitable statements query depending on passed version.
-func selectStatementsQuery(version int) string {
+func selectStatementsQuery(version int, schema string) string {
 	switch {
 	case version < PostgresV13:
-		return postgresStatementsQuery12
+		return fmt.Sprintf(postgresStatementsQuery12, schema)
 	default:
-		return postgresStatementsQueryLatest
+		return fmt.Sprintf(postgresStatementsQueryLatest, schema)
 	}
 }
