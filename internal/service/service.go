@@ -442,17 +442,14 @@ func (repo *Repository) healthcheckServices() {
 	log.Debug("services healthcheck finished")
 }
 
-// discoverPostgres reads "datadir" argument from Postmaster's cmdline string and reads postmaster.pid stored in data
-// directory. Using postmaster.pid data construct "conninfo" string and test it through making a connection.
+// discoverPostgres reads postmaster.pid stored in data directory.
+// Using postmaster.pid data construct "conninfo" string and test it through making a connection.
 func discoverPostgres(proc *process.Process, config Config) (Service, error) {
 	log.Debugf("auto-discovery [postgres]: analyzing process with pid %d", proc.Pid)
 
-	cmdline, err := proc.CmdlineSlice()
-	if err != nil {
-		return Service{}, err
-	}
-	// parse cmdline
-	datadirCmdPath, err := parsePostgresProcessCmdline(cmdline)
+	// Postgres at startup change current working directory to the data directory.
+	// Use it for find postmaster.pid.
+	datadirCmdPath, err := proc.Cwd()
 	if err != nil {
 		return Service{}, err
 	}
