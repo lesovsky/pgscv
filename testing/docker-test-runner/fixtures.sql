@@ -1,11 +1,12 @@
 -- schema fixtures
-CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
-SELECT pg_stat_statements_reset();
-
 CREATE ROLE pgscv WITH LOGIN SUPERUSER;
 
 CREATE DATABASE pgscv_fixtures OWNER pgscv;
 \c pgscv_fixtures pgscv
+
+-- create pg_stat_statements
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+SELECT pg_stat_statements_reset();
 
 -- create table with invalid index
 CREATE TABLE orders (id SERIAL PRIMARY KEY, name TEXT, status INT);
