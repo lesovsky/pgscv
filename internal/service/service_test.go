@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
-	"os"
 	"testing"
 	"time"
 )
@@ -131,15 +130,15 @@ func TestRepository_startBackgroundDiscovery(t *testing.T) {
 	}
 }
 
-func TestRepository_lookupServices(t *testing.T) {
-	if uid := os.Geteuid(); uid != 0 {
-		t.Skipf("root privileges required, skip")
-	}
-
-	r := NewRepository()
-	assert.NoError(t, r.lookupServices(Config{}))
-	assert.NotEqual(t, 0, r.totalServices())
-}
+//func TestRepository_lookupServices(t *testing.T) {
+//	if uid := os.Geteuid(); uid != 0 {
+//		t.Skipf("root privileges required, skip")
+//	}
+//
+//	r := NewRepository()
+//	assert.NoError(t, r.lookupServices(Config{}))
+//	assert.NotEqual(t, 0, r.totalServices())
+//}
 
 func TestRepository_setupServices(t *testing.T) {
 	testCases := []struct {
