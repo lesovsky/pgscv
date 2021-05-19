@@ -61,7 +61,6 @@ func parsePostgresGenericStats(r *model.PGResult, labelNames []string) map[strin
 			// If column's name is NOT in the labelNames, process column's values
 			// as values for metrics. If column's name is in the labelNames, skip that column.
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 

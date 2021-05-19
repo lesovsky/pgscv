@@ -116,10 +116,10 @@ func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, 
 
 		device := strings.TrimRight(values[0], ":")
 		if !filter.Pass(device) {
-			log.Debugf("ignore device %s", device)
+			//log.Debugf("ignore device %s", device)
 			continue
 		}
-		log.Debugf("pass device %s", device)
+		//log.Debugf("pass device %s", device)
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-1)

@@ -37,16 +37,16 @@ func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, er
 		mountpoint, fstype := parts[1], parts[2]
 		if f, ok := filters["filesystem/fstype"]; ok {
 			if !f.Pass(fstype) {
-				log.Debugf("skip %s filesystem %s", fstype, mountpoint)
+				//log.Debugf("skip %s filesystem %s", fstype, mountpoint)
 				continue
 			}
 
-			log.Debugf("pass %s filesystem %s", fstype, mountpoint)
+			//log.Debugf("pass %s filesystem %s", fstype, mountpoint)
 		}
 
 		s := mount{
 			device:     parts[0],
-			mountpoint: parts[1],
+			mountpoint: mountpoint,
 			fstype:     fstype,
 			options:    parts[3],
 		}

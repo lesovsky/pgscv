@@ -387,7 +387,6 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 		for i, colname := range r.Colnames {
 			// skip columns if its value used as a label
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
@@ -482,7 +481,6 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 				s.walBytes += v
 				stats[statement] = s
 			default:
-				log.Debugf("unsupported pg_stat_statements stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

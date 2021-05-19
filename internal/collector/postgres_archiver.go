@@ -128,7 +128,6 @@ func parsePostgresWalArchivingStats(r *model.PGResult) postgresWalArchivingStat 
 			case "lag_files":
 				stats.lagFiles = v
 			default:
-				log.Debugf("unsupported pg_stat_archiver stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

@@ -207,7 +207,6 @@ func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfile
 		for i, colname := range r.Colnames {
 			// skip tablespace column - it's mapped as a label
 			if string(colname.Name) == "tablespace" {
-				log.Debug("skip label mapped column, 'tablespace'")
 				continue
 			}
 
@@ -238,7 +237,6 @@ func parsePostgresTempFileInflght(r *model.PGResult) map[string]postgresTempfile
 				s.tempmaxage = v
 				stats[tablespaceFQName] = s
 			default:
-				log.Debugf("unsupported stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

@@ -355,7 +355,6 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 		for i, colname := range r.Colnames {
 			// skip columns if its value used as a label
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
@@ -477,7 +476,6 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 				s.sizebytes = v
 				stats[tablename] = s
 			default:
-				log.Debugf("unsupported pg_stat_user_tables (or pg_statio_user_tables) stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

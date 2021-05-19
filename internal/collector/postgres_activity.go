@@ -414,7 +414,6 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 					stats.updateQueryStat(value, state)
 				}
 			default:
-				log.Debugf("unsupported pg_stat_activity stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

@@ -202,7 +202,6 @@ func parsePostgresBgwriterStats(r *model.PGResult) postgresBgwriterStat {
 			case "stats_age_seconds":
 				stats.statsAgeSeconds = v
 			default:
-				log.Debugf("unsupported pg_stat_bgwriter stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

@@ -145,7 +145,6 @@ func parsePostgresLocksStats(r *model.PGResult) locksStat {
 			case "total":
 				stats.total = v
 			default:
-				log.Debugf("unsupported pg_locks stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

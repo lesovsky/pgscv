@@ -105,7 +105,6 @@ func parsePostgresReplicationSlotStats(r *model.PGResult, labelNames []string) m
 		for i, colname := range r.Colnames {
 			// skip columns if its value used as a label
 			if stringsContains(labelNames, string(colname.Name)) {
-				log.Debugf("skip label mapped column '%s'", string(colname.Name))
 				continue
 			}
 
@@ -128,7 +127,6 @@ func parsePostgresReplicationSlotStats(r *model.PGResult, labelNames []string) m
 				s.retainedBytes = v
 				stats[slotFQName] = s
 			default:
-				log.Debugf("unsupported pg_replication_slot stat column: %s, skip", string(colname.Name))
 				continue
 			}
 		}

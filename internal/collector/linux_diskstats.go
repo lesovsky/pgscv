@@ -225,10 +225,10 @@ func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, er
 
 		var device = values[2]
 		if !filter.Pass(device) {
-			log.Debugf("skip device %s", device)
+			//log.Debugf("skip device %s", device)
 			continue
 		}
-		log.Debugf("pass device %s", device)
+		//log.Debugf("pass device %s", device)
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-3)
@@ -270,10 +270,10 @@ func getStorageProperties(path string, filter filter.Filter) ([]storageDevicePro
 		device := parts[len(parts)-1]
 
 		if !filter.Pass(device) {
-			log.Debugf("skip device %s", device)
+			//log.Debugf("skip device %s", device)
 			continue
 		}
-		log.Debugf("pass device %s", device)
+		//log.Debugf("pass device %s", device)
 
 		// Read 'rotational' property.
 		rotational, err := getDeviceRotational(devpath)
