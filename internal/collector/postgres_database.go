@@ -10,7 +10,7 @@ import (
 
 const (
 	databaseQuery = "SELECT " +
-		"datname AS database, " +
+		"coalesce(datname, 'global') AS database, " +
 		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
 		"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
 		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
