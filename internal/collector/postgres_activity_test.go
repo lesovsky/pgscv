@@ -37,7 +37,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 		{
 			name: "normal output",
 			res: &model.PGResult{
-				Nrows: 10,
+				Nrows: 11,
 				Ncols: 8,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("user")},
@@ -100,6 +100,11 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 						{String: "active", Valid: true}, {String: "Lock", Valid: true}, {String: "transactionid", Valid: true},
 						{String: "12", Valid: true}, {String: "12", Valid: true}, {String: "VACUUM example2", Valid: true},
 					},
+					{ // this is a WAL sender - its state is active, but not accounted.
+						{String: "postgres", Valid: true}, {String: "", Valid: false},
+						{String: "active", Valid: true}, {String: "", Valid: false}, {String: "", Valid: false},
+						{String: "0", Valid: true}, {String: "0", Valid: true}, {String: "START_REPLICATION", Valid: true},
+					},
 				},
 			},
 			want: postgresActivityStat{
@@ -111,7 +116,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 				maxActiveMaint: map[string]float64{"testuser/testdb": 9},
 				maxWaitUser:    map[string]float64{"testuser/testdb": 13},
 				maxWaitMaint:   map[string]float64{"testuser/testdb": 12},
-				querySelect:    1, queryMod: 1, queryMaint: 4,
+				querySelect:    1, queryMod: 1, queryMaint: 4, queryOther: 1,
 				vacuumOps: map[string]float64{"regular": 1, "user": 2, "wraparound": 0},
 				re:        testRE,
 			},

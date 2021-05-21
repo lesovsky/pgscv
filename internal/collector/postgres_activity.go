@@ -163,7 +163,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	}
 
 	// connection states
-	// totals doesn't account waitings because they have 'active' state.
+	// totals doesn't include waiting state because they already included in 'active' state.
 	var total = stats.active + stats.idle + stats.idlexact + stats.other
 	ch <- c.statesAll.newConstMetric(total)
 	ch <- c.states.newConstMetric(stats.active, "active")
@@ -172,7 +172,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	ch <- c.states.newConstMetric(stats.other, "other")
 	ch <- c.states.newConstMetric(stats.waiting, "waiting")
 
-	// prepared xacts
+	// prepared transactions
 	ch <- c.prepared.newConstMetric(stats.prepared)
 
 	// max duration of user's idle_xacts per user/database.
@@ -349,13 +349,17 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 				continue
 			}
 
-			// Run column-specific logic. All empty (NULL) or invalid values are silently ignored.
+			// Run column-specific logic.
 			switch string(colname.Name) {
 			case "state":
-				// Check backend is not in a waiting state. Waiting backends are accounted separately.
 				waitColIdx := colindexes[waitColumnName]
+				databaseColIdx := colindexes["database"]
 
-				if row[waitColIdx].String == weLock || row[waitColIdx].String == "t" {
+				// Check backend state:
+				// 1) is not in a waiting state. Waiting backends are accounted separately.
+				// 2) don't have NULL database. This is a background daemon and should not accounted.
+
+				if (row[waitColIdx].String == weLock || row[waitColIdx].String == "t") || !row[databaseColIdx].Valid {
 					continue
 				}
 
@@ -444,7 +448,6 @@ func (s *postgresActivityStat) updateState(state string) {
 	case stFastpath, stDisabled:
 		s.other++
 	case stWaiting:
-		// waiting must not increment totals because it isn't based on state column
 		s.waiting++
 	}
 }
@@ -456,7 +459,7 @@ func (s *postgresActivityStat) updateMaxIdletimeDuration(value, usename, datname
 		return
 	}
 
-	// don't account time for any activity except idle xacts.
+	// don't account time for any activity except idle transactions.
 	if state != stIdleXact && state != stIdleXactAborted {
 		return
 	}
