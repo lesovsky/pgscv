@@ -12,17 +12,29 @@ import (
 )
 
 const (
+	// postgresActivityQuery95 defines activity query for 9.5 and older.
+	// Postgres 9.5 doesn't have 'wait_event_type', 'wait_event' and 'backend_type'  attributes.
 	postgresActivityQuery95 = "SELECT " +
-		"coalesce(usename, 'system') AS user, coalesce(datname, 'none') AS database, state, waiting, " +
-		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
-		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
+		"coalesce(usename, 'system') AS user, datname AS database, state, waiting, " +
+		"coalesce(extract(epoch FROM clock_timestamp() - xact_start), 0) AS active_seconds, " +
+		"case when waiting = 't' THEN extract(epoch FROM clock_timestamp() - state_change) ELSE 0 END AS waiting_seconds, " +
 		"left(query, 32) as query " +
 		"FROM pg_stat_activity"
 
+	// postgresActivityQuery96 defines activity query for 9.6 and older.
+	// Postgres 9.6 doesn't have 'backend_type' attribute.
+	postgresActivityQuery96 = "SELECT " +
+		"coalesce(usename, 'system') AS user, datname AS database, state, wait_event_type, wait_event, " +
+		"coalesce(extract(epoch FROM clock_timestamp() - xact_start), 0) AS active_seconds, " +
+		"case when wait_event_type = 'Lock' THEN extract(epoch FROM clock_timestamp() - state_change) ELSE 0 END AS waiting_seconds, " +
+		"left(query, 32) as query " +
+		"FROM pg_stat_activity"
+
+	// postgresActivityQueryLatest defines activity query for recent versions.
 	postgresActivityQueryLatest = "SELECT " +
-		"coalesce(usename, backend_type) AS user, coalesce(datname, 'none') AS database, state, wait_event_type, wait_event, " +
-		"extract(epoch FROM clock_timestamp() - coalesce(xact_start, query_start)) AS since_start_seconds, " +
-		"extract(epoch FROM clock_timestamp() - state_change) AS since_change_seconds, " +
+		"coalesce(usename, backend_type) AS user, datname AS database, state, wait_event_type, wait_event, " +
+		"coalesce(extract(epoch FROM clock_timestamp() - xact_start), 0) AS active_seconds, " +
+		"case when wait_event_type = 'Lock' THEN extract(epoch FROM clock_timestamp() - state_change) ELSE 0 END AS waiting_seconds, " +
 		"left(query, 32) as query " +
 		"FROM pg_stat_activity"
 
@@ -181,19 +193,19 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		}
 	}
 
-	// max duration of users running activity per user/database.
-	for k, v := range stats.maxRunUser {
+	// max duration of users active (running) activity per user/database.
+	for k, v := range stats.maxActiveUser {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "user")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "active", "user")
 		} else {
 			log.Warnf("create max running user activity failed: invalid input '%s'; skip", k)
 		}
 	}
 
-	// max duration of maintenance running activity per user/database.
-	for k, v := range stats.maxRunMaint {
+	// max duration of maintenance active (running) activity per user/database.
+	for k, v := range stats.maxActiveMaint {
 		if names := strings.Split(k, "/"); len(names) >= 2 {
-			ch <- c.activity.newConstMetric(v, names[0], names[1], "running", "maintenance")
+			ch <- c.activity.newConstMetric(v, names[0], names[1], "active", "maintenance")
 		} else {
 			log.Warnf("create max running maintenance activity failed: invalid input '%s'; skip", k)
 		}
@@ -263,37 +275,29 @@ func newQueryRegexp() queryRegexp {
 	}
 }
 
-/*
-   *** IMPORTANT: основная сложность в том что активность определяется по нескольким источникам, например по полям state,
-   wait_event_type и вообще на основе двух представлений. Может получиться так что бэкенд учитывается в двух местах, например
-   в active и waiting. Кроме того есть еще backend_type != 'client_backend', который вносит некоторую путаницу при учете через
-   state/wait_event_type. Поэтому нельзя так просто взять и сложить все типы и получить total - полученное значение будет
-   больше чем реальный total. Именно поэтому есть отдельно посчитанный total.
-*/
-
 // postgresActivityStat describes current activity
 type postgresActivityStat struct {
-	idle         float64            // state = 'idle'
-	idlexact     float64            // state IN ('idle in transaction', 'idle in transaction (aborted)'))
-	active       float64            // state = 'active'
-	other        float64            // state IN ('fastpath function call','disabled')
-	waiting      float64            // wait_event_type = 'Lock' (or waiting = 't')
-	waitEvents   map[string]float64 // wait_event_type/wait_event counters
-	prepared     float64            // FROM pg_prepared_xacts
-	maxIdleUser  map[string]float64 // longest duration among idle transactions opened by user/database
-	maxIdleMaint map[string]float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
-	maxRunUser   map[string]float64 // longest duration among client queries
-	maxRunMaint  map[string]float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
-	maxWaitUser  map[string]float64 // longest duration being in waiting state (all activity)
-	maxWaitMaint map[string]float64 // longest duration being in waiting state (all activity)
-	querySelect  float64            // number of select queries: SELECT, TABLE
-	queryMod     float64            // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
-	queryDdl     float64            // number of DDL queries: CREATE, ALTER, DROP
-	queryMaint   float64            // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
-	queryWith    float64            // number of CTE queries
-	queryCopy    float64            // number of COPY queries
-	queryOther   float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
-	vacuumOps    map[string]float64 // vacuum operations by type
+	idle           float64            // state = 'idle'
+	idlexact       float64            // state IN ('idle in transaction', 'idle in transaction (aborted)'))
+	active         float64            // state = 'active'
+	other          float64            // state IN ('fastpath function call','disabled')
+	waiting        float64            // wait_event_type = 'Lock' (or waiting = 't')
+	waitEvents     map[string]float64 // wait_event_type/wait_event counters
+	prepared       float64            // FROM pg_prepared_xacts
+	maxIdleUser    map[string]float64 // longest duration among idle transactions opened by user/database
+	maxIdleMaint   map[string]float64 // longest duration among idle transactions initiated by maintenance operations (autovacuum, vacuum. analyze)
+	maxActiveUser  map[string]float64 // longest duration among client queries
+	maxActiveMaint map[string]float64 // longest duration among maintenance operations (autovacuum, vacuum. analyze)
+	maxWaitUser    map[string]float64 // longest duration being in waiting state (all activity)
+	maxWaitMaint   map[string]float64 // longest duration being in waiting state (all activity)
+	querySelect    float64            // number of select queries: SELECT, TABLE
+	queryMod       float64            // number of DML: INSERT, UPDATE, DELETE, TRUNCATE
+	queryDdl       float64            // number of DDL queries: CREATE, ALTER, DROP
+	queryMaint     float64            // number of maintenance queries: VACUUM, ANALYZE, CLUSTER, REINDEX, REFRESH, CHECKPOINT
+	queryWith      float64            // number of CTE queries
+	queryCopy      float64            // number of COPY queries
+	queryOther     float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
+	vacuumOps      map[string]float64 // vacuum operations by type
 
 	re queryRegexp // regexps used for query classification, it comes from postgresActivityCollector.
 }
@@ -301,13 +305,13 @@ type postgresActivityStat struct {
 // newPostgresActivityStat creates new postgresActivityStat struct with initialized maps.
 func newPostgresActivityStat(re queryRegexp) postgresActivityStat {
 	return postgresActivityStat{
-		waitEvents:   make(map[string]float64),
-		maxIdleUser:  make(map[string]float64),
-		maxIdleMaint: make(map[string]float64),
-		maxRunUser:   make(map[string]float64),
-		maxRunMaint:  make(map[string]float64),
-		maxWaitUser:  make(map[string]float64),
-		maxWaitMaint: make(map[string]float64),
+		waitEvents:     make(map[string]float64),
+		maxIdleUser:    make(map[string]float64),
+		maxIdleMaint:   make(map[string]float64),
+		maxActiveUser:  make(map[string]float64),
+		maxActiveMaint: make(map[string]float64),
+		maxWaitUser:    make(map[string]float64),
+		maxWaitMaint:   make(map[string]float64),
 		vacuumOps: map[string]float64{
 			"wraparound": 0,
 			"regular":    0,
@@ -345,20 +349,19 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 				continue
 			}
 
-			// Run column-specific logic. All empty (NULL) or not Valid values are silently ignored.
+			// Run column-specific logic. All empty (NULL) or invalid values are silently ignored.
 			switch string(colname.Name) {
 			case "state":
-				// Count activity only if query is not NULL (if query is NULL it means this is a background server process
-				// and is not a client backend).
-				// Also check backend is not in waiting state. Waiting backends are accounted separately.
+				// Check backend is not in a waiting state. Waiting backends are accounted separately.
 				waitColIdx := colindexes[waitColumnName]
-				queryColIdx := colindexes["query"]
 
-				if (row[waitColIdx].String != weLock && row[waitColIdx].String != "t") && (row[queryColIdx].String != "" && row[queryColIdx].Valid) {
-					stats.updateState(row[i].String)
+				if row[waitColIdx].String == weLock || row[waitColIdx].String == "t" {
+					continue
 				}
+
+				stats.updateState(row[i].String)
 			case waitColumnName:
-				// Count waitings only if waiting = 't' or wait_event_type = 'Lock'.
+				// Count waiting activity only if waiting = 't' or wait_event_type = 'Lock'.
 				if row[i].String == weLock || row[i].String == "t" {
 					stats.updateState("waiting")
 				}
@@ -370,7 +373,7 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 					key := row[i].String + "/" + row[waitEventColIdx].String
 					stats.waitEvents[key]++
 				}
-			case "since_start_seconds":
+			case "active_seconds":
 				// Consider type of activity depending on 'state' column.
 				stateIdx := colindexes["state"]
 				eventIdx := colindexes[waitColumnName]
@@ -378,41 +381,47 @@ func parsePostgresActivityStats(r *model.PGResult, re queryRegexp) postgresActiv
 				databaseIdx := colindexes["database"]
 				queryIdx := colindexes["query"]
 
-				if row[stateIdx].Valid && row[queryIdx].Valid {
-					value := row[i].String
-					user := row[userIdx].String
-					database := row[databaseIdx].String
-					state := row[stateIdx].String
-					event := row[eventIdx].String
-					query := row[queryIdx].String
-					if state == stIdleXact || state == stIdleXactAborted {
-						stats.updateMaxIdletimeDuration(value, user, database, state, query)
-					} else {
-						stats.updateMaxRuntimeDuration(value, user, database, state, event, query)
-					}
+				if !row[stateIdx].Valid || !row[queryIdx].Valid {
+					continue
 				}
-			case "since_change_seconds":
+
+				value := row[i].String
+				user := row[userIdx].String
+				database := row[databaseIdx].String
+				state := row[stateIdx].String
+				event := row[eventIdx].String
+				query := row[queryIdx].String
+				if state == stIdleXact || state == stIdleXactAborted {
+					stats.updateMaxIdletimeDuration(value, user, database, state, query)
+				} else {
+					stats.updateMaxRuntimeDuration(value, user, database, state, event, query)
+				}
+			case "waiting_seconds":
 				eventIdx := colindexes[waitColumnName]
 				userIdx := colindexes["user"]
 				databaseIdx := colindexes["database"]
 				queryIdx := colindexes["query"]
 
-				if row[eventIdx].Valid && row[queryIdx].Valid {
-					value := row[i].String
-					user := row[userIdx].String
-					database := row[databaseIdx].String
-					event := row[eventIdx].String
-					query := row[queryIdx].String
-					stats.updateMaxWaittimeDuration(value, user, database, event, query)
+				if !row[eventIdx].Valid || !row[queryIdx].Valid {
+					continue
 				}
+
+				value := row[i].String
+				user := row[userIdx].String
+				database := row[databaseIdx].String
+				event := row[eventIdx].String
+				query := row[queryIdx].String
+				stats.updateMaxWaittimeDuration(value, user, database, event, query)
 			case "query":
 				stateIdx := colindexes["state"]
 
-				if row[stateIdx].Valid {
-					value := row[i].String
-					state := row[stateIdx].String
-					stats.updateQueryStat(value, state)
+				if !row[stateIdx].Valid {
+					continue
 				}
+
+				value := row[i].String
+				state := row[stateIdx].String
+				stats.updateQueryStat(value, state)
 			default:
 				continue
 			}
@@ -498,12 +507,12 @@ func (s *postgresActivityStat) updateMaxRuntimeDuration(value, usename, datname,
 	key := usename + "/" + datname
 
 	if s.re.vacanl.MatchString(query) {
-		if v > s.maxRunMaint[key] {
-			s.maxRunMaint[key] = v
+		if v > s.maxActiveMaint[key] {
+			s.maxActiveMaint[key] = v
 		}
 	} else {
-		if v > s.maxRunUser[key] {
-			s.maxRunUser[key] = v
+		if v > s.maxActiveUser[key] {
+			s.maxActiveUser[key] = v
 		}
 	}
 }
@@ -601,6 +610,8 @@ func selectActivityQuery(version int) string {
 	switch {
 	case version < PostgresV96:
 		return postgresActivityQuery95
+	case version < PostgresV10:
+		return postgresActivityQuery96
 	default:
 		return postgresActivityQueryLatest
 	}

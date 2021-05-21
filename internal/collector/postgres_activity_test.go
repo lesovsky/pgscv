@@ -45,8 +45,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 					{Name: []byte("state")},
 					{Name: []byte("wait_event_type")},
 					{Name: []byte("wait_event")},
-					{Name: []byte("since_start_seconds")},
-					{Name: []byte("since_change_seconds")},
+					{Name: []byte("active_seconds")},
+					{Name: []byte("waiting_seconds")},
 					{Name: []byte("query")},
 				},
 				Rows: [][]sql.NullString{
@@ -104,14 +104,14 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 			},
 			want: postgresActivityStat{
 				active: 4, idle: 1, idlexact: 3, other: 1, waiting: 2,
-				waitEvents:   map[string]float64{"Client/ClientRead": 4, "Lock/transactionid": 2},
-				maxIdleUser:  map[string]float64{"testuser/testdb": 20},
-				maxIdleMaint: map[string]float64{"testuser/testdb": 28},
-				maxRunUser:   map[string]float64{"testuser/testdb": 10},
-				maxRunMaint:  map[string]float64{"testuser/testdb": 9},
-				maxWaitUser:  map[string]float64{"testuser/testdb": 13},
-				maxWaitMaint: map[string]float64{"testuser/testdb": 12},
-				querySelect:  1, queryMod: 1, queryMaint: 4,
+				waitEvents:     map[string]float64{"Client/ClientRead": 4, "Lock/transactionid": 2},
+				maxIdleUser:    map[string]float64{"testuser/testdb": 20},
+				maxIdleMaint:   map[string]float64{"testuser/testdb": 28},
+				maxActiveUser:  map[string]float64{"testuser/testdb": 10},
+				maxActiveMaint: map[string]float64{"testuser/testdb": 9},
+				maxWaitUser:    map[string]float64{"testuser/testdb": 13},
+				maxWaitMaint:   map[string]float64{"testuser/testdb": 12},
+				querySelect:    1, queryMod: 1, queryMaint: 4,
 				vacuumOps: map[string]float64{"regular": 1, "user": 2, "wraparound": 0},
 				re:        testRE,
 			},
@@ -127,8 +127,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 					{Name: []byte("state")},
 					{Name: []byte("wait_event_type")},
 					{Name: []byte("wait_event")},
-					{Name: []byte("since_start_seconds")},
-					{Name: []byte("since_change_seconds")},
+					{Name: []byte("active_seconds")},
+					{Name: []byte("waiting_seconds")},
 					{Name: []byte("query")},
 				},
 				Rows: [][]sql.NullString{
@@ -159,7 +159,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{"testuser/testdb": 1}, maxRunMaint: map[string]float64{"testuser/testdb": 1},
+				maxActiveUser: map[string]float64{"testuser/testdb": 1}, maxActiveMaint: map[string]float64{"testuser/testdb": 1},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				active: 22, querySelect: 2, queryMod: 4, queryDdl: 3, queryMaint: 7, queryWith: 1, queryCopy: 1, queryOther: 4,
 				vacuumOps: map[string]float64{"regular": 1, "user": 1, "wraparound": 0},
@@ -176,8 +176,8 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 					{Name: []byte("database")},
 					{Name: []byte("state")},
 					{Name: []byte("waiting")},
-					{Name: []byte("since_start_seconds")},
-					{Name: []byte("since_change_seconds")},
+					{Name: []byte("active_seconds")},
+					{Name: []byte("waiting_seconds")},
 					{Name: []byte("query")},
 				},
 				Rows: [][]sql.NullString{
@@ -188,7 +188,7 @@ func Test_parsePostgresActivityStats(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{"testuser/testdb": 10}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{"testuser/testdb": 10}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
 				active: 1, waiting: 1, querySelect: 2,
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
@@ -211,7 +211,8 @@ func Test_selectActivityQuery(t *testing.T) {
 		want    string
 	}{
 		{version: PostgresV95, want: postgresActivityQuery95},
-		{version: PostgresV96, want: postgresActivityQueryLatest},
+		{version: PostgresV96, want: postgresActivityQuery96},
+		{version: PostgresV10, want: postgresActivityQueryLatest},
 	}
 
 	for _, tc := range testcases {
@@ -243,7 +244,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{"testuser/testdb": 10}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -253,7 +254,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -263,7 +264,7 @@ func Test_updateMaxIdletimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{"testuser/testdb": 10},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -309,7 +310,7 @@ func Test_updateMaxRuntimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{"testuser/testdb": 5}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{"testuser/testdb": 5}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -319,7 +320,7 @@ func Test_updateMaxRuntimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{"testuser/testdb": 6},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{"testuser/testdb": 6},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -358,7 +359,7 @@ func Test_updateMaxWaittimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{"testuser/testdb": 5}, maxWaitMaint: map[string]float64{},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -368,7 +369,7 @@ func Test_updateMaxWaittimeDuration(t *testing.T) {
 			want: postgresActivityStat{
 				waitEvents:  map[string]float64{},
 				maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-				maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+				maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 				maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{"testuser/testdb": 6},
 				vacuumOps: map[string]float64{"regular": 0, "user": 0, "wraparound": 0},
 				re:        testRE,
@@ -409,7 +410,7 @@ func Test_updateQueryStat(t *testing.T) {
 	assert.Equal(t, postgresActivityStat{
 		waitEvents:  map[string]float64{},
 		maxIdleUser: map[string]float64{}, maxIdleMaint: map[string]float64{},
-		maxRunUser: map[string]float64{}, maxRunMaint: map[string]float64{},
+		maxActiveUser: map[string]float64{}, maxActiveMaint: map[string]float64{},
 		maxWaitUser: map[string]float64{}, maxWaitMaint: map[string]float64{},
 		querySelect: 2,
 		queryMod:    4,
