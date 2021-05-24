@@ -23,7 +23,7 @@ type postgresReplicationSlotCollector struct {
 	labelNames []string
 }
 
-// NewPostgresReplicationSlotCollector returns a new Collector exposing postgres replication slots stats.
+// NewPostgresReplicationSlotsCollector returns a new Collector exposing postgres replication slots stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-replication-slots.html
 func NewPostgresReplicationSlotsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"database", "slot_name", "slot_type", "active"}

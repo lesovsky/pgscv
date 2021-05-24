@@ -14,8 +14,8 @@ func TestPostgresFunctionsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
 			"postgres_function_calls_total",
-			"postgres_function_total_time_seconds",
-			"postgres_function_self_time_seconds",
+			"postgres_function_total_time_seconds_total",
+			"postgres_function_self_time_seconds_total",
 		},
 		collector: NewPostgresFunctionsCollector,
 		service:   model.ServiceTypePostgresql,

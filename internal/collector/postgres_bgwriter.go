@@ -84,7 +84,7 @@ func NewPostgresBgwriterCollector(constLabels prometheus.Labels, _ model.Collect
 			},
 			"stats_age_seconds": {
 				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "bgwriter", "stats_age_seconds"),
+					prometheus.BuildFQName("postgres", "bgwriter", "stats_age_seconds_total"),
 					"The age of the background writer activity statistics, in seconds.",
 					nil, constLabels,
 				), valueType: prometheus.CounterValue,

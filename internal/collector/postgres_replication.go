@@ -87,14 +87,14 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels, _ model.Coll
 		},
 		lagtotalbytes: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_total_bytes"),
+				prometheus.BuildFQName("postgres", "replication", "lag_all_bytes"),
 				"Number of bytes standby is behind than primary including all phases.",
 				[]string{"client_addr", "user", "application_name", "state"}, constLabels,
 			), valueType: prometheus.GaugeValue,
 		},
 		lagtotalseconds: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_total_seconds"),
+				prometheus.BuildFQName("postgres", "replication", "lag_all_seconds"),
 				"Number of seconds standby is behind than primary including all phases.",
 				[]string{"client_addr", "user", "application_name", "state"}, constLabels,
 			), valueType: prometheus.GaugeValue,

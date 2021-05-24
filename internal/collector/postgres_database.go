@@ -103,8 +103,8 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels, _ model.Collec
 		},
 		blockstime: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "database", "blk_time_seconds"),
-				"Time spent accessing data file blocks by backends in this database in each access type, in seconds.",
+				prometheus.BuildFQName("postgres", "database", "blk_time_seconds_total"),
+				"Total time spent accessing data blocks by backends in this database in each access type, in seconds.",
 				[]string{"database", "type"}, constLabels,
 			), valueType: prometheus.CounterValue, factor: .001,
 		},
@@ -117,8 +117,8 @@ func NewPostgresDatabasesCollector(constLabels prometheus.Labels, _ model.Collec
 		},
 		statsage: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "database", "stats_age_seconds"),
-				"The age of the activity statistics, in seconds.",
+				prometheus.BuildFQName("postgres", "database", "stats_age_seconds_total"),
+				"The age of the databases activity statistics, in seconds.",
 				labels, constLabels,
 			), valueType: prometheus.CounterValue,
 		},

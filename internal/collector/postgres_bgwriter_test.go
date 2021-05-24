@@ -19,7 +19,7 @@ func TestPostgresBgwriterCollector_Update(t *testing.T) {
 			"postgres_bgwriter_maxwritten_clean_total",
 			"postgres_backends_fsync_total",
 			"postgres_backends_allocated_bytes_total",
-			"postgres_bgwriter_stats_age_seconds",
+			"postgres_bgwriter_stats_age_seconds_total",
 		},
 		collector: NewPostgresBgwriterCollector,
 		service:   model.ServiceTypePostgresql,

@@ -141,7 +141,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 		},
 		maintLastVacuum: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "last_vacuum_seconds"),
+				prometheus.BuildFQName("postgres", "table", "since_last_vacuum_seconds_total"),
 				"Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.",
 				labels, constLabels,
 			),
@@ -149,7 +149,7 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 		},
 		maintLastAnalyze: typedDesc{
 			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "last_analyze_seconds"),
+				prometheus.BuildFQName("postgres", "table", "since_last_analyze_seconds_total"),
 				"Total time since table was analyzed manually or automatically, in seconds.",
 				labels, constLabels,
 			),
