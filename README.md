@@ -30,8 +30,8 @@
 Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-wget https://github.com/weaponry/pgscv/releases/download/v0.4.22/pgscv_0.4.22_linux_amd64.tar.gz
-tar xvzf pgscv_0.4.22_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.5.0/pgscv_0.5.0_linux_amd64.tar.gz
+tar xvzf pgscv_0.5.0_linux_amd64.tar.gz
 sudo -u postgres ./pgscv 
 ```
 
@@ -53,6 +53,9 @@ To help development you are encouraged to:
 - provide [suggestion/feedback](https://github.com/weaponry/pgscv/discussions) or [issue](https://github.com/weaponry/pgscv/issues)
 - pull requests for new features
 - star the project
+
+### Authors
+- [Lesovsky Alexey](https://github.com/lesovsky)
 
 ### License
 BSD-3. See [LICENSE](./LICENSE) for more details.
