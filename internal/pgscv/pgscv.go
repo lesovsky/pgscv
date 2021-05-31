@@ -113,14 +113,14 @@ func Start(ctx context.Context, config *Config) error {
 
 // runMetricsListener start HTTP listener accordingly to passed configuration.
 func runMetricsListener(ctx context.Context, config *Config) error {
-	log.Infof("accepting requests on http://%s/metrics", config.ListenAddress)
+	log.Infof("accepting requests on %s", config.ListenAddress)
 
 	http.Handle("/metrics", promhttp.Handler())
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, err := w.Write([]byte(`<html>
-			<head><title>pgSCV / Weaponry metric collector</title></head>
+			<head><title>pgSCV / Weaponry metrics collector</title></head>
 			<body>
-			<h1>pgSCV / Weaponry metric collector, for more info visit https://github.com/weaponry/pgscv</h1>
+			<h1>pgSCV / Weaponry metrics collector, for more info visit https://github.com/weaponry/pgscv</h1>
 			<p><a href="/metrics">Metrics</a></p>
 			</body>
 			</html>`))
