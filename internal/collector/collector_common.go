@@ -21,18 +21,19 @@ type typedDesc struct {
 	valueType prometheus.ValueType
 	// multiplier used to cast value to necessary units.
 	factor float64
-	// value defines column name where metric value should be collected
+	// value used for user-defined metrics and defines column name where metric value should be collected
 	value string
-	// labeledValues defines pairs with labelname:[]column_name,
+	// labeledValues used for user-defined metrics and defines pairs with labelname:[]column_name,
 	// where column name used as label values, column values used as metric values
 	labeledValues map[string][]string
-	// list of all metric labels (including those from labeledValues)
-	labels []string
-
-	//
+	// labelNames defines list of all labels names (including those from labeledValues)
+	labelNames []string
+	// labels defines pairs label:value
+	labels map[string]string
+	// filters defines settings for label-based metrics filtering
 	filters filter.Filters
+	// filtered defines a flag when metric should be filtered or not
 	//filtered bool
-	labelsV2 map[string]string
 }
 
 // descOpts defines metric descriptor options.
@@ -53,10 +54,10 @@ func newBuiltinTypedDesc(opts descOpts, dtype prometheus.ValueType, varLabelName
 			varLabelNames,
 			constLabels,
 		),
-		valueType: dtype,
-		labels:    varLabelNames,
-		labelsV2:  map[string]string{},
-		filters:   filters,
+		valueType:  dtype,
+		labelNames: varLabelNames,
+		labels:     map[string]string{},
+		filters:    filters,
 	}
 }
 
@@ -70,8 +71,8 @@ func newCustomTypedDesc(opts descOpts, dtype prometheus.ValueType, valueSource s
 			constLabels,
 		),
 		valueType:     dtype,
-		labels:        varLabelNames,
-		labelsV2:      map[string]string{},
+		labelNames:    varLabelNames,
+		labels:        map[string]string{},
 		value:         valueSource,
 		labeledValues: labeledValues,
 		filters:       filters,
@@ -394,7 +395,7 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 			value, valueOK := float64(0), false
 
 			// Sanity check. Can't imaging such case when this condition is satisfied, but who knows...
-			if len(labelValues) == len(desc.labels) {
+			if len(labelValues) == len(desc.labelNames) {
 				labelValuesOK = true
 			}
 
@@ -417,7 +418,7 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 
 					// When value found also update associated label.
 					labelValues = append(labelValues, destName)
-					if len(labelValues) == len(desc.labels) {
+					if len(labelValues) == len(desc.labelNames) {
 						labelValuesOK = true
 					}
 					valueOK = true
@@ -426,10 +427,10 @@ func updateMultipleMetrics(row []sql.NullString, desc typedDesc, colnames []stri
 				}
 
 				// Check for rest labels.
-				if stringsContains(desc.labels, resColname) && !labelValuesOK {
+				if stringsContains(desc.labelNames, resColname) && !labelValuesOK {
 					labelValues = append(labelValues, row[i].String)
 
-					if len(labelValues) == len(desc.labels) {
+					if len(labelValues) == len(desc.labelNames) {
 						labelValuesOK = true
 					}
 				}
@@ -456,12 +457,12 @@ func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string,
 	if databaseLabelValue != "" && !stringsContains(colnames, "database") {
 		labelValues = append(labelValues, databaseLabelValue)
 	}
-	if len(labelValues) == len(desc.labels) {
+	if len(labelValues) == len(desc.labelNames) {
 		labelValuesOK = true
 	}
 
 	// Case when metric doesn't have any labels.
-	if desc.labels == nil {
+	if desc.labelNames == nil {
 		labelValues = nil
 		labelValuesOK = true
 	}
@@ -486,10 +487,10 @@ func updateSingleMetric(row []sql.NullString, desc typedDesc, colnames []string,
 		}
 
 		// Check for labels.
-		if stringsContains(desc.labels, colname) {
+		if stringsContains(desc.labelNames, colname) {
 			labelValues = append(labelValues, row[i].String)
 
-			if len(labelValues) == len(desc.labels) {
+			if len(labelValues) == len(desc.labelNames) {
 				labelValuesOK = true
 			}
 			continue

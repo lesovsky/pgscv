@@ -50,7 +50,7 @@ func (c *postgresReplicationSlotCollector) Update(config Config, ch chan<- prome
 	}
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresReplicationSlotStats(res, c.restart.labels)
+	stats := parsePostgresReplicationSlotStats(res, c.restart.labelNames)
 
 	for _, stat := range stats {
 		ch <- c.restart.newConstMetric(stat.retainedBytes, stat.database, stat.slotname, stat.slottype, stat.active)

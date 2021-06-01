@@ -43,7 +43,7 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 		return err
 	}
 
-	stats := parsePostgresConflictStats(res, c.conflicts.labels)
+	stats := parsePostgresConflictStats(res, c.conflicts.labelNames)
 
 	for _, stat := range stats {
 		ch <- c.conflicts.newConstMetric(stat.tablespace, stat.database, "tablespace")

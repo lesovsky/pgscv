@@ -99,7 +99,7 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 			continue
 		}
 
-		stats := parsePostgresIndexStats(res, c.indexes.labels)
+		stats := parsePostgresIndexStats(res, c.indexes.labelNames)
 
 		for _, stat := range stats {
 			// always send idx scan metrics and indexes size
