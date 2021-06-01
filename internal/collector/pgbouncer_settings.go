@@ -27,7 +27,7 @@ type pgbouncerSettingsCollector struct {
 
 // NewPgbouncerSettingsCollector returns a new Collector exposing pgbouncer configuration.
 // For details see https://www.pgbouncer.org/usage.html#show-config.
-func NewPgbouncerSettingsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPgbouncerSettingsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &pgbouncerSettingsCollector{
 		settings: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "service", "settings_info", "Labeled information about Pgbouncer configuration settings.", 0},

@@ -18,24 +18,24 @@ type loadaverageCollector struct {
 }
 
 // NewLoadAverageCollector returns a new Collector exposing load average statistics.
-func NewLoadAverageCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewLoadAverageCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &loadaverageCollector{
 		load1: newBuiltinTypedDesc(
 			descOpts{"node", "", "load1", "1m load average.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		load5: newBuiltinTypedDesc(
 			descOpts{"node", "", "load5", "5m load average.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		load15: newBuiltinTypedDesc(
 			descOpts{"node", "", "load15", "15m load average.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 	}, nil

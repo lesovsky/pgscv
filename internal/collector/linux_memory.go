@@ -16,26 +16,26 @@ import (
 
 type meminfoCollector struct {
 	re          *regexp.Regexp
-	constLabels prometheus.Labels
+	constLabels labels
 	memused     typedDesc
 	swapused    typedDesc
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
-func NewMeminfoCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewMeminfoCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &meminfoCollector{
 		re:          regexp.MustCompile(`\((.*)\)`),
-		constLabels: labels,
+		constLabels: constLabels,
 		memused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "MemUsed", "Memory information composite field MemUsed.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		swapused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "SwapUsed", "Memory information composite field SwapUsed.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 	}, nil

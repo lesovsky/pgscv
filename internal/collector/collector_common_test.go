@@ -15,19 +15,52 @@ import (
 )
 
 func Test_newConstMetric(t *testing.T) {
-	d := typedDesc{
-		desc: prometheus.NewDesc(
-			prometheus.BuildFQName("postgres", "archiver", "archived_total"),
-			"Test description.",
-			[]string{"L1", "L2"}, nil,
-		), valueType: prometheus.CounterValue,
-		factor: .001,
-	}
+	d := newBuiltinTypedDesc(
+		descOpts{"postgres", "archiver", "archived_total", "Test description.", .001},
+		prometheus.CounterValue,
+		[]string{"L1", "L2"}, nil,
+		filter.New(),
+	)
 	m := d.newConstMetric(1, "L1", "L2")
 	assert.NotNil(t, m)
 
 	m = d.newConstMetric(1, "L1", "L2", "L3")
 	assert.Nil(t, m)
+}
+
+func Test_typedDesc_hasFilter(t *testing.T) {
+	f := filter.New()
+	f.Add("target", filter.Filter{Exclude: "unwanted"})
+	assert.NoError(t, f.Compile())
+
+	testcases := []struct {
+		desc typedDesc
+		want bool
+	}{
+		{
+			// should not be filtered
+			desc: newBuiltinTypedDesc(
+				descOpts{"m", "test", "example", "description", 0},
+				prometheus.CounterValue,
+				[]string{"L1", "L2"}, nil,
+				f,
+			), want: false,
+		},
+		{
+			// should be filtered
+			desc: newBuiltinTypedDesc(
+				descOpts{"m", "test", "example", "description", 0},
+				prometheus.CounterValue,
+				[]string{"L1", "target"}, nil,
+				f,
+			), want: true,
+		},
+	}
+	labelValues := []string{"label1", "unwanted"}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, tc.desc.hasFilter(labelValues))
+	}
 }
 
 func Test_newDeskSetsFromSubsystems(t *testing.T) {
@@ -49,7 +82,7 @@ func Test_newDeskSetsFromSubsystems(t *testing.T) {
 		},
 	}
 
-	constLabels := prometheus.Labels{"const": "constlabel"}
+	constLabels := labels{"const": "constlabel"}
 
 	subsysDescs := newDeskSetsFromSubsystems("example", subsystems, constLabels)
 	assert.Equal(t, 2, len(subsysDescs))
@@ -82,14 +115,14 @@ func Test_newDescSet(t *testing.T) {
 		},
 	}
 
-	desc, err := newDescSet("example", "test", subsys1, prometheus.Labels{"const": "constlabel"})
+	desc, err := newDescSet("example", "test", subsys1, labels{"const": "constlabel"})
 	assert.NoError(t, err)
 	assert.NotNil(t, desc)
 	assert.NotNil(t, desc.databasesRE)
 	assert.Equal(t, "SELECT 'l1' as label1, 'l21' as label2_1, 'l22' as label2_2, 100 as v1, 200 as v2", desc.query)
 	assert.Equal(t, 2, len(desc.descs))
 
-	desc2, err := newDescSet("example", "test", subsys2, prometheus.Labels{"const": "constlabel"})
+	desc2, err := newDescSet("example", "test", subsys2, labels{"const": "constlabel"})
 	assert.NoError(t, err)
 	assert.NotNil(t, desc2)
 	assert.Nil(t, desc2.databasesRE)
@@ -133,7 +166,7 @@ func Test_updateAllDescSets(t *testing.T) {
 		},
 	}
 
-	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, labels{"const": "example"})
 
 	ch := make(chan prometheus.Metric)
 
@@ -186,7 +219,7 @@ func Test_updateFromMultipleDatabases(t *testing.T) {
 		},
 	}
 
-	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, labels{"const": "example"})
 
 	ch := make(chan prometheus.Metric)
 
@@ -229,7 +262,7 @@ func Test_updateFromSingleDatabase(t *testing.T) {
 		},
 	}
 
-	desksets := newDeskSetsFromSubsystems("postgres", subsystems, prometheus.Labels{"const": "example"})
+	desksets := newDeskSetsFromSubsystems("postgres", subsystems, labels{"const": "example"})
 
 	ch := make(chan prometheus.Metric)
 
@@ -259,14 +292,14 @@ func Test_updateSingleDescSet(t *testing.T) {
 	defer conn.Close()
 
 	testcases := []struct {
-		constLabels prometheus.Labels
+		constLabels labels
 		subsysName  string
 		subsys      model.MetricsSubsystem
 		want        []string
 	}{
 		{
 			// descSet with no specified databases
-			constLabels: prometheus.Labels{"constlabel": "example1"},
+			constLabels: labels{"constlabel": "example1"},
 			subsysName:  "class1",
 			subsys: model.MetricsSubsystem{
 				Query: "SELECT 'l1' as label1, 0.123 as metric1, 0.456 as metric2",
@@ -280,7 +313,7 @@ func Test_updateSingleDescSet(t *testing.T) {
 		},
 		{
 			// descSet with specified databases
-			constLabels: prometheus.Labels{"constlabel": "example2"},
+			constLabels: labels{"constlabel": "example2"},
 			subsysName:  "class2",
 			subsys: model.MetricsSubsystem{
 				Databases: conn.Conn().Config().Database,
@@ -344,7 +377,7 @@ func Test_updateMetrics(t *testing.T) {
 				descOpts{"postgres", "database", "tuples_total", "description", 0},
 				prometheus.CounterValue,
 				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				[]string{"relname", "tuples"}, prometheus.Labels{"const": "example"},
+				[]string{"relname", "tuples"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "",
@@ -355,7 +388,7 @@ func Test_updateMetrics(t *testing.T) {
 				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
 				prometheus.CounterValue,
 				"seq_scan", nil,
-				[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "relname"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "testdb",
@@ -402,7 +435,7 @@ func Test_updateMultipleMetrics(t *testing.T) {
 				descOpts{"postgres", "table", "tuples_total", "description", 0},
 				prometheus.CounterValue,
 				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				[]string{"database", "relname", "tuples"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "relname", "tuples"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "pgscv_fixtures",
@@ -413,7 +446,7 @@ func Test_updateMultipleMetrics(t *testing.T) {
 				descOpts{"postgres", "table", "tuples_total", "description", 0},
 				prometheus.CounterValue,
 				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				[]string{"database", "tuples"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "tuples"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "pgscv_fixtures",
@@ -425,7 +458,7 @@ func Test_updateMultipleMetrics(t *testing.T) {
 				descOpts{"postgres", "table", "tuples_total", "description", 0},
 				prometheus.CounterValue,
 				"", nil,
-				nil, prometheus.Labels{"const": "example"},
+				nil, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "",
@@ -436,7 +469,7 @@ func Test_updateMultipleMetrics(t *testing.T) {
 				descOpts{"postgres", "table", "tuples_total", "description", 0},
 				prometheus.CounterValue,
 				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				[]string{"database", "relname", "schema", "tuples"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "relname", "schema", "tuples"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "pgscv_fixtures",
@@ -482,7 +515,7 @@ func Test_updateSingleMetric(t *testing.T) {
 				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
 				prometheus.CounterValue,
 				"seq_scan", nil,
-				[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "relname"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "testdb",
@@ -494,7 +527,7 @@ func Test_updateSingleMetric(t *testing.T) {
 				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
 				prometheus.CounterValue,
 				"seq_scan", nil,
-				[]string{"database"}, prometheus.Labels{"const": "example"},
+				[]string{"database"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "testdb",
@@ -506,7 +539,7 @@ func Test_updateSingleMetric(t *testing.T) {
 				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
 				prometheus.CounterValue,
 				"seq_scan", nil,
-				nil, prometheus.Labels{"const": "example"},
+				nil, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "",
@@ -518,7 +551,7 @@ func Test_updateSingleMetric(t *testing.T) {
 				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
 				prometheus.CounterValue,
 				"seq_scan", nil,
-				[]string{"database", "schemaname"}, prometheus.Labels{"const": "example"},
+				[]string{"database", "schemaname"}, labels{"const": "example"},
 				filter.New(),
 			),
 			dbLabelValue: "testdb",

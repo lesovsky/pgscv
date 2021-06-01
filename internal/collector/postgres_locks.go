@@ -32,7 +32,7 @@ type postgresLocksCollector struct {
 }
 
 // NewPostgresLocksCollector creates new postgresLocksCollector.
-func NewPostgresLocksCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresLocksCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresLocksCollector{
 		locks: newBuiltinTypedDesc(
 			descOpts{"postgres", "locks", "in_flight", "Number of in-flight locks held by active processes in each mode.", 0},

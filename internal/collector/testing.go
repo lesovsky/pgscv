@@ -17,7 +17,7 @@ type pipelineInput struct {
 	// prints warning.
 	optional []string
 	// collector defines a function used for creating metric collector.
-	collector func(prometheus.Labels, model.CollectorSettings) (Collector, error)
+	collector func(labels, model.CollectorSettings) (Collector, error)
 	// collectorSettings defines collector settings used during testing.
 	collectorSettings model.CollectorSettings
 	// Service type related to collector.
@@ -32,7 +32,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 	// requiredMetricNamesCounter is the counter of how many times metrics have been collected
 	metricNamesCounter := map[string]int{}
 
-	collector, err := input.collector(prometheus.Labels{"example_label": "example_value"}, input.collectorSettings)
+	collector, err := input.collector(labels{"example_label": "example_value"}, input.collectorSettings)
 	assert.NoError(t, err)
 	ch := make(chan prometheus.Metric)
 
@@ -55,6 +55,11 @@ func pipeline(t *testing.T, input pipelineInput) {
 
 	// receive metrics from channel, extract name from the metric and check name of received metric exists in the test slice
 	for metric := range ch {
+		// skip nil values
+		if metric == nil {
+			continue
+		}
+
 		//log.Infoln("debug purpose: ", metric.Desc().String())
 		re := regexp.MustCompile(`fqName: "([a-zA-Z0-9_]+)"`)
 		match := re.FindStringSubmatch(metric.Desc().String())[1]

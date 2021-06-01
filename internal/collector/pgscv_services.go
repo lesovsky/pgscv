@@ -12,12 +12,12 @@ type pgscvServicesCollector struct {
 }
 
 // NewPgscvServicesCollector creates new collector.
-func NewPgscvServicesCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPgscvServicesCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &pgscvServicesCollector{
 		service: newBuiltinTypedDesc(
 			descOpts{"pgscv", "services", "registered_total", "Total number of services registered by pgSCV.", 0},
 			prometheus.GaugeValue,
-			[]string{"service"}, labels,
+			[]string{"service"}, constLabels,
 			filter.New(),
 		)}, nil
 }

@@ -41,7 +41,7 @@ type postgresDatabasesCollector struct {
 
 // NewPostgresDatabasesCollector returns a new Collector exposing postgres databases stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-VIEW
-func NewPostgresDatabasesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresDatabasesCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	var labels = []string{"database"}
 
 	return &postgresDatabasesCollector{

@@ -26,7 +26,7 @@ type cpuCollector struct {
 }
 
 // NewCPUCollector returns a new Collector exposing kernel/system statistics.
-func NewCPUCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewCPUCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	cmdOutput, err := exec.Command("getconf", "CLK_TCK").Output()
 	if err != nil {
 		return nil, fmt.Errorf("determine clock frequency failed: %s", err)
@@ -43,31 +43,31 @@ func NewCPUCollector(labels prometheus.Labels, _ model.CollectorSettings) (Colle
 		cpu: newBuiltinTypedDesc(
 			descOpts{"node", "cpu", "seconds_total", "Seconds the CPUs spent in each mode.", 0},
 			prometheus.CounterValue,
-			[]string{"mode"}, labels,
+			[]string{"mode"}, constLabels,
 			filter.New(),
 		),
 		cpuAll: newBuiltinTypedDesc(
 			descOpts{"node", "cpu", "seconds_all_total", "Seconds the CPUs spent in all modes.", 0},
 			prometheus.CounterValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		cpuGuest: newBuiltinTypedDesc(
 			descOpts{"node", "cpu", "guest_seconds_total", "Seconds the CPUs spent in guests (VMs) for each mode.", 0},
 			prometheus.CounterValue,
-			[]string{"mode"}, labels,
+			[]string{"mode"}, constLabels,
 			filter.New(),
 		),
 		uptime: newBuiltinTypedDesc(
 			descOpts{"node", "uptime", "up_seconds_total", "Total number of seconds the system has been up, accordingly to /proc/uptime.", 0},
 			prometheus.CounterValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		idletime: newBuiltinTypedDesc(
 			descOpts{"node", "uptime", "idle_seconds_total", "Total number of seconds all cores have spent idle, accordingly to /proc/uptime.", 0},
 			prometheus.CounterValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 	}

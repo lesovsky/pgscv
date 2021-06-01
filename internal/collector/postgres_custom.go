@@ -10,7 +10,7 @@ type postgresCustomCollector struct {
 }
 
 // NewPostgresCustomCollector returns a new Collector that expose user-defined postgres metrics.
-func NewPostgresCustomCollector(constLabels prometheus.Labels, settings model.CollectorSettings) (Collector, error) {
+func NewPostgresCustomCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresCustomCollector{
 		custom: newDeskSetsFromSubsystems("postgres", settings.Subsystems, constLabels),
 	}, nil

@@ -19,7 +19,7 @@ type postgresConflictsCollector struct {
 
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
-func NewPostgresConflictsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresConflictsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresConflictsCollector{
 		conflicts: newBuiltinTypedDesc(
 			descOpts{"postgres", "recovery", "conflicts_total", "Total number of recovery conflicts occurred by each conflict type.", 0},

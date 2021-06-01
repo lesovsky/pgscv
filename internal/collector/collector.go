@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"os"
@@ -9,7 +10,7 @@ import (
 )
 
 // Factories defines collector functions which used for collecting metrics.
-type Factories map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error)
+type Factories map[string]func(labels, model.CollectorSettings) (Collector, error)
 
 // RegisterSystemCollectors unions all system-related collectors and registers them in single place.
 func (f Factories) RegisterSystemCollectors(disabled []string) {
@@ -18,7 +19,7 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
+	funcs := map[string]func(labels, model.CollectorSettings) (Collector, error){
 		"system/pgscv":       NewPgscvServicesCollector,
 		"system/loadaverage": NewLoadAverageCollector,
 		"system/cpu":         NewCPUCollector,
@@ -48,7 +49,7 @@ func (f Factories) RegisterPostgresCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
+	funcs := map[string]func(labels, model.CollectorSettings) (Collector, error){
 		"postgres/pgscv":             NewPgscvServicesCollector,
 		"postgres/activity":          NewPostgresActivityCollector,
 		"postgres/archiver":          NewPostgresWalArchivingCollector,
@@ -86,7 +87,7 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 		return
 	}
 
-	funcs := map[string]func(prometheus.Labels, model.CollectorSettings) (Collector, error){
+	funcs := map[string]func(labels, model.CollectorSettings) (Collector, error){
 		"pgbouncer/pgscv":    NewPgscvServicesCollector,
 		"pgbouncer/pools":    NewPgbouncerPoolsCollector,
 		"pgbouncer/stats":    NewPgbouncerStatsCollector,
@@ -105,7 +106,7 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 }
 
 // register is the generic routine which register any kind of collectors.
-func (f Factories) register(collector string, factory func(prometheus.Labels, model.CollectorSettings) (Collector, error)) {
+func (f Factories) register(collector string, factory func(labels, model.CollectorSettings) (Collector, error)) {
 	f[collector] = factory
 }
 
@@ -131,7 +132,7 @@ func NewPgscvCollector(serviceID string, factories Factories, config Config) (*P
 	}
 
 	collectors := make(map[string]Collector)
-	constLabels := prometheus.Labels{"instance": hostname, "service_id": serviceID}
+	constLabels := labels{"instance": hostname, "service_id": serviceID}
 
 	for key := range factories {
 		settings := config.Settings[key]
@@ -145,13 +146,12 @@ func NewPgscvCollector(serviceID string, factories Factories, config Config) (*P
 
 	// anchorDesc is a metric descriptor used for distinguish collectors. Creating many collectors with uniq anchorDesc makes
 	// possible to unregister collectors if they or their associated services become unnecessary or unavailable.
-	desc := typedDesc{
-		desc: prometheus.NewDesc(
-			prometheus.BuildFQName("pgscv", "service", serviceID),
-			"Service metric.",
-			nil, constLabels,
-		), valueType: prometheus.GaugeValue,
-	}
+	desc := newBuiltinTypedDesc(
+		descOpts{"pgscv", "service", serviceID, "Service metric.", 0},
+		prometheus.GaugeValue,
+		nil, constLabels,
+		filter.New(),
+	)
 
 	return &PgscvCollector{Config: config, Collectors: collectors, anchorDesc: desc}, nil
 }

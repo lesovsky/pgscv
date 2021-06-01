@@ -15,18 +15,18 @@ type networkCollector struct {
 	publicAddresses  typedDesc
 }
 
-func NewNetworkCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewNetworkCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &networkCollector{
 		publicAddresses: newBuiltinTypedDesc(
 			descOpts{"node", "network", "public_addresses", "Number of public network addresses present on the system, by type.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		privateAddresses: newBuiltinTypedDesc(
 			descOpts{"node", "network", "private_addresses", "Number of private network addresses present on the system, by type.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 	}, nil

@@ -37,80 +37,80 @@ type diskstatsCollector struct {
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt and https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
-func NewDiskstatsCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewDiskstatsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	var diskLabelNames = []string{"device", "type"}
 
 	return &diskstatsCollector{
 		completed: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "completed_total", "The total number of IO requests completed successfully of each type.", 0},
 			prometheus.CounterValue,
-			diskLabelNames, labels,
+			diskLabelNames, constLabels,
 			filter.New(),
 		),
 		completedAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "completed_all_total", "The total number of IO requests completed successfully.", 0},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		merged: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "merged_total", "The total number of merged IO requests of each type.", 0},
 			prometheus.CounterValue,
-			diskLabelNames, labels,
+			diskLabelNames, constLabels,
 			filter.New(),
 		),
 		mergedAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "merged_all_total", "The total number of merged IO requests.", 0},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "bytes_total", "The total number of bytes processed by IO requests of each type.", diskSectorSize},
 			prometheus.CounterValue,
-			diskLabelNames, labels,
+			diskLabelNames, constLabels,
 			filter.New(),
 		),
 		bytesAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "bytes_all_total", "The total number of bytes processed by IO requests.", diskSectorSize},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		times: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "time_seconds_total", "The total number of seconds spent on all requests of each type.", .001},
 			prometheus.CounterValue,
-			diskLabelNames, labels,
+			diskLabelNames, constLabels,
 			filter.New(),
 		),
 		timesAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "time_seconds_all_total", "The total number of seconds spent on all requests.", .001},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		ionow: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_now", "The number of I/Os currently in progress.", 0},
 			prometheus.GaugeValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		iotime: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_time_seconds_total", "Total seconds spent doing I/Os.", .001},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		iotimeweighted: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_time_weighted_seconds_total", "The weighted number of seconds spent doing I/Os.", .001},
 			prometheus.CounterValue,
-			[]string{"device"}, labels,
+			[]string{"device"}, constLabels,
 			filter.New(),
 		),
 		storages: newBuiltinTypedDesc(
 			descOpts{"node", "system", "storage_info", "Labeled information about storage devices present in the system.", 0},
 			prometheus.GaugeValue,
-			[]string{"device", "rotational", "scheduler"}, labels,
+			[]string{"device", "rotational", "scheduler"}, constLabels,
 			filter.New(),
 		),
 	}, nil

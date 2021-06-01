@@ -22,7 +22,7 @@ type postgresFunctionsCollector struct {
 
 // NewPostgresFunctionsCollector returns a new Collector exposing postgres SQL functions stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-USER-FUNCTIONS-VIEW
-func NewPostgresFunctionsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresFunctionsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"database", "schema", "function"}
 
 	return &postgresFunctionsCollector{

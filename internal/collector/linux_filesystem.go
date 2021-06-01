@@ -22,30 +22,30 @@ type filesystemCollector struct {
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
-func NewFilesystemCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewFilesystemCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &filesystemCollector{
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "bytes", "Number of bytes of filesystem by usage.", 0},
 			prometheus.GaugeValue,
-			[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			[]string{"device", "mountpoint", "fstype", "usage"}, constLabels,
 			filter.New(),
 		),
 		bytesTotal: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "bytes_total", "Total number of bytes of filesystem capacity.", 0},
 			prometheus.GaugeValue,
-			[]string{"device", "mountpoint", "fstype"}, labels,
+			[]string{"device", "mountpoint", "fstype"}, constLabels,
 			filter.New(),
 		),
 		files: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "files", "Number of files (inodes) of filesystem by usage.", 0},
 			prometheus.GaugeValue,
-			[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			[]string{"device", "mountpoint", "fstype", "usage"}, constLabels,
 			filter.New(),
 		),
 		filesTotal: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "files_total", "Total number of files (inodes) of filesystem capacity.", 0},
 			prometheus.GaugeValue,
-			[]string{"device", "mountpoint", "fstype"}, labels,
+			[]string{"device", "mountpoint", "fstype"}, constLabels,
 			filter.New(),
 		),
 	}, nil

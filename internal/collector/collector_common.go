@@ -13,6 +13,9 @@ import (
 	"strings"
 )
 
+// labels is a local wrapper over prometheus.Labels which is a simple map[string]string.
+type labels prometheus.Labels
+
 // typedDesc is the descriptor wrapper with extra properties
 type typedDesc struct {
 	// desc is the descriptor used by every Prometheus Metric.
@@ -29,11 +32,9 @@ type typedDesc struct {
 	// labelNames defines list of all labels names (including those from labeledValues)
 	labelNames []string
 	// labels defines pairs label:value
-	labels map[string]string
+	labels labels
 	// filters defines settings for label-based metrics filtering
 	filters filter.Filters
-	// filtered defines a flag when metric should be filtered or not
-	//filtered bool
 }
 
 // descOpts defines metric descriptor options.
@@ -46,13 +47,13 @@ type descOpts struct {
 }
 
 // newBuiltinTypedDesc is a constructor for builtin metric descriptor.
-func newBuiltinTypedDesc(opts descOpts, dtype prometheus.ValueType, varLabelNames []string, constLabels prometheus.Labels, filters filter.Filters) typedDesc {
+func newBuiltinTypedDesc(opts descOpts, dtype prometheus.ValueType, varLabelNames []string, constLabels labels, filters filter.Filters) typedDesc {
 	return typedDesc{
 		desc: prometheus.NewDesc(
 			prometheus.BuildFQName(opts.namespace, opts.subsystem, opts.name),
 			opts.help,
 			varLabelNames,
-			constLabels,
+			prometheus.Labels(constLabels),
 		),
 		valueType:  dtype,
 		labelNames: varLabelNames,
@@ -62,13 +63,13 @@ func newBuiltinTypedDesc(opts descOpts, dtype prometheus.ValueType, varLabelName
 }
 
 // newCustomTypedDesc is a constructor for user-defined metric descriptor.
-func newCustomTypedDesc(opts descOpts, dtype prometheus.ValueType, valueSource string, labeledValues map[string][]string, varLabelNames []string, constLabels prometheus.Labels, filters filter.Filters) typedDesc {
+func newCustomTypedDesc(opts descOpts, dtype prometheus.ValueType, valueSource string, labeledValues map[string][]string, varLabelNames []string, constLabels labels, filters filter.Filters) typedDesc {
 	return typedDesc{
 		desc: prometheus.NewDesc(
 			prometheus.BuildFQName(opts.namespace, opts.subsystem, opts.name),
 			opts.help,
 			varLabelNames,
-			constLabels,
+			prometheus.Labels(constLabels),
 		),
 		valueType:     dtype,
 		labelNames:    varLabelNames,
@@ -80,12 +81,22 @@ func newCustomTypedDesc(opts descOpts, dtype prometheus.ValueType, valueSource s
 }
 
 // newConstMetric is the wrapper on prometheus.NewConstMetric
-func (d *typedDesc) newConstMetric(value float64, labels ...string) prometheus.Metric {
+func (d *typedDesc) newConstMetric(value float64, labelValues ...string) prometheus.Metric {
 	if d.factor != 0 {
 		value *= d.factor
 	}
 
-	m, err := prometheus.NewConstMetric(d.desc, d.valueType, value, labels...)
+	if len(d.labelNames) != len(labelValues) {
+		log.Errorf("number of labels and collected label values does not match, want %d, got %d", len(d.labelNames), len(labelValues))
+		return nil
+	}
+
+	// Check passed label values against configure filters.
+	if d.hasFilter(labelValues) {
+		return nil
+	}
+
+	m, err := prometheus.NewConstMetric(d.desc, d.valueType, value, labelValues...)
 	if err != nil {
 		log.Errorf("create const metric failed: %s; skip. Failed metric descriptor: '%s'", err, d.desc.String())
 	}
@@ -93,52 +104,18 @@ func (d *typedDesc) newConstMetric(value float64, labels ...string) prometheus.M
 	return m
 }
 
-//// newConstMetric is the wrapper on prometheus.NewConstMetric
-//func (d *typedDesc) newConstMetricV2(value float64) prometheus.Metric {
-//	if d.factor != 0 {
-//		value *= d.factor
-//	}
-//
-//	if len(d.labels) != len(d.labelsV2) {
-//		log.Errorf("number of labels and collected label values does not match, want %d, got %d", len(d.labels), len(d.labelsV2))
-//		return nil
-//	}
-//
-//	d.filterDesc()
-//	if d.filtered {
-//		return nil
-//	}
-//
-//	var labelValues []string
-//	for _, label := range d.labels {
-//		labelValues = append(labelValues, d.labelsV2[label])
-//	}
-//	m, err := prometheus.NewConstMetric(d.desc, d.valueType, value, labelValues...)
-//	if err != nil {
-//		log.Errorf("create const metric failed: %s; skip. Failed metric descriptor: '%s'", err, d.desc.String())
-//	}
-//
-//	return m
-//}
+func (d *typedDesc) hasFilter(labelValues []string) bool {
+	for i, key := range d.labelNames {
+		val := labelValues[i]
+		re := d.filters[key]
 
-//func (d *typedDesc) filterDesc() *typedDesc {
-//	for label, value := range d.labelsV2 {
-//		for f, re := range d.filters {
-//			if label == f && !re.Pass(value) {
-//				d.filtered = true
-//			}
-//		}
-//	}
-//	return d
-//}
+		if !re.Pass(val) {
+			return true
+		}
+	}
 
-//func (d *typedDesc) with(labels map[string]string) *typedDesc {
-//	for k, v := range labels {
-//		d.labelsV2[k] = v
-//	}
-//
-//	return d
-//}
+	return false
+}
 
 // typedDescSet unions metrics in a set, which could be collected using query.
 type typedDescSet struct {
@@ -150,7 +127,7 @@ type typedDescSet struct {
 }
 
 // newDeskSetsFromSubsystems parses subsystem object and produces []typedDescSet object.
-func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, constLabels prometheus.Labels) []typedDescSet {
+func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, constLabels labels) []typedDescSet {
 	var sets []typedDescSet
 
 	// Iterate over all passed subsystems and create dedicated descs set per each subsystem.
@@ -167,7 +144,7 @@ func newDeskSetsFromSubsystems(namespace string, subsystems model.Subsystems, co
 }
 
 // newDescSet creates new typedDescSet based on passed metrics attributes.
-func newDescSet(namespace string, subsystemName string, subsystem model.MetricsSubsystem, constLabels prometheus.Labels) (typedDescSet, error) {
+func newDescSet(namespace string, subsystemName string, subsystem model.MetricsSubsystem, constLabels labels) (typedDescSet, error) {
 
 	// Compile regexp object if databases are specified
 	var databasesRE *regexp.Regexp
@@ -210,18 +187,6 @@ func newDescSet(namespace string, subsystemName string, subsystem model.MetricsS
 			continue
 		}
 
-		//d := typedDesc{
-		//	desc: prometheus.NewDesc(
-		//		prometheus.BuildFQName(namespace, subsystemName, m.ShortName),
-		//		m.Description,
-		//		labels,
-		//		constLabels,
-		//	),
-		//	valueType:     promValueTypes[m.Usage],
-		//	value:         m.Value,
-		//	labeledValues: m.LabeledValues,
-		//	labels:        labels,
-		//}
 		d := newCustomTypedDesc(
 			descOpts{namespace, subsystemName, m.ShortName, m.Description, 0},
 			promValueTypes[m.Usage],

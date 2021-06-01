@@ -29,7 +29,7 @@ type systemCollector struct {
 }
 
 // NewSystemCollector returns a new Collector exposing system-wide stats.
-func NewSysconfigCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
+func NewSysconfigCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
 	return &systemCollector{
 		sysctlList: []string{
 			"kernel.sched_migration_cost_ns",
@@ -48,43 +48,43 @@ func NewSysconfigCollector(labels prometheus.Labels, _ model.CollectorSettings) 
 		sysctl: newBuiltinTypedDesc(
 			descOpts{"node", "system", "sysctl", "Node sysctl system settings.", 0},
 			prometheus.GaugeValue,
-			[]string{"sysctl"}, labels,
+			[]string{"sysctl"}, constLabels,
 			filter.New(),
 		),
 		cpucores: newBuiltinTypedDesc(
 			descOpts{"node", "system", "cpu_cores_total", "Total number of CPU cores in each state.", 0},
 			prometheus.GaugeValue,
-			[]string{"state"}, labels,
+			[]string{"state"}, constLabels,
 			filter.New(),
 		),
 		governors: newBuiltinTypedDesc(
 			descOpts{"node", "system", "scaling_governors_total", "Total number of CPU scaling governors used of each type.", 0},
 			prometheus.GaugeValue,
-			[]string{"governor"}, labels,
+			[]string{"governor"}, constLabels,
 			filter.New(),
 		),
 		numanodes: newBuiltinTypedDesc(
 			descOpts{"node", "system", "numa_nodes_total", "Total number of NUMA nodes in the system.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		ctxt: newBuiltinTypedDesc(
 			descOpts{"node", "", "context_switches_total", "Total number of context switches.", 0},
 			prometheus.CounterValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		forks: newBuiltinTypedDesc(
 			descOpts{"node", "", "forks_total", "Total number of forks.", 0},
 			prometheus.CounterValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 		btime: newBuiltinTypedDesc(
 			descOpts{"node", "", "boot_time_seconds", "Node boot time, in unixtime.", 0},
 			prometheus.GaugeValue,
-			nil, labels,
+			nil, constLabels,
 			filter.New(),
 		),
 	}, nil
