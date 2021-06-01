@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -64,148 +65,114 @@ type postgresStatementsCollector struct {
 // For details see https://www.postgresql.org/docs/current/pgstatstatements.html
 func NewPostgresStatementsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresStatementsCollector{
-		query: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "query_info"),
-				"Labeled info about statements has been executed.",
-				[]string{"user", "database", "md5", "query"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		calls: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "calls_total"),
-				"Total number of times statement has been executed.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		rows: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "rows_total"),
-				"Total number of rows retrieved or affected by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		times: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "time_seconds_total"),
-				"Time spent by the statement in each mode, in seconds.",
-				[]string{"user", "database", "md5", "mode"}, constLabels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		allTimes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "time_seconds_all_total"),
-				"Total time spent by the statement, in seconds.",
-				[]string{"user", "database", "md5"}, constLabels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		sharedHit: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "shared_hit_bytes_total"),
-				"Total number of bytes found in shared buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		sharedRead: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "shared_read_bytes_total"),
-				"Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		sharedDirtied: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "shared_dirtied_bytes_total"),
-				"Total number of bytes dirtied in shared buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		sharedWritten: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "shared_written_bytes_total"),
-				"Total number of bytes written to shared buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		localHit: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "local_hit_bytes_total"),
-				"Total number of bytes found in local buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		localRead: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "local_read_bytes_total"),
-				"Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		localDirtied: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "local_dirtied_bytes_total"),
-				"Total number of bytes dirtied in local buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		localWritten: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "local_written_bytes_total"),
-				"Total number of bytes written to local buffers by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tempRead: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "temp_read_bytes_total"),
-				"Total number of bytes read from temporary files by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tempWritten: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "temp_written_bytes_total"),
-				"Total number of bytes written to temporary files by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		walRecords: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "wal_records_total"),
-				"Total number of WAL records generated by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		walFPI: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "wal_fpi_bytes_total"),
-				"Total number of WAL full-page images generated by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		walBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "statements", "wal_bytes_total"),
-				"Total number of WAL bytes (not including FPI) generated by the statement.",
-				[]string{"user", "database", "md5"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
+		query: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "query_info", "Labeled info about statements has been executed.", 0},
+			prometheus.GaugeValue,
+			[]string{"user", "database", "md5", "query"}, constLabels,
+			filter.New(),
+		),
+		calls: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "calls_total", "Total number of times statement has been executed.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		rows: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "rows_total", "Total number of rows retrieved or affected by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		times: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "time_seconds_total", "Time spent by the statement in each mode, in seconds.", .001},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5", "mode"}, constLabels,
+			filter.New(),
+		),
+		allTimes: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "time_seconds_all_total", "Total time spent by the statement, in seconds.", .001},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		sharedHit: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "shared_hit_bytes_total", "Total number of bytes found in shared buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		sharedRead: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "shared_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		sharedDirtied: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "shared_dirtied_bytes_total", "Total number of bytes dirtied in shared buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		sharedWritten: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "shared_written_bytes_total", "Total number of bytes written to shared buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		localHit: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "local_hit_bytes_total", "Total number of bytes found in local buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		localRead: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "local_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		localDirtied: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "local_dirtied_bytes_total", "Total number of bytes dirtied in local buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		localWritten: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "local_written_bytes_total", "Total number of bytes written to local buffers by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		tempRead: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "temp_read_bytes_total", "Total number of bytes read from temporary files by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		tempWritten: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "temp_written_bytes_total", "Total number of bytes written to temporary files by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		walRecords: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "wal_records_total", "Total number of WAL records generated by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		walFPI: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "wal_fpi_bytes_total", "Total number of WAL full-page images generated by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
+		walBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "statements", "wal_bytes_total", "Total number of WAL bytes (not including FPI) generated by the statement.", 0},
+			prometheus.CounterValue,
+			[]string{"user", "database", "md5"}, constLabels,
+			filter.New(),
+		),
 		chain: newNormalizationChain(),
 	}, nil
 }

@@ -3,6 +3,7 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -21,11 +22,10 @@ const (
 
 // postgresIndexesCollector defines metric descriptors and stats store.
 type postgresIndexesCollector struct {
-	indexes    typedDesc
-	tuples     typedDesc
-	io         typedDesc
-	sizes      typedDesc
-	labelNames []string
+	indexes typedDesc
+	tuples  typedDesc
+	io      typedDesc
+	sizes   typedDesc
 }
 
 // NewPostgresIndexesCollector returns a new Collector exposing postgres indexes stats.
@@ -33,42 +33,31 @@ type postgresIndexesCollector struct {
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
 func NewPostgresIndexesCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labels = []string{"database", "schema", "table", "index", "key"}
-
 	return &postgresIndexesCollector{
-		labelNames: labels,
-		indexes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "index", "scans_total"),
-				"Total number of index scans initiated.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tuples: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "index", "tuples_total"),
-				"Total number of index entries processed by scans.",
-				[]string{"database", "schema", "table", "index", "tuples"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		io: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "index_io", "blocks_total"),
-				"Total number of indexes' blocks processed.",
-				[]string{"database", "schema", "table", "index", "access"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		sizes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "index", "size_bytes"),
-				"Total size of the index, in bytes.",
-				[]string{"database", "schema", "table", "index"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		indexes: newBuiltinTypedDesc(
+			descOpts{"postgres", "index", "scans_total", "Total number of index scans initiated.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "schema", "table", "index", "key"}, constLabels,
+			filter.New(),
+		),
+		tuples: newBuiltinTypedDesc(
+			descOpts{"postgres", "index", "tuples_total", "Total number of index entries processed by scans.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "schema", "table", "index", "tuples"}, constLabels,
+			filter.New(),
+		),
+		io: newBuiltinTypedDesc(
+			descOpts{"postgres", "index_io", "blocks_total", "Total number of indexes' blocks processed.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "schema", "table", "index", "access"}, constLabels,
+			filter.New(),
+		),
+		sizes: newBuiltinTypedDesc(
+			descOpts{"postgres", "index", "size_bytes", "Total size of the index, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table", "index"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 
@@ -110,7 +99,7 @@ func (c *postgresIndexesCollector) Update(config Config, ch chan<- prometheus.Me
 			continue
 		}
 
-		stats := parsePostgresIndexStats(res, c.labelNames)
+		stats := parsePostgresIndexStats(res, c.indexes.labels)
 
 		for _, stat := range stats {
 			// always send idx scan metrics and indexes size

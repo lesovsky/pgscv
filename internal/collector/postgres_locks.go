@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -33,27 +34,24 @@ type postgresLocksCollector struct {
 // NewPostgresLocksCollector creates new postgresLocksCollector.
 func NewPostgresLocksCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresLocksCollector{
-		locks: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "locks", "in_flight"),
-				"Number of in-flight locks held by active processes in each mode.",
-				[]string{"mode"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		locksAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "locks", "all_in_flight"),
-				"Total number of all in-flight locks held by active processes.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		notgranted: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "locks", "not_granted_in_flight"),
-				"Number of in-flight not granted locks held by active processes.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		locks: newBuiltinTypedDesc(
+			descOpts{"postgres", "locks", "in_flight", "Number of in-flight locks held by active processes in each mode.", 0},
+			prometheus.GaugeValue,
+			[]string{"mode"}, constLabels,
+			filter.New(),
+		),
+		locksAll: newBuiltinTypedDesc(
+			descOpts{"postgres", "locks", "all_in_flight", "Total number of all in-flight locks held by active processes.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		notgranted: newBuiltinTypedDesc(
+			descOpts{"postgres", "locks", "not_granted_in_flight", "Number of in-flight not granted locks held by active processes.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

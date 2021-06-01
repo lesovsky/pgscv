@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -13,24 +14,19 @@ const (
 )
 
 type postgresConflictsCollector struct {
-	labelNames []string
-	conflicts  typedDesc
+	conflicts typedDesc
 }
 
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
 func NewPostgresConflictsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labelNames = []string{"database", "conflict"}
-
 	return &postgresConflictsCollector{
-		labelNames: labelNames,
-		conflicts: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "recovery", "conflicts_total"),
-				"Total number of recovery conflicts occurred by each conflict type.",
-				labelNames, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
+		conflicts: newBuiltinTypedDesc(
+			descOpts{"postgres", "recovery", "conflicts_total", "Total number of recovery conflicts occurred by each conflict type.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "conflict"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 
@@ -47,7 +43,7 @@ func (c *postgresConflictsCollector) Update(config Config, ch chan<- prometheus.
 		return err
 	}
 
-	stats := parsePostgresConflictStats(res, c.labelNames)
+	stats := parsePostgresConflictStats(res, c.conflicts.labels)
 
 	for _, stat := range stats {
 		ch <- c.conflicts.newConstMetric(stat.tablespace, stat.database, "tablespace")

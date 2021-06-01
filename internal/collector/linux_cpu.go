@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
@@ -39,46 +40,36 @@ func NewCPUCollector(labels prometheus.Labels, _ model.CollectorSettings) (Colle
 
 	c := &cpuCollector{
 		systicks: systicks,
-		cpu: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "cpu", "seconds_total"),
-				"Seconds the CPUs spent in each mode.",
-				[]string{"mode"}, labels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		cpuAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "cpu", "seconds_all_total"),
-				"Seconds the CPUs spent in all modes.",
-				nil, labels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		cpuGuest: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "cpu", "guest_seconds_total"),
-				"Seconds the CPUs spent in guests (VMs) for each mode.",
-				[]string{"mode"}, labels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		uptime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "uptime", "up_seconds_total"),
-				"Total number of seconds the system has been up, accordingly to /proc/uptime.",
-				nil, labels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		idletime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "uptime", "idle_seconds_total"),
-				"Total number of seconds all cores have spent idle, accordingly to /proc/uptime.",
-				nil, labels,
-			),
-			valueType: prometheus.CounterValue,
-		},
+		cpu: newBuiltinTypedDesc(
+			descOpts{"node", "cpu", "seconds_total", "Seconds the CPUs spent in each mode.", 0},
+			prometheus.CounterValue,
+			[]string{"mode"}, labels,
+			filter.New(),
+		),
+		cpuAll: newBuiltinTypedDesc(
+			descOpts{"node", "cpu", "seconds_all_total", "Seconds the CPUs spent in all modes.", 0},
+			prometheus.CounterValue,
+			nil, labels,
+			filter.New(),
+		),
+		cpuGuest: newBuiltinTypedDesc(
+			descOpts{"node", "cpu", "guest_seconds_total", "Seconds the CPUs spent in guests (VMs) for each mode.", 0},
+			prometheus.CounterValue,
+			[]string{"mode"}, labels,
+			filter.New(),
+		),
+		uptime: newBuiltinTypedDesc(
+			descOpts{"node", "uptime", "up_seconds_total", "Total number of seconds the system has been up, accordingly to /proc/uptime.", 0},
+			prometheus.CounterValue,
+			nil, labels,
+			filter.New(),
+		),
+		idletime: newBuiltinTypedDesc(
+			descOpts{"node", "uptime", "idle_seconds_total", "Total number of seconds all cores have spent idle, accordingly to /proc/uptime.", 0},
+			prometheus.CounterValue,
+			nil, labels,
+			filter.New(),
+		),
 	}
 	return c, nil
 }

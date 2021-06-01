@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -25,34 +26,34 @@ func NewPgbouncerStatsCollector(constLabels prometheus.Labels, _ model.Collector
 
 	return &pgbouncerStatsCollector{
 		labelNames: pgbouncerLabelNames,
-		xacts: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "transactions_total"),
-				"Total number of SQL transactions processed, for each database.",
-				pgbouncerLabelNames, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		queries: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "queries_total"),
-				"Total number of SQL queries processed, for each database.",
-				pgbouncerLabelNames, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		bytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "bytes_total"),
-				"Total volume of network traffic processed by pgbouncer in each direction, in bytes.",
-				[]string{"database", "type"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		time: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "", "spent_seconds_total"),
+		xacts: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "", "transactions_total", "Total number of SQL transactions processed, for each database.", 0},
+			prometheus.CounterValue,
+			pgbouncerLabelNames, constLabels,
+			filter.New(),
+		),
+		queries: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "", "queries_total", "Total number of SQL queries processed, for each database.", 0},
+			prometheus.CounterValue,
+			pgbouncerLabelNames, constLabels,
+			filter.New(),
+		),
+		bytes: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "", "bytes_total", "Total volume of network traffic processed by pgbouncer in each direction, in bytes.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "type"}, constLabels,
+			filter.New(),
+		),
+		time: newBuiltinTypedDesc(
+			descOpts{
+				"pgbouncer", "", "spent_seconds_total",
 				"Total number of time spent by pgbouncer when connected to PostgreSQL executing queries or processing transactions, in seconds.",
-				[]string{"database", "type", "mode"}, constLabels,
-			), valueType: prometheus.CounterValue, factor: .000001,
-		},
+				.000001,
+			},
+			prometheus.CounterValue,
+			[]string{"database", "type", "mode"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

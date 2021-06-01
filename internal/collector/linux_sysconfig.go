@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
@@ -44,55 +45,48 @@ func NewSysconfigCollector(labels prometheus.Labels, _ model.CollectorSettings) 
 			"vm.nr_hugepages",
 			"vm.nr_overcommit_hugepages",
 		},
-		sysctl: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "system", "sysctl"),
-				"Node sysctl system settings.",
-				[]string{"sysctl"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		cpucores: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "system", "cpu_cores_total"),
-				"Total number of CPU cores in each state.",
-				[]string{"state"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		governors: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "system", "scaling_governors_total"),
-				"Total number of CPU scaling governors used of each type.",
-				[]string{"governor"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		numanodes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "system", "numa_nodes_total"),
-				"Total number of NUMA nodes in the system.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		ctxt: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "context_switches_total"),
-				"Total number of context switches.",
-				nil, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		forks: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "forks_total"),
-				"Total number of forks.",
-				nil, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		btime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "boot_time_seconds"),
-				"Node boot time, in unixtime.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		sysctl: newBuiltinTypedDesc(
+			descOpts{"node", "system", "sysctl", "Node sysctl system settings.", 0},
+			prometheus.GaugeValue,
+			[]string{"sysctl"}, labels,
+			filter.New(),
+		),
+		cpucores: newBuiltinTypedDesc(
+			descOpts{"node", "system", "cpu_cores_total", "Total number of CPU cores in each state.", 0},
+			prometheus.GaugeValue,
+			[]string{"state"}, labels,
+			filter.New(),
+		),
+		governors: newBuiltinTypedDesc(
+			descOpts{"node", "system", "scaling_governors_total", "Total number of CPU scaling governors used of each type.", 0},
+			prometheus.GaugeValue,
+			[]string{"governor"}, labels,
+			filter.New(),
+		),
+		numanodes: newBuiltinTypedDesc(
+			descOpts{"node", "system", "numa_nodes_total", "Total number of NUMA nodes in the system.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
+		ctxt: newBuiltinTypedDesc(
+			descOpts{"node", "", "context_switches_total", "Total number of context switches.", 0},
+			prometheus.CounterValue,
+			nil, labels,
+			filter.New(),
+		),
+		forks: newBuiltinTypedDesc(
+			descOpts{"node", "", "forks_total", "Total number of forks.", 0},
+			prometheus.CounterValue,
+			nil, labels,
+			filter.New(),
+		),
+		btime: newBuiltinTypedDesc(
+			descOpts{"node", "", "boot_time_seconds", "Node boot time, in unixtime.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
 	}, nil
 }
 

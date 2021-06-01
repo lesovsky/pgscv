@@ -3,6 +3,7 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -51,134 +52,102 @@ func NewPostgresTablesCollector(constLabels prometheus.Labels, _ model.Collector
 
 	return &postgresTablesCollector{
 		labelNames: labels,
-		seqscan: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-				"The total number of sequential scans have been done.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		seqtupread: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "seq_tup_read_total"),
-				"The total number of tuples have been read by sequential scans.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		idxscan: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "idx_scan_total"),
-				"Total number of index scans initiated on this table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		idxtupfetch: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "idx_tup_fetch_total"),
-				"Total number of live rows fetched by index scans.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tupInserted: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_inserted_total"),
-				"Total number of tuples (rows) have been inserted in the table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tupUpdated: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_updated_total"),
-				"Total number of tuples (rows) have been updated in the table (including HOT).",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tupHotUpdated: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_hot_updated_total"),
-				"Total number of tuples (rows) have been updated in the table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tupDeleted: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_deleted_total"),
-				"Total number of tuples (rows) have been deleted in the table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		tupLive: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_live_total"),
-				"Estimated total number of live tuples in the table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		tupDead: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_dead_total"),
-				"Estimated total number of dead tuples in the table.",
-				labels, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		tupModified: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "tuples_modified_total"),
-				"Estimated total number of modified tuples in the table since last vacuum.",
-				labels, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		maintLastVacuum: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "since_last_vacuum_seconds_total"),
-				"Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		maintLastAnalyze: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "since_last_analyze_seconds_total"),
-				"Total time since table was analyzed manually or automatically, in seconds.",
-				labels, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		maintenance: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "maintenance_total"),
-				"Total number of times this table has been maintained by each type of maintenance operation.",
-				[]string{"database", "schema", "table", "type"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		io: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table_io", "blocks_total"),
-				"Total number of table's blocks processed.",
-				[]string{"database", "schema", "table", "type", "access"}, constLabels,
-			),
-			valueType: prometheus.CounterValue,
-		},
-		sizes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "table", "size_bytes"),
-				"Total size of the table, in bytes.",
-				labels, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		seqscan: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "seq_scan_total", "The total number of sequential scans have been done.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		seqtupread: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "seq_tup_read_total", "The total number of tuples have been read by sequential scans.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		idxscan: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "idx_scan_total", "Total number of index scans initiated on this table.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		idxtupfetch: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "idx_tup_fetch_total", "Total number of live rows fetched by index scans.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupInserted: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_inserted_total", "Total number of tuples (rows) have been inserted in the table.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupUpdated: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_updated_total", "Total number of tuples (rows) have been updated in the table (including HOT).", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupHotUpdated: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_hot_updated_total", "Total number of tuples (rows) have been updated in the table (HOT only).", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupDeleted: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_deleted_total", "Total number of tuples (rows) have been deleted in the table.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupLive: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_live_total", "Estimated total number of live tuples in the table.", 0},
+			prometheus.GaugeValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupDead: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_dead_total", "Estimated total number of dead tuples in the table.", 0},
+			prometheus.GaugeValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		tupModified: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_modified_total", "Estimated total number of modified tuples in the table since last vacuum.", 0},
+			prometheus.GaugeValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		maintLastVacuum: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "since_last_vacuum_seconds_total", "Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		maintLastAnalyze: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "since_last_analyze_seconds_total", "Total time since table was analyzed manually or automatically, in seconds.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			filter.New(),
+		),
+		maintenance: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "maintenance_total", "Total number of times this table has been maintained by each type of maintenance operation.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "schema", "table", "type"}, constLabels,
+			filter.New(),
+		),
+		io: newBuiltinTypedDesc(
+			descOpts{"postgres", "table_io", "blocks_total", "Total number of table's blocks processed.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "schema", "table", "type", "access"}, constLabels,
+			filter.New(),
+		),
+		sizes: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "size_bytes", "Total size of the table, in bytes.", 0},
+			prometheus.GaugeValue,
+			labels, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

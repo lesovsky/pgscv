@@ -22,27 +22,24 @@ type netdevCollector struct {
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
 func NewNetdevCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &netdevCollector{
-		bytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "bytes_total"),
-				"Total number of bytes processed by network device, by each direction.",
-				[]string{"device", "type"}, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		packets: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "packets_total"),
-				"Total number of packets processed by network device, by each direction.",
-				[]string{"device", "type"}, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		events: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "events_total"),
-				"Total number of events occurred on network device, by each type and direction.",
-				[]string{"device", "type", "event"}, labels,
-			), valueType: prometheus.CounterValue,
-		},
+		bytes: newBuiltinTypedDesc(
+			descOpts{"node", "network", "bytes_total", "Total number of bytes processed by network device, by each direction.", 0},
+			prometheus.CounterValue,
+			[]string{"device", "type"}, labels,
+			filter.New(),
+		),
+		packets: newBuiltinTypedDesc(
+			descOpts{"node", "network", "packets_total", "Total number of packets processed by network device, by each direction.", 0},
+			prometheus.CounterValue,
+			[]string{"device", "type"}, labels,
+			filter.New(),
+		),
+		events: newBuiltinTypedDesc(
+			descOpts{"node", "network", "events_total", "Total number of events occurred on network device, by each type and direction.", 0},
+			prometheus.CounterValue,
+			[]string{"device", "type", "event"}, labels,
+			filter.New(),
+		),
 	}, nil
 }
 

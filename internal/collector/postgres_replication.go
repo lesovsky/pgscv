@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -57,48 +58,42 @@ func NewPostgresReplicationCollector(constLabels prometheus.Labels, _ model.Coll
 
 	return &postgresReplicationCollector{
 		labelNames: labelNames,
-		recovery: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "recovery", "info"),
-				"Current recovery state, 0 - not in recovery; 1 - in recovery.",
-				[]string{}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		wal: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "wal", "written_bytes_total"),
-				"Total amount of WAL written (or received in case of standby), in bytes.",
-				[]string{}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		lagbytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_bytes"),
-				"Number of bytes standby is behind than primary in each WAL processing phase.",
-				labelNames, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagseconds: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_seconds"),
-				"Number of seconds standby is behind than primary in each WAL processing phase.",
-				labelNames, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagtotalbytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_all_bytes"),
-				"Number of bytes standby is behind than primary including all phases.",
-				[]string{"client_addr", "user", "application_name", "state"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		lagtotalseconds: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication", "lag_all_seconds"),
-				"Number of seconds standby is behind than primary including all phases.",
-				[]string{"client_addr", "user", "application_name", "state"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		recovery: newBuiltinTypedDesc(
+			descOpts{"postgres", "recovery", "info", "Current recovery state, 0 - not in recovery; 1 - in recovery.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		wal: newBuiltinTypedDesc(
+			descOpts{"postgres", "wal", "written_bytes_total", "Total amount of WAL written (or received in case of standby), in bytes.", 0},
+			prometheus.CounterValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		lagbytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "replication", "lag_bytes", "Number of bytes standby is behind than primary in each WAL processing phase.", 0},
+			prometheus.GaugeValue,
+			labelNames, constLabels,
+			filter.New(),
+		),
+		lagseconds: newBuiltinTypedDesc(
+			descOpts{"postgres", "replication", "lag_seconds", "Number of seconds standby is behind than primary in each WAL processing phase.", 0},
+			prometheus.GaugeValue,
+			labelNames, constLabels,
+			filter.New(),
+		),
+		lagtotalbytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "replication", "lag_all_bytes", "Number of bytes standby is behind than primary including all phases.", 0},
+			prometheus.GaugeValue,
+			[]string{"client_addr", "user", "application_name", "state"}, constLabels,
+			filter.New(),
+		),
+		lagtotalseconds: newBuiltinTypedDesc(
+			descOpts{"postgres", "replication", "lag_all_seconds", "Number of seconds standby is behind than primary including all phases.", 0},
+			prometheus.GaugeValue,
+			[]string{"client_addr", "user", "application_name", "state"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

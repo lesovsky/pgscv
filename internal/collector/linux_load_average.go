@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"os"
@@ -19,27 +20,24 @@ type loadaverageCollector struct {
 // NewLoadAverageCollector returns a new Collector exposing load average statistics.
 func NewLoadAverageCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &loadaverageCollector{
-		load1: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "load1"),
-				"1m load average.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		load5: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "load5"),
-				"5m load average.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		load15: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "", "load15"),
-				"15m load average.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		load1: newBuiltinTypedDesc(
+			descOpts{"node", "", "load1", "1m load average.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
+		load5: newBuiltinTypedDesc(
+			descOpts{"node", "", "load5", "5m load average.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
+		load15: newBuiltinTypedDesc(
+			descOpts{"node", "", "load15", "15m load average.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
 	}, nil
 }
 

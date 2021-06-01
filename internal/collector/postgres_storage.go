@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -37,76 +38,66 @@ type postgresStorageCollector struct {
 // This stats observed using different stats sources.
 func NewPostgresStorageCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresStorageCollector{
-		tempFiles: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "temp_files", "in_flight"),
-				"Number of temporary files processed in flight.",
-				[]string{"tablespace"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		tempBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "temp_bytes", "in_flight"),
-				"Number of bytes occupied by temporary files processed in flight.",
-				[]string{"tablespace"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		tempFilesMaxAge: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "temp_files", "max_age_seconds"),
-				"The age of the oldest temporary file, in seconds.",
-				[]string{"tablespace"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		datadirBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "data_directory", "bytes"),
-				"The size of Postgres server data directory, in bytes.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		tblspcBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "tablespace_directory", "bytes"),
-				"The size of Postgres tablespace directory, in bytes.",
-				[]string{"tablespace", "device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		waldirBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "wal_directory", "bytes"),
-				"The size of Postgres server WAL directory, in bytes.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		waldirFiles: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "wal_directory", "files"),
-				"The number of files in Postgres server WAL directory.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		logdirBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log_directory", "bytes"),
-				"The size of Postgres server LOG directory, in bytes.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		logdirFiles: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log_directory", "files"),
-				"The number of files in Postgres server LOG directory.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		tmpfilesBytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "temp_files_all", "bytes"),
-				"The size of all Postgres temp directories, in bytes.",
-				[]string{"device", "mountpoint", "path"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		tempFiles: newBuiltinTypedDesc(
+			descOpts{"postgres", "temp_files", "in_flight", "Number of temporary files processed in flight.", 0},
+			prometheus.GaugeValue,
+			[]string{"tablespace"}, constLabels,
+			filter.New(),
+		),
+		tempBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "temp_bytes", "in_flight", "Number of bytes occupied by temporary files processed in flight.", 0},
+			prometheus.GaugeValue,
+			[]string{"tablespace"}, constLabels,
+			filter.New(),
+		),
+		tempFilesMaxAge: newBuiltinTypedDesc(
+			descOpts{"postgres", "temp_files", "max_age_seconds", "The age of the oldest temporary file, in seconds.", 0},
+			prometheus.GaugeValue,
+			[]string{"tablespace"}, constLabels,
+			filter.New(),
+		),
+		datadirBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "data_directory", "bytes", "The size of Postgres server data directory, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		tblspcBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "tablespace_directory", "bytes", "The size of Postgres tablespace directory, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"tablespace", "device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		waldirBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "wal_directory", "bytes", "The size of Postgres server WAL directory, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		waldirFiles: newBuiltinTypedDesc(
+			descOpts{"postgres", "wal_directory", "files", "The number of files in Postgres server WAL directory.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		logdirBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "log_directory", "bytes", "The size of Postgres server LOG directory, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		logdirFiles: newBuiltinTypedDesc(
+			descOpts{"postgres", "log_directory", "files", "The number of files in Postgres server LOG directory.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
+		tmpfilesBytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "temp_files_all", "bytes", "The size of all Postgres temp directories, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "path"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

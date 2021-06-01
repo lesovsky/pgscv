@@ -3,6 +3,7 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -26,27 +27,24 @@ func NewPostgresFunctionsCollector(constLabels prometheus.Labels, _ model.Collec
 
 	return &postgresFunctionsCollector{
 		labelNames: labelNames,
-		calls: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "function", "calls_total"),
-				"Total number of times functions had been called.",
-				labelNames, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		totaltime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "function", "total_time_seconds_total"),
-				"Total time spent in function and all other functions called by it, in seconds.",
-				labelNames, constLabels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		selftime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "function", "self_time_seconds_total"),
-				"Total time spent in function itself, not including other functions called by it, in seconds.",
-				labelNames, constLabels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
+		calls: newBuiltinTypedDesc(
+			descOpts{"postgres", "function", "calls_total", "Total number of times functions had been called.", 0},
+			prometheus.CounterValue,
+			labelNames, constLabels,
+			filter.New(),
+		),
+		totaltime: newBuiltinTypedDesc(
+			descOpts{"postgres", "function", "total_time_seconds_total", "Total time spent in function and all other functions called by it, in seconds.", .001},
+			prometheus.CounterValue,
+			labelNames, constLabels,
+			filter.New(),
+		),
+		selftime: newBuiltinTypedDesc(
+			descOpts{"postgres", "function", "self_time_seconds_total", "Total time spent in function itself, not including other functions called by it, in seconds.", .001},
+			prometheus.CounterValue,
+			labelNames, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

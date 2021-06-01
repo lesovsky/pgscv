@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
@@ -25,20 +26,18 @@ func NewMeminfoCollector(labels prometheus.Labels, _ model.CollectorSettings) (C
 	return &meminfoCollector{
 		re:          regexp.MustCompile(`\((.*)\)`),
 		constLabels: labels,
-		memused: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "memory", "MemUsed"),
-				"Memory information composite field MemUsed.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		swapused: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "memory", "SwapUsed"),
-				"Memory information composite field SwapUsed.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		memused: newBuiltinTypedDesc(
+			descOpts{"node", "memory", "MemUsed", "Memory information composite field MemUsed.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
+		swapused: newBuiltinTypedDesc(
+			descOpts{"node", "memory", "SwapUsed", "Memory information composite field SwapUsed.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
 	}, nil
 }
 
@@ -57,13 +56,14 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	// Processing meminfo stats.
 	for param, value := range meminfo {
 		param = c.re.ReplaceAllString(param, "_${1}")
-		ch <- prometheus.MustNewConstMetric(
-			prometheus.NewDesc(
-				prometheus.BuildFQName("node", "memory", param),
-				fmt.Sprintf("Memory information field %s.", param),
-				nil, c.constLabels,
-			), prometheus.GaugeValue, value,
+		desc := newBuiltinTypedDesc(
+			descOpts{"node", "memory", param, fmt.Sprintf("Memory information field %s.", param), 0},
+			prometheus.GaugeValue,
+			nil, c.constLabels,
+			filter.New(),
 		)
+
+		ch <- desc.newConstMetric(value)
 	}
 
 	// MemUsed and SwapUsed are composite metrics and not present in /proc/meminfo.
@@ -82,13 +82,12 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 		param = c.re.ReplaceAllString(param, "_${1}")
 
-		ch <- prometheus.MustNewConstMetric(
-			prometheus.NewDesc(
-				prometheus.BuildFQName("node", "vmstat", param),
-				fmt.Sprintf("Vmstat information field %s.", param),
-				nil, c.constLabels,
-			), t, value,
+		desc := newBuiltinTypedDesc(
+			descOpts{"node", "vmstat", param, fmt.Sprintf("Vmstat information field %s.", param), 0},
+			t, nil, c.constLabels, filter.New(),
 		)
+
+		ch <- desc.newConstMetric(value)
 	}
 
 	return nil

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -28,30 +29,24 @@ func NewPgbouncerPoolsCollector(constLabels prometheus.Labels, _ model.Collector
 	var poolsLabelNames = []string{"user", "database", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
-		conns: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "pool", "connections_in_flight"),
-				"The total number of connections established by each state.",
-				poolsLabelNames, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		maxwait: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "pool", "max_wait_seconds"),
-				"Total time the first (oldest) client in the queue has waited, in seconds.",
-				[]string{"user", "database", "pool_mode"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		clients: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "client", "connections_in_flight"),
-				"The total number of client connections established by source address.",
-				[]string{"user", "database", "address"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		conns: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "pool", "connections_in_flight", "The total number of connections established by each state.", 0},
+			prometheus.GaugeValue,
+			poolsLabelNames, constLabels,
+			filter.New(),
+		),
+		maxwait: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "pool", "max_wait_seconds", "Total time the first (oldest) client in the queue has waited, in seconds.", 0},
+			prometheus.GaugeValue,
+			[]string{"user", "database", "pool_mode"}, constLabels,
+			filter.New(),
+		),
+		clients: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "client", "connections_in_flight", "The total number of client connections established by source address.", 0},
+			prometheus.GaugeValue,
+			[]string{"user", "database", "address"}, constLabels,
+			filter.New(),
+		),
 		labelNames: poolsLabelNames,
 	}, nil
 }

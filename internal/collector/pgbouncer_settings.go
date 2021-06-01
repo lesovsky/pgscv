@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -28,30 +29,24 @@ type pgbouncerSettingsCollector struct {
 // For details see https://www.pgbouncer.org/usage.html#show-config.
 func NewPgbouncerSettingsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &pgbouncerSettingsCollector{
-		settings: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "service", "settings_info"),
-				"Labeled information about Pgbouncer configuration settings.",
-				[]string{"name", "setting"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		dbSettings: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "service", "database_settings_info"),
-				"Labeled information about Pgbouncer's per-database configuration settings.",
-				[]string{"database", "mode", "size"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		poolSize: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgbouncer", "service", "database_pool_size"),
-				"Maximum size of pools for the database.",
-				[]string{"database"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		settings: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "service", "settings_info", "Labeled information about Pgbouncer configuration settings.", 0},
+			prometheus.GaugeValue,
+			[]string{"name", "setting"}, constLabels,
+			filter.New(),
+		),
+		dbSettings: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "service", "database_settings_info", "Labeled information about Pgbouncer's per-database configuration settings.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "mode", "size"}, constLabels,
+			filter.New(),
+		),
+		poolSize: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "service", "database_pool_size", "Maximum size of pools for the database.", 0},
+			prometheus.GaugeValue,
+			[]string{"database"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

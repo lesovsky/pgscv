@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -71,55 +72,48 @@ type postgresActivityCollector struct {
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
 func NewPostgresActivityCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
-		waitEvents: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "wait_events_in_flight"),
-				"Number of wait events in-flight in each state.",
-				[]string{"type", "event"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		states: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "connections_in_flight"),
-				"Number of connections in-flight in each state.",
-				[]string{"state"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		statesAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "connections_all_in_flight"),
-				"Number of all connections in-flight.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		activity: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "max_seconds"),
-				"Longest activity for each user, database and activity type.",
-				[]string{"user", "database", "state", "type"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		prepared: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "prepared_transactions_in_flight"),
-				"Number of transactions that are currently prepared for two-phase commit.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		inflight: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "queries_in_flight"),
-				"Number of queries running in-flight of each type.",
-				[]string{"type"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		vacuums: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "activity", "vacuums_in_flight"),
-				"Number of vacuum operations running in-flight of each type.",
-				[]string{"type"}, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		waitEvents: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "wait_events_in_flight", "Number of wait events in-flight in each state.", 0},
+			prometheus.GaugeValue,
+			[]string{"type", "event"}, constLabels,
+			filter.New(),
+		),
+		states: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "connections_in_flight", "Number of connections in-flight in each state.", 0},
+			prometheus.GaugeValue,
+			[]string{"state"}, constLabels,
+			filter.New(),
+		),
+		statesAll: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "connections_all_in_flight", "Number of all connections in-flight.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		activity: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "max_seconds", "Longest activity for each user, database and activity type.", 0},
+			prometheus.GaugeValue,
+			[]string{"user", "database", "state", "type"}, constLabels,
+			filter.New(),
+		),
+		prepared: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "prepared_transactions_in_flight", "Number of transactions that are currently prepared for two-phase commit.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		inflight: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "queries_in_flight", "Number of queries running in-flight of each type.", 0},
+			prometheus.GaugeValue,
+			[]string{"type"}, constLabels,
+			filter.New(),
+		),
+		vacuums: newBuiltinTypedDesc(
+			descOpts{"postgres", "activity", "vacuums_in_flight", "Number of vacuum operations running in-flight of each type.", 0},
+			prometheus.GaugeValue,
+			[]string{"type"}, constLabels,
+			filter.New(),
+		),
 		re: newQueryRegexp(),
 	}, nil
 }

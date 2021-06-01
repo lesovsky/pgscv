@@ -63,7 +63,11 @@ func New() Filters {
 	return map[string]Filter{}
 }
 
-// DefaultFilters set up default collectors filters.
+func (f Filters) Add(name string, filter Filter) {
+	f[name] = filter
+}
+
+// SetDefault set up default collectors filters.
 func (f Filters) SetDefault() {
 	log.Debug("define default filters")
 
@@ -83,7 +87,7 @@ func (f Filters) SetDefault() {
 	}
 }
 
-// CompileFilters walk trough filters and compile them.
+// Compile walk trough filters and compile them.
 func (f Filters) Compile() error {
 	log.Debug("compile filters")
 

@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	// Service label string for system service
+	// ServiceTypeSystem defines label string for system service.
 	ServiceTypeSystem = "system"
-	// Service label string for Postgres services
+	// ServiceTypePostgresql defines label string for Postgres services.
 	ServiceTypePostgresql = "postgres"
-	// Service label string for Pgbouncer services
+	// ServiceTypePgbouncer defines label string for Pgbouncer services.
 	ServiceTypePgbouncer = "pgbouncer"
 )
 
@@ -51,8 +51,8 @@ type CollectorsSettings map[string]CollectorSettings
 
 // CollectorSettings unions all settings related to a single collector.
 type CollectorSettings struct {
-	// reserved for further extend
-
+	//
+	//Filters filter.Filters `yaml:"filters"`
 	// Subsystems defines subsystem with user-defined metrics.
 	Subsystems Subsystems `yaml:"subsystems"`
 }
@@ -74,7 +74,6 @@ type MetricsSubsystem struct {
 }
 
 // Metrics unions all metrics in one place.
-//type Metrics map[string]UserMetric
 type Metrics []UserMetric
 
 // UserMetric defines a single metric and its properties.

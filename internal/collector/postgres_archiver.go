@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -24,34 +25,30 @@ type postgresWalArchivingCollector struct {
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ARCHIVER-VIEW
 func NewPostgresWalArchivingCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresWalArchivingCollector{
-		archived: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "archiver", "archived_total"),
-				"Total number of WAL segments had been successfully archived.",
-				nil, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		failed: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "archiver", "failed_total"),
-				"Total number of attempts when WAL segments had been failed to archive.",
-				nil, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		sinceArchivedSeconds: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "archiver", "since_last_archive_seconds"),
-				"Number of seconds since last WAL segment had been successfully archived.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
-		archivingLag: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "archiver", "lag_bytes"),
-				"Amount of WAL segments ready, but not archived, in bytes.",
-				nil, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		archived: newBuiltinTypedDesc(
+			descOpts{"postgres", "archiver", "archived_total", "Total number of WAL segments had been successfully archived.", 0},
+			prometheus.CounterValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		failed: newBuiltinTypedDesc(
+			descOpts{"postgres", "archiver", "failed_total", "Total number of attempts when WAL segments had been failed to archive.", 0},
+			prometheus.CounterValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		sinceArchivedSeconds: newBuiltinTypedDesc(
+			descOpts{"postgres", "archiver", "since_last_archive_seconds", "Number of seconds since last WAL segment had been successfully archived.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
+		archivingLag: newBuiltinTypedDesc(
+			descOpts{"postgres", "archiver", "lag_bytes", "Amount of WAL segments ready, but not archived, in bytes.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/model"
 )
 
@@ -13,13 +14,12 @@ type pgscvServicesCollector struct {
 // NewPgscvServicesCollector creates new collector.
 func NewPgscvServicesCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &pgscvServicesCollector{
-		service: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("pgscv", "services", "registered_total"),
-				"Total number of services registered by pgSCV.",
-				[]string{"service"}, labels,
-			), valueType: prometheus.GaugeValue,
-		}}, nil
+		service: newBuiltinTypedDesc(
+			descOpts{"pgscv", "services", "registered_total", "Total number of services registered by pgSCV.", 0},
+			prometheus.GaugeValue,
+			[]string{"service"}, labels,
+			filter.New(),
+		)}, nil
 }
 
 // Update method is used for sending pgscvServicesCollector's metrics.

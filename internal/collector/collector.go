@@ -196,6 +196,10 @@ func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
 // send acts like a middleware between metric collector functions which produces metrics and Prometheus who accepts metrics.
 func send(in <-chan prometheus.Metric, out chan<- prometheus.Metric) {
 	for m := range in {
+		// Skip received nil values
+		if m == nil {
+			continue
+		}
 
 		// implement other middlewares here.
 

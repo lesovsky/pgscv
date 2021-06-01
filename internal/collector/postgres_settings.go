@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -23,22 +24,18 @@ type postgresSettingsCollector struct {
 // and https://www.postgresql.org/docs/current/view-pg-file-settings.html
 func NewPostgresSettingsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresSettingsCollector{
-		settings: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "service", "settings_info"),
-				"Labeled information about Postgres configuration settings.",
-				[]string{"name", "setting", "unit", "vartype", "source"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		files: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "service", "files_info"),
-				"Labeled information about Postgres system files.",
-				[]string{"guc", "mode", "path"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		settings: newBuiltinTypedDesc(
+			descOpts{"postgres", "service", "settings_info", "Labeled information about Postgres configuration settings.", 0},
+			prometheus.GaugeValue,
+			[]string{"name", "setting", "unit", "vartype", "source"}, constLabels,
+			filter.New(),
+		),
+		files: newBuiltinTypedDesc(
+			descOpts{"postgres", "service", "files_info", "Labeled information about Postgres system files.", 0},
+			prometheus.GaugeValue,
+			[]string{"guc", "mode", "path"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

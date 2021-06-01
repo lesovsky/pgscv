@@ -2,6 +2,7 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -19,24 +20,19 @@ const (
 
 //
 type postgresReplicationSlotCollector struct {
-	restart    typedDesc
-	labelNames []string
+	restart typedDesc
 }
 
 // NewPostgresReplicationSlotsCollector returns a new Collector exposing postgres replication slots stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-replication-slots.html
 func NewPostgresReplicationSlotsCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
-	var labelNames = []string{"database", "slot_name", "slot_type", "active"}
-
 	return &postgresReplicationSlotCollector{
-		labelNames: labelNames,
-		restart: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "replication_slot", "wal_retain_bytes"),
-				"Number of WAL retained and required by consumers, in bytes.",
-				labelNames, constLabels,
-			), valueType: prometheus.GaugeValue,
-		},
+		restart: newBuiltinTypedDesc(
+			descOpts{"postgres", "replication_slot", "wal_retain_bytes", "Number of WAL retained and required by consumers, in bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "slot_name", "slot_type", "active"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 
@@ -54,7 +50,7 @@ func (c *postgresReplicationSlotCollector) Update(config Config, ch chan<- prome
 	}
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresReplicationSlotStats(res, c.labelNames)
+	stats := parsePostgresReplicationSlotStats(res, c.restart.labels)
 
 	for _, stat := range stats {
 		ch <- c.restart.newConstMetric(stat.retainedBytes, stat.database, stat.slotname, stat.slottype, stat.active)

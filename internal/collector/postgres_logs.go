@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/nxadm/tail"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -67,41 +68,36 @@ func NewPostgresLogsCollector(constLabels prometheus.Labels, _ model.CollectorSe
 			store: map[string]float64{},
 			mu:    sync.RWMutex{},
 		},
-		messagesTotal: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log", "messages_total"),
-				"Total number of log messages written by each level.",
-				[]string{"level"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		panicMessages: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log", "panic_messages_total"),
-				"Total number of PANIC log messages written.",
-				[]string{"msg"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		fatalMessages: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log", "fatal_messages_total"),
-				"Total number of FATAL log messages written.",
-				[]string{"msg"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		errorMessages: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log", "error_messages_total"),
-				"Total number of ERROR log messages written.",
-				[]string{"msg"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
-		warningMessages: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "log", "warning_messages_total"),
-				"Total number of WARNING log messages written.",
-				[]string{"msg"}, constLabels,
-			), valueType: prometheus.CounterValue,
-		},
+		messagesTotal: newBuiltinTypedDesc(
+			descOpts{"postgres", "log", "messages_total", "Total number of log messages written by each level.", 0},
+			prometheus.CounterValue,
+			[]string{"level"}, constLabels,
+			filter.New(),
+		),
+		panicMessages: newBuiltinTypedDesc(
+			descOpts{"postgres", "log", "panic_messages_total", "Total number of PANIC log messages written.", 0},
+			prometheus.CounterValue,
+			[]string{"msg"}, constLabels,
+			filter.New(),
+		),
+		fatalMessages: newBuiltinTypedDesc(
+			descOpts{"postgres", "log", "fatal_messages_total", "Total number of FATAL log messages written.", 0},
+			prometheus.CounterValue,
+			[]string{"msg"}, constLabels,
+			filter.New(),
+		),
+		errorMessages: newBuiltinTypedDesc(
+			descOpts{"postgres", "log", "error_messages_total", "Total number of ERROR log messages written.", 0},
+			prometheus.CounterValue,
+			[]string{"msg"}, constLabels,
+			filter.New(),
+		),
+		warningMessages: newBuiltinTypedDesc(
+			descOpts{"postgres", "log", "warning_messages_total", "Total number of WARNING log messages written.", 0},
+			prometheus.CounterValue,
+			[]string{"msg"}, constLabels,
+			filter.New(),
+		),
 	}
 
 	go runTailLoop(collector)

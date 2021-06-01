@@ -24,34 +24,30 @@ type filesystemCollector struct {
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
 func NewFilesystemCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &filesystemCollector{
-		bytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "filesystem", "bytes"),
-				"Number of bytes of filesystem by usage.",
-				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		bytesTotal: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "filesystem", "bytes_total"),
-				"Total number of bytes of filesystem capacity.",
-				[]string{"device", "mountpoint", "fstype"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		files: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "filesystem", "files"),
-				"Number of files (inodes) of filesystem by usage.",
-				[]string{"device", "mountpoint", "fstype", "usage"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		filesTotal: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "filesystem", "files_total"),
-				"Total number of files (inodes) of filesystem capacity.",
-				[]string{"device", "mountpoint", "fstype"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		bytes: newBuiltinTypedDesc(
+			descOpts{"node", "filesystem", "bytes", "Number of bytes of filesystem by usage.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			filter.New(),
+		),
+		bytesTotal: newBuiltinTypedDesc(
+			descOpts{"node", "filesystem", "bytes_total", "Total number of bytes of filesystem capacity.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "fstype"}, labels,
+			filter.New(),
+		),
+		files: newBuiltinTypedDesc(
+			descOpts{"node", "filesystem", "files", "Number of files (inodes) of filesystem by usage.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "fstype", "usage"}, labels,
+			filter.New(),
+		),
+		filesTotal: newBuiltinTypedDesc(
+			descOpts{"node", "filesystem", "files_total", "Total number of files (inodes) of filesystem capacity.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "mountpoint", "fstype"}, labels,
+			filter.New(),
+		),
 	}, nil
 }
 

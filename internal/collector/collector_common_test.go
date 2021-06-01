@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"regexp"
@@ -339,32 +340,24 @@ func Test_updateMetrics(t *testing.T) {
 		want         int
 	}{
 		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "database", "tuples_total"),
-					"description",
-					[]string{"relname", "tuples"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				labels:        []string{"relname", "tuples"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "database", "tuples_total", "description", 0},
+				prometheus.CounterValue,
+				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				[]string{"relname", "tuples"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "",
 			want:         3,
 		},
 		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database", "relname"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
+				prometheus.CounterValue,
+				"seq_scan", nil,
+				[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "testdb",
 			want:         1,
 		},
@@ -405,63 +398,47 @@ func Test_updateMultipleMetrics(t *testing.T) {
 		want         int
 	}{
 		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "tuples_total"),
-					"description",
-					[]string{"database", "relname", "tuples"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				labels:        []string{"database", "relname", "tuples"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "tuples_total", "description", 0},
+				prometheus.CounterValue,
+				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				[]string{"database", "relname", "tuples"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "pgscv_fixtures",
 			want:         3,
 		},
 		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "tuples_total"),
-					"description",
-					[]string{"database", "tuples"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				labels:        []string{"database", "tuples"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "tuples_total", "description", 0},
+				prometheus.CounterValue,
+				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				[]string{"database", "tuples"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "pgscv_fixtures",
 			want:         3,
 		},
 		{
 			// This is wrong case, but at at least it proves that no panic occurs
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "tuples_total"),
-					"description",
-					nil, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: nil,
-				labels:        nil,
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "tuples_total", "description", 0},
+				prometheus.CounterValue,
+				"", nil,
+				nil, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "",
 			want:         0,
 		},
 		{
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "tuples_total"),
-					"description",
-					[]string{"database", "relname", "schema", "tuples"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "",
-				labeledValues: map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
-				labels:        []string{"database", "relname", "schema", "tuples"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "tuples_total", "description", 0},
+				prometheus.CounterValue,
+				"", map[string][]string{"tuples": {"inserted", "updated", "deleted"}},
+				[]string{"database", "relname", "schema", "tuples"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "pgscv_fixtures",
 			want:         0,
 		},
@@ -501,65 +478,49 @@ func Test_updateSingleMetric(t *testing.T) {
 	}{
 		{
 			// many labels
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database", "relname"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
+				prometheus.CounterValue,
+				"seq_scan", nil,
+				[]string{"database", "relname"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "testdb",
 			want:         1,
 		},
 		{
 			// 'database' label is single in label list
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
+				prometheus.CounterValue,
+				"seq_scan", nil,
+				[]string{"database"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "testdb",
 			want:         1,
 		},
 		{
 			// no labels
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					nil, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        nil,
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
+				prometheus.CounterValue,
+				"seq_scan", nil,
+				nil, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "",
 			want:         1,
 		},
 		{
 			// label which present in metric labels, but absent in data row.
-			desc: typedDesc{
-				desc: prometheus.NewDesc(
-					prometheus.BuildFQName("postgres", "table", "seq_scan_total"),
-					"description",
-					[]string{"database", "schemaname"}, prometheus.Labels{"const": "example"},
-				),
-				valueType:     prometheus.CounterValue,
-				value:         "seq_scan",
-				labeledValues: nil,
-				labels:        []string{"database", "schemaname"},
-			},
+			desc: newCustomTypedDesc(
+				descOpts{"postgres", "table", "seq_scan_total", "description", 0},
+				prometheus.CounterValue,
+				"seq_scan", nil,
+				[]string{"database", "schemaname"}, prometheus.Labels{"const": "example"},
+				filter.New(),
+			),
 			dbLabelValue: "testdb",
 			want:         0,
 		},

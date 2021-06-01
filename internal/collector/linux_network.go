@@ -3,6 +3,7 @@ package collector
 import (
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"net"
@@ -16,20 +17,18 @@ type networkCollector struct {
 
 func NewNetworkCollector(labels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &networkCollector{
-		publicAddresses: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "public_addresses"),
-				"Number of public network addresses present on the system, by type.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		privateAddresses: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "network", "private_addresses"),
-				"Number of private network addresses present on the system, by type.",
-				nil, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		publicAddresses: newBuiltinTypedDesc(
+			descOpts{"node", "network", "public_addresses", "Number of public network addresses present on the system, by type.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
+		privateAddresses: newBuiltinTypedDesc(
+			descOpts{"node", "network", "private_addresses", "Number of private network addresses present on the system, by type.", 0},
+			prometheus.GaugeValue,
+			nil, labels,
+			filter.New(),
+		),
 	}, nil
 }
 

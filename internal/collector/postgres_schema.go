@@ -3,6 +3,7 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -25,62 +26,48 @@ type postgresSchemaCollector struct {
 // sources inside system catalog.
 func NewPostgresSchemasCollector(constLabels prometheus.Labels, _ model.CollectorSettings) (Collector, error) {
 	return &postgresSchemaCollector{
-		syscatalog: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "system_catalog_bytes"),
-				"Number of bytes occupied by system catalog.",
-				[]string{"database"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		nonpktables: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "non_pk_tables"),
-				"Labeled information about tables with no primary or unique key constraints.",
-				[]string{"database", "schema", "table"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		invalididx: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "invalid_indexes_bytes"),
-				"Number of bytes occupied by invalid indexes.",
-				[]string{"database", "schema", "table", "index"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		nonidxfkey: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "non_indexed_fkeys"),
-				"Number of non-indexed FOREIGN key constraints.",
-				[]string{"database", "schema", "table", "columns", "constraint", "referenced"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		redundantidx: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "redundant_indexes_bytes"),
-				"Number of bytes occupied by redundant indexes.",
-				[]string{"database", "schema", "table", "index", "indexdef", "redundantdef"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		sequences: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "sequence_exhaustion_ratio"),
-				"Sequences usage percentage accordingly to attached column, in percent.",
-				[]string{"database", "schema", "sequence"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
-		difftypefkey: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("postgres", "schema", "mistyped_fkeys"),
-				"Number of foreign key constraints with different data type.",
-				[]string{"database", "schema", "table", "column", "refschema", "reftable", "refcolumn"}, constLabels,
-			),
-			valueType: prometheus.GaugeValue,
-		},
+		syscatalog: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "system_catalog_bytes", "Number of bytes occupied by system catalog.", 0},
+			prometheus.GaugeValue,
+			[]string{"database"}, constLabels,
+			filter.New(),
+		),
+		nonpktables: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "non_pk_tables", "Labeled information about tables with no primary or unique key constraints.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table"}, constLabels,
+			filter.New(),
+		),
+		invalididx: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "invalid_indexes_bytes", "Number of bytes occupied by invalid indexes.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table", "index"}, constLabels,
+			filter.New(),
+		),
+		nonidxfkey: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "non_indexed_fkeys", "Number of non-indexed FOREIGN key constraints.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table", "columns", "constraint", "referenced"}, constLabels,
+			filter.New(),
+		),
+		redundantidx: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "redundant_indexes_bytes", "Number of bytes occupied by redundant indexes.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table", "index", "indexdef", "redundantdef"}, constLabels,
+			filter.New(),
+		),
+		sequences: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "sequence_exhaustion_ratio", "Sequences usage percentage accordingly to attached column, in percent.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "sequence"}, constLabels,
+			filter.New(),
+		),
+		difftypefkey: newBuiltinTypedDesc(
+			descOpts{"postgres", "schema", "mistyped_fkeys", "Number of foreign key constraints with different data type.", 0},
+			prometheus.GaugeValue,
+			[]string{"database", "schema", "table", "column", "refschema", "reftable", "refcolumn"}, constLabels,
+			filter.New(),
+		),
 	}, nil
 }
 

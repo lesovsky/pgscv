@@ -41,90 +41,78 @@ func NewDiskstatsCollector(labels prometheus.Labels, _ model.CollectorSettings) 
 	var diskLabelNames = []string{"device", "type"}
 
 	return &diskstatsCollector{
-		completed: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "completed_total"),
-				"The total number of IO requests completed successfully of each type.",
-				diskLabelNames, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		completedAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "completed_all_total"),
-				"The total number of IO requests completed successfully.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		merged: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "merged_total"),
-				"The total number of merged IO requests of each type.",
-				diskLabelNames, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		mergedAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "merged_all_total"),
-				"The total number of merged IO requests.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue,
-		},
-		bytes: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "bytes_total"),
-				"The total number of bytes processed by IO requests of each type.",
-				diskLabelNames, labels,
-			), valueType: prometheus.CounterValue, factor: diskSectorSize,
-		},
-		bytesAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "bytes_all_total"),
-				"The total number of bytes processed by IO requests.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue, factor: diskSectorSize,
-		},
-		times: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "time_seconds_total"),
-				"The total number of seconds spent on all requests of each type.",
-				diskLabelNames, labels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		timesAll: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "time_seconds_all_total"),
-				"The total number of seconds spent on all requests.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		ionow: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "io_now"),
-				"The number of I/Os currently in progress.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
-		iotime: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "io_time_seconds_total"),
-				"Total seconds spent doing I/Os.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		iotimeweighted: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "disk", "io_time_weighted_seconds_total"),
-				"The weighted number of seconds spent doing I/Os.",
-				[]string{"device"}, labels,
-			), valueType: prometheus.CounterValue, factor: .001,
-		},
-		storages: typedDesc{
-			desc: prometheus.NewDesc(
-				prometheus.BuildFQName("node", "system", "storage_info"),
-				"Labeled information about storage devices present in the system.",
-				[]string{"device", "rotational", "scheduler"}, labels,
-			), valueType: prometheus.GaugeValue,
-		},
+		completed: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "completed_total", "The total number of IO requests completed successfully of each type.", 0},
+			prometheus.CounterValue,
+			diskLabelNames, labels,
+			filter.New(),
+		),
+		completedAll: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "completed_all_total", "The total number of IO requests completed successfully.", 0},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		merged: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "merged_total", "The total number of merged IO requests of each type.", 0},
+			prometheus.CounterValue,
+			diskLabelNames, labels,
+			filter.New(),
+		),
+		mergedAll: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "merged_all_total", "The total number of merged IO requests.", 0},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		bytes: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "bytes_total", "The total number of bytes processed by IO requests of each type.", diskSectorSize},
+			prometheus.CounterValue,
+			diskLabelNames, labels,
+			filter.New(),
+		),
+		bytesAll: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "bytes_all_total", "The total number of bytes processed by IO requests.", diskSectorSize},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		times: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "time_seconds_total", "The total number of seconds spent on all requests of each type.", .001},
+			prometheus.CounterValue,
+			diskLabelNames, labels,
+			filter.New(),
+		),
+		timesAll: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "time_seconds_all_total", "The total number of seconds spent on all requests.", .001},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		ionow: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "io_now", "The number of I/Os currently in progress.", 0},
+			prometheus.GaugeValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		iotime: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "io_time_seconds_total", "Total seconds spent doing I/Os.", .001},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		iotimeweighted: newBuiltinTypedDesc(
+			descOpts{"node", "disk", "io_time_weighted_seconds_total", "The weighted number of seconds spent doing I/Os.", .001},
+			prometheus.CounterValue,
+			[]string{"device"}, labels,
+			filter.New(),
+		),
+		storages: newBuiltinTypedDesc(
+			descOpts{"node", "system", "storage_info", "Labeled information about storage devices present in the system.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "rotational", "scheduler"}, labels,
+			filter.New(),
+		),
 	}, nil
 }
 
