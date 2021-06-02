@@ -37,87 +37,101 @@ type diskstatsCollector struct {
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
 // Docs from https://www.kernel.org/doc/Documentation/iostats.txt and https://www.kernel.org/doc/Documentation/ABI/testing/procfs-diskstats
-func NewDiskstatsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
-	var diskLabelNames = []string{"device", "type"}
+func NewDiskstatsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
+
+	// Define default filters (if no already present) to avoid collecting metrics about virtual devices and device partitions.
+	if _, ok := settings.Filters["device"]; !ok {
+		if settings.Filters == nil {
+			settings.Filters = filter.New()
+		}
+
+		settings.Filters.Add("device", filter.Filter{Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`})
+		err := settings.Filters.Compile()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	diskLabelNames := []string{"device", "type"}
 
 	return &diskstatsCollector{
 		completed: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "completed_total", "The total number of IO requests completed successfully of each type.", 0},
 			prometheus.CounterValue,
 			diskLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		completedAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "completed_all_total", "The total number of IO requests completed successfully.", 0},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		merged: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "merged_total", "The total number of merged IO requests of each type.", 0},
 			prometheus.CounterValue,
 			diskLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		mergedAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "merged_all_total", "The total number of merged IO requests.", 0},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "bytes_total", "The total number of bytes processed by IO requests of each type.", diskSectorSize},
 			prometheus.CounterValue,
 			diskLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		bytesAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "bytes_all_total", "The total number of bytes processed by IO requests.", diskSectorSize},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		times: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "time_seconds_total", "The total number of seconds spent on all requests of each type.", .001},
 			prometheus.CounterValue,
 			diskLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		timesAll: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "time_seconds_all_total", "The total number of seconds spent on all requests.", .001},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		ionow: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_now", "The number of I/Os currently in progress.", 0},
 			prometheus.GaugeValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		iotime: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_time_seconds_total", "Total seconds spent doing I/Os.", .001},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		iotimeweighted: newBuiltinTypedDesc(
 			descOpts{"node", "disk", "io_time_weighted_seconds_total", "The weighted number of seconds spent doing I/Os.", .001},
 			prometheus.CounterValue,
 			[]string{"device"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		storages: newBuiltinTypedDesc(
 			descOpts{"node", "system", "storage_info", "Labeled information about storage devices present in the system.", 0},
 			prometheus.GaugeValue,
 			[]string{"device", "rotational", "scheduler"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }
 
 func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	stats, err := getDiskstats(config.Filters["diskstats/device"])
+	stats, err := getDiskstats()
 	if err != nil {
 		return fmt.Errorf("get diskstats failed: %s", err)
 	}
@@ -172,7 +186,7 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 	}
 
 	// Collect storages properties.
-	storages, err := getStorageProperties("/sys/block/*", config.Filters["diskstats/device"])
+	storages, err := getStorageProperties("/sys/block/*")
 	if err != nil {
 		log.Warnf("get storage devices properties failed: %s; skip", err)
 	} else {
@@ -185,18 +199,18 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 }
 
 // getDiskstats opens stats file and executes stats parser.
-func getDiskstats(filter filter.Filter) (map[string][]float64, error) {
+func getDiskstats() (map[string][]float64, error) {
 	file, err := os.Open("/proc/diskstats")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseDiskstats(file, filter)
+	return parseDiskstats(file)
 }
 
 // parseDiskstat reads stats file and returns stats structs.
-func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
+func parseDiskstats(r io.Reader) (map[string][]float64, error) {
 	log.Debug("parse disk stats")
 
 	var scanner = bufio.NewScanner(r)
@@ -211,12 +225,7 @@ func parseDiskstats(r io.Reader, filter filter.Filter) (map[string][]float64, er
 			return nil, fmt.Errorf("invalid input, '%s': wrong number of values", scanner.Text())
 		}
 
-		var device = values[2]
-		if !filter.Pass(device) {
-			//log.Debugf("skip device %s", device)
-			continue
-		}
-		//log.Debugf("pass device %s", device)
+		device := values[2]
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-3)
@@ -243,7 +252,7 @@ type storageDeviceProperties struct {
 }
 
 // getStorageProperties reads storages properties.
-func getStorageProperties(path string, filter filter.Filter) ([]storageDeviceProperties, error) {
+func getStorageProperties(path string) ([]storageDeviceProperties, error) {
 	log.Debugf("parse storage properties: %s", path)
 
 	dirs, err := filepath.Glob(path)
@@ -256,12 +265,6 @@ func getStorageProperties(path string, filter filter.Filter) ([]storageDevicePro
 	for _, devpath := range dirs {
 		parts := strings.Split(devpath, "/")
 		device := parts[len(parts)-1]
-
-		if !filter.Pass(device) {
-			//log.Debugf("skip device %s", device)
-			continue
-		}
-		//log.Debugf("pass device %s", device)
 
 		// Read 'rotational' property.
 		rotational, err := getDeviceRotational(devpath)

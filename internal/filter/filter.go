@@ -63,28 +63,9 @@ func New() Filters {
 	return map[string]Filter{}
 }
 
+// Add add new filter to existing set of filters. After adding new filter, filters should be recompiled.
 func (f Filters) Add(name string, filter Filter) {
 	f[name] = filter
-}
-
-// SetDefault set up default collectors filters.
-func (f Filters) SetDefault() {
-	log.Debug("define default filters")
-
-	// Setting up default EXCLUDE pattern for storage devices.
-	if _, ok := f["diskstats/device"]; !ok {
-		f["diskstats/device"] = Filter{Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`}
-	}
-
-	// Setting up default EXCLUDE pattern for network devices.
-	if _, ok := f["netdev/device"]; !ok {
-		f["netdev/device"] = Filter{Exclude: `docker|virbr`}
-	}
-
-	// Setting up default INCLUDE pattern for filesystem types.
-	if _, ok := f["filesystem/fstype"]; !ok {
-		f["filesystem/fstype"] = Filter{Include: `^(ext3|ext4|xfs|btrfs)$`}
-	}
 }
 
 // Compile walk trough filters and compile them.

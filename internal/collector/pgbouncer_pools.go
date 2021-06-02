@@ -24,7 +24,7 @@ type pgbouncerPoolsCollector struct {
 
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
 // For details see https://www.pgbouncer.org/usage.html#show-pools.
-func NewPgbouncerPoolsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPgbouncerPoolsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	var poolsLabelNames = []string{"user", "database", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
@@ -32,19 +32,19 @@ func NewPgbouncerPoolsCollector(constLabels labels, subsystems model.CollectorSe
 			descOpts{"pgbouncer", "pool", "connections_in_flight", "The total number of connections established by each state.", 0},
 			prometheus.GaugeValue,
 			poolsLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		maxwait: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "pool", "max_wait_seconds", "Total time the first (oldest) client in the queue has waited, in seconds.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "pool_mode"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		clients: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "client", "connections_in_flight", "The total number of client connections established by source address.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "address"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		labelNames: poolsLabelNames,
 	}, nil

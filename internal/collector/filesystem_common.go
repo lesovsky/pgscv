@@ -3,7 +3,6 @@ package collector
 import (
 	"bufio"
 	"fmt"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"io"
 	"os"
@@ -19,7 +18,7 @@ type mount struct {
 }
 
 // parseProcMounts parses /proc/mounts and returns slice of mounted filesystems properties.
-func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, error) {
+func parseProcMounts(r io.Reader) ([]mount, error) {
 	log.Debug("parse mounted filesystems")
 	var (
 		scanner = bufio.NewScanner(r)
@@ -34,20 +33,10 @@ func parseProcMounts(r io.Reader, filters map[string]filter.Filter) ([]mount, er
 			return nil, fmt.Errorf("invalid input: '%s', skip", scanner.Text())
 		}
 
-		mountpoint, fstype := parts[1], parts[2]
-		if f, ok := filters["filesystem/fstype"]; ok {
-			if !f.Pass(fstype) {
-				//log.Debugf("skip %s filesystem %s", fstype, mountpoint)
-				continue
-			}
-
-			//log.Debugf("pass %s filesystem %s", fstype, mountpoint)
-		}
-
 		s := mount{
 			device:     parts[0],
-			mountpoint: mountpoint,
-			fstype:     fstype,
+			mountpoint: parts[1],
+			fstype:     parts[2],
 			options:    parts[3],
 		}
 
@@ -70,7 +59,7 @@ func truncateDeviceName(path string) string {
 	// Check device path exists.
 	fi, err := os.Lstat(path)
 	if err != nil {
-		log.Warnf("%s, use default '%s'", err, name)
+		log.Debugf("%s, use default '%s'", err, name)
 		return name
 	}
 

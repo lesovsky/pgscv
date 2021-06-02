@@ -91,7 +91,7 @@ func (d *typedDesc) newConstMetric(value float64, labelValues ...string) prometh
 		return nil
 	}
 
-	// Check passed label values against configure filters.
+	// Check passed label values against configured filters.
 	if d.hasFilter(labelValues) {
 		return nil
 	}
@@ -104,6 +104,7 @@ func (d *typedDesc) newConstMetric(value float64, labelValues ...string) prometh
 	return m
 }
 
+// hasFilter checks label values against configured filters. Returns true if metric has to be filtered and false otherwise.
 func (d *typedDesc) hasFilter(labelValues []string) bool {
 	for i, key := range d.labelNames {
 		val := labelValues[i]

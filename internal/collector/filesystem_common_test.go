@@ -3,10 +3,8 @@ package collector
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/filter"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sync"
 	"testing"
 	"time"
@@ -17,11 +15,7 @@ func Test_parseProcMounts(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	ff := map[string]filter.Filter{
-		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^(ext3|ext4|xfs|btrfs)$`)},
-	}
-
-	stats, err := parseProcMounts(file, ff)
+	stats, err := parseProcMounts(file)
 	assert.NoError(t, err)
 
 	want := []mount{
@@ -38,7 +32,7 @@ func Test_parseProcMounts(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	stats, err = parseProcMounts(file, nil)
+	stats, err = parseProcMounts(file)
 	assert.Error(t, err)
 	assert.Nil(t, stats)
 }

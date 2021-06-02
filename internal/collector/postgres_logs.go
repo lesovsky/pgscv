@@ -4,7 +4,6 @@ import (
 	"context"
 	"github.com/nxadm/tail"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -39,7 +38,7 @@ type postgresLogsCollector struct {
 }
 
 // NewPostgresLogsCollector creates new collector for Postgres log messages.
-func NewPostgresLogsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresLogsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	collector := &postgresLogsCollector{
 		updateLogfile: make(chan string),
 		totals: syncKV{
@@ -72,31 +71,31 @@ func NewPostgresLogsCollector(constLabels labels, subsystems model.CollectorSett
 			descOpts{"postgres", "log", "messages_total", "Total number of log messages written by each level.", 0},
 			prometheus.CounterValue,
 			[]string{"level"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		panicMessages: newBuiltinTypedDesc(
 			descOpts{"postgres", "log", "panic_messages_total", "Total number of PANIC log messages written.", 0},
 			prometheus.CounterValue,
 			[]string{"msg"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		fatalMessages: newBuiltinTypedDesc(
 			descOpts{"postgres", "log", "fatal_messages_total", "Total number of FATAL log messages written.", 0},
 			prometheus.CounterValue,
 			[]string{"msg"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		errorMessages: newBuiltinTypedDesc(
 			descOpts{"postgres", "log", "error_messages_total", "Total number of ERROR log messages written.", 0},
 			prometheus.CounterValue,
 			[]string{"msg"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		warningMessages: newBuiltinTypedDesc(
 			descOpts{"postgres", "log", "warning_messages_total", "Total number of WARNING log messages written.", 0},
 			prometheus.CounterValue,
 			[]string{"msg"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 	}
 

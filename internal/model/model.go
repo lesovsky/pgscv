@@ -79,7 +79,7 @@ type MetricsSubsystem struct {
 // Metrics unions all metrics in one place.
 type Metrics []UserMetric
 
-// UserMetric defines a single metric and its properties.
+// UserMetric defines a single user-defined metric and its properties.
 type UserMetric struct {
 	ShortName     string              `yaml:"name"`
 	Usage         string              `yaml:"usage"`

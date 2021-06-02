@@ -20,7 +20,7 @@ type pgbouncerStatsCollector struct {
 
 // NewPgbouncerStatsCollector returns a new Collector exposing pgbouncer pools usage stats (except averages).
 // For details see https://www.pgbouncer.org/usage.html#show-stats.
-func NewPgbouncerStatsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPgbouncerStatsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	var pgbouncerLabelNames = []string{"database"}
 
 	return &pgbouncerStatsCollector{
@@ -29,19 +29,19 @@ func NewPgbouncerStatsCollector(constLabels labels, subsystems model.CollectorSe
 			descOpts{"pgbouncer", "", "transactions_total", "Total number of SQL transactions processed, for each database.", 0},
 			prometheus.CounterValue,
 			pgbouncerLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		queries: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "", "queries_total", "Total number of SQL queries processed, for each database.", 0},
 			prometheus.CounterValue,
 			pgbouncerLabelNames, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		bytes: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "", "bytes_total", "Total volume of network traffic processed by pgbouncer in each direction, in bytes.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "type"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		time: newBuiltinTypedDesc(
 			descOpts{
@@ -51,7 +51,7 @@ func NewPgbouncerStatsCollector(constLabels labels, subsystems model.CollectorSe
 			},
 			prometheus.CounterValue,
 			[]string{"database", "type", "mode"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }

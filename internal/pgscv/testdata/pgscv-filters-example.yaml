@@ -1,7 +1,6 @@
 listen_address: "127.0.0.1:8080"
-filters:
-  diskstats/device:
-    exclude: "^(test|example)$"
-  netdev/device:
-    include: "^(test|example)$"
-
+collectors:
+  postgres/custom:
+    filters:
+      device:
+        exclude: "^(test|example)$"

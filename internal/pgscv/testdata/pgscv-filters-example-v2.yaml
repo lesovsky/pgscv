@@ -1,6 +1,0 @@
-listen_address: "127.0.0.1:8080"
-collectors:
-  postgres/custom:
-    filters:
-      device:
-        exclude: "^(test|example)$"

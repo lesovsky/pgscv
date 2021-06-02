@@ -3,7 +3,6 @@ package pgscv
 import (
 	"fmt"
 	"github.com/jackc/pgx/v4"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
@@ -33,10 +32,9 @@ type Config struct {
 	ListenAddress         string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
 	SendMetricsURL        string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
 	SendMetricsInterval   time.Duration            // Metric send interval
-	APIKey                string                   `yaml:"api_key"`  // API key for accessing to Weaponry
-	ServicesConnsSettings service.ConnsSettings    `yaml:"services"` // All connections settings for exact services
-	Defaults              map[string]string        `yaml:"defaults"` // Defaults
-	Filters               filter.Filters           `yaml:"filters"`
+	APIKey                string                   `yaml:"api_key"`            // API key for accessing to Weaponry
+	ServicesConnsSettings service.ConnsSettings    `yaml:"services"`           // All connections settings for exact services
+	Defaults              map[string]string        `yaml:"defaults"`           // Defaults
 	DisableCollectors     []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
 	CollectorsSettings    model.CollectorsSettings `yaml:"collectors"`         // Collectors settings propagated from main YAML configuration
 	Databases             string                   `yaml:"databases"`          // Regular expression string specifies databases from which metrics should be collected
@@ -139,15 +137,6 @@ func (c *Config) Validate() error {
 		return err
 	}
 	c.DatabasesRE = re
-
-	// Add default filters and compile regexps.
-	if c.Filters == nil {
-		c.Filters = filter.New()
-	}
-	c.Filters.SetDefault()
-	if err := c.Filters.Compile(); err != nil {
-		return err
-	}
 
 	// Validate collector settings.
 	err = validateCollectorSettings(c.CollectorsSettings)

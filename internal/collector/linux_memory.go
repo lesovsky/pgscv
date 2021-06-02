@@ -23,22 +23,22 @@ type meminfoCollector struct {
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
-func NewMeminfoCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewMeminfoCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &meminfoCollector{
 		re:            regexp.MustCompile(`\((.*)\)`),
-		subsysFilters: subsystems.Filters,
+		subsysFilters: settings.Filters,
 		constLabels:   constLabels,
 		memused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "MemUsed", "Memory information composite field MemUsed.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		swapused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "SwapUsed", "Memory information composite field SwapUsed.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }

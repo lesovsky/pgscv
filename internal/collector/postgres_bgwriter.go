@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -24,62 +23,62 @@ type postgresBgwriterCollector struct {
 
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-BGWRITER-VIEW
-func NewPostgresBgwriterCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresBgwriterCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
 			"checkpoints": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "total", "Total number of checkpoints that have been performed of each type.", 0},
 				prometheus.CounterValue,
 				[]string{"checkpoint"}, constLabels,
-				subsystems.Filters,
+				settings.Filters,
 			),
 			"checkpoints_all": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "all_total", "Total number of checkpoints that have been performed.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				subsystems.Filters,
+				settings.Filters,
 			),
 			"checkpoint_time": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "seconds_total", "Total amount of time that has been spent processing data during checkpoint in each stage, in seconds.", .001},
 				prometheus.CounterValue,
 				[]string{"stage"}, constLabels,
-				subsystems.Filters,
+				settings.Filters,
 			),
 			"checkpoint_time_all": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "seconds_all_total", "Total amount of time that has been spent processing data during checkpoint, in seconds.", .001},
 				prometheus.CounterValue,
 				nil, constLabels,
-				subsystems.Filters,
+				settings.Filters,
 			),
 			"written_bytes": newBuiltinTypedDesc(
 				descOpts{"postgres", "written", "bytes_total", "Total number of bytes written by each subsystem, in bytes.", 0},
 				prometheus.CounterValue,
 				[]string{"process"}, constLabels,
-				subsystems.Filters,
+				settings.Filters,
 			),
 			"maxwritten_clean": newBuiltinTypedDesc(
 				descOpts{"postgres", "bgwriter", "maxwritten_clean_total", "Total number of times the background writer stopped a cleaning scan because it had written too many buffers.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				settings.Filters,
 			),
 			"buffers_backend_fsync": newBuiltinTypedDesc(
 				descOpts{"postgres", "backends", "fsync_total", "Total number of times a backends had to execute its own fsync() call.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				settings.Filters,
 			),
 			"alloc_bytes": newBuiltinTypedDesc(
 				descOpts{"postgres", "backends", "allocated_bytes_total", "Total number of bytes allocated by backends.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				settings.Filters,
 			),
 			"stats_age_seconds": newBuiltinTypedDesc(
 				descOpts{"postgres", "bgwriter", "stats_age_seconds_total", "The age of the background writer activity statistics, in seconds.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				settings.Filters,
 			),
 		},
 	}, nil

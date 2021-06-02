@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -19,13 +18,13 @@ type postgresConflictsCollector struct {
 
 // NewPostgresConflictsCollector returns a new Collector exposing postgres databases recovery conflicts stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-CONFLICTS-VIEW
-func NewPostgresConflictsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresConflictsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresConflictsCollector{
 		conflicts: newBuiltinTypedDesc(
 			descOpts{"postgres", "recovery", "conflicts_total", "Total number of recovery conflicts occurred by each conflict type.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "conflict"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 	}, nil
 }

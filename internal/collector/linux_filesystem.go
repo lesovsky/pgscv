@@ -22,38 +22,52 @@ type filesystemCollector struct {
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
-func NewFilesystemCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewFilesystemCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
+
+	// Define default filters (if no already present) to avoid collecting metrics about exotic filesystems.
+	if _, ok := settings.Filters["fstype"]; !ok {
+		if settings.Filters == nil {
+			settings.Filters = filter.New()
+		}
+
+		settings.Filters.Add("fstype", filter.Filter{Include: `^(ext3|ext4|xfs|btrfs)$`})
+		err := settings.Filters.Compile()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &filesystemCollector{
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "bytes", "Number of bytes of filesystem by usage.", 0},
 			prometheus.GaugeValue,
 			[]string{"device", "mountpoint", "fstype", "usage"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		bytesTotal: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "bytes_total", "Total number of bytes of filesystem capacity.", 0},
 			prometheus.GaugeValue,
 			[]string{"device", "mountpoint", "fstype"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		files: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "files", "Number of files (inodes) of filesystem by usage.", 0},
 			prometheus.GaugeValue,
 			[]string{"device", "mountpoint", "fstype", "usage"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		filesTotal: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "files_total", "Total number of files (inodes) of filesystem capacity.", 0},
 			prometheus.GaugeValue,
 			[]string{"device", "mountpoint", "fstype"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 	}, nil
 }
 
 // Update method collects filesystem usage statistics.
 func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	stats, err := getFilesystemStats(config.Filters)
+	stats, err := getFilesystemStats()
 	if err != nil {
 		return fmt.Errorf("get filesystem stats failed: %s", err)
 	}
@@ -88,19 +102,19 @@ type filesystemStat struct {
 }
 
 // getFilesystemStats opens stats file and execute stats parser.
-func getFilesystemStats(filters map[string]filter.Filter) ([]filesystemStat, error) {
+func getFilesystemStats() ([]filesystemStat, error) {
 	file, err := os.Open("/proc/mounts")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseFilesystemStats(file, filters)
+	return parseFilesystemStats(file)
 }
 
 // parseFilesystemStats parses stats file and return stats.
-func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]filesystemStat, error) {
-	mounts, err := parseProcMounts(r, filters)
+func parseFilesystemStats(r io.Reader) ([]filesystemStat, error) {
+	mounts, err := parseProcMounts(r)
 	if err != nil {
 		return nil, err
 	}
@@ -113,8 +127,9 @@ func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]file
 	for _, m := range mounts {
 		mount := m
 
-		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too. To avoid such situations wrap
-		// stats requests into context with timeout. One second timeout should be sufficient for machines.
+		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too.
+		// To avoid such situations wrap stats requests into context with timeout. One second
+		// timeout should be sufficient for machines.
 		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 
 		// Requesting stats.
@@ -124,7 +139,9 @@ func parseFilesystemStats(r io.Reader, filters map[string]filter.Filter) ([]file
 		select {
 		case response := <-statCh:
 			if response.err != nil {
-				log.Errorf("get filesystem %s stats failed: %s; skip", mount.mountpoint, err)
+				// Skip filesystems if getting its stats failed. This could occur quite often,
+				// for example due to denied permissions.
+				log.Debugf("get filesystem %s stats failed: %s; skip", mount.mountpoint, response.err)
 				cancel()
 				continue
 			}

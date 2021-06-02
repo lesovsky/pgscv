@@ -3,9 +3,9 @@ package collector
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 )
 
@@ -25,7 +25,8 @@ func TestDiskstatsCollector_Update(t *testing.T) {
 			"node_disk_io_time_weighted_seconds_total",
 			"node_system_storage_info",
 		},
-		collector: NewDiskstatsCollector,
+		collector:         NewDiskstatsCollector,
+		collectorSettings: model.CollectorSettings{Filters: filter.New()},
 	}
 
 	pipeline(t, input)
@@ -36,8 +37,7 @@ func Test_parseDiskstats(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	f := filter.Filter{ExcludeRE: regexp.MustCompile(`^(ram|loop|fd|dm-|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)}
-	stats, err := parseDiskstats(file, f)
+	stats, err := parseDiskstats(file)
 	assert.NoError(t, err)
 
 	want := map[string][]float64{
@@ -49,14 +49,12 @@ func Test_parseDiskstats(t *testing.T) {
 }
 
 func Test_getStorageProperties(t *testing.T) {
-	f := filter.Filter{ExcludeRE: regexp.MustCompile(`^(ram|loop|fd|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`)}
-
 	want := []storageDeviceProperties{
 		{device: "sda", rotational: "0", scheduler: "mq-deadline"},
 		{device: "sdb", rotational: "1", scheduler: "deadline"},
 	}
 
-	storages, err := getStorageProperties("testdata/sys/block/*", f)
+	storages, err := getStorageProperties("testdata/sys/block/*")
 	assert.NoError(t, err)
 	assert.Equal(t, want, storages)
 }

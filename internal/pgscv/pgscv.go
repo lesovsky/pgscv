@@ -30,7 +30,6 @@ func Start(ctx context.Context, config *Config) error {
 		NoTrackMode:        config.NoTrackMode,
 		ConnDefaults:       config.Defaults,
 		ConnsSettings:      config.ServicesConnsSettings,
-		Filters:            config.Filters,
 		DatabasesRE:        config.DatabasesRE,
 		DisabledCollectors: config.DisableCollectors,
 		CollectorsSettings: config.CollectorsSettings,

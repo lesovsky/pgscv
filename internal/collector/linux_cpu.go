@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
@@ -26,7 +25,7 @@ type cpuCollector struct {
 }
 
 // NewCPUCollector returns a new Collector exposing kernel/system statistics.
-func NewCPUCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewCPUCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	cmdOutput, err := exec.Command("getconf", "CLK_TCK").Output()
 	if err != nil {
 		return nil, fmt.Errorf("determine clock frequency failed: %s", err)
@@ -44,31 +43,31 @@ func NewCPUCollector(constLabels labels, subsystems model.CollectorSettings) (Co
 			descOpts{"node", "cpu", "seconds_total", "Seconds the CPUs spent in each mode.", 0},
 			prometheus.CounterValue,
 			[]string{"mode"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		cpuAll: newBuiltinTypedDesc(
 			descOpts{"node", "cpu", "seconds_all_total", "Seconds the CPUs spent in all modes.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		cpuGuest: newBuiltinTypedDesc(
 			descOpts{"node", "cpu", "guest_seconds_total", "Seconds the CPUs spent in guests (VMs) for each mode.", 0},
 			prometheus.CounterValue,
 			[]string{"mode"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		uptime: newBuiltinTypedDesc(
 			descOpts{"node", "uptime", "up_seconds_total", "Total number of seconds the system has been up, accordingly to /proc/uptime.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		idletime: newBuiltinTypedDesc(
 			descOpts{"node", "uptime", "idle_seconds_total", "Total number of seconds all cores have spent idle, accordingly to /proc/uptime.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}
 	return c, nil

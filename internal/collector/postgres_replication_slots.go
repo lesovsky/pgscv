@@ -24,13 +24,13 @@ type postgresReplicationSlotCollector struct {
 
 // NewPostgresReplicationSlotsCollector returns a new Collector exposing postgres replication slots stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-replication-slots.html
-func NewPostgresReplicationSlotsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresReplicationSlotsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresReplicationSlotCollector{
 		restart: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication_slot", "wal_retain_bytes", "Number of WAL retained and required by consumers, in bytes.", 0},
 			prometheus.GaugeValue,
 			[]string{"database", "slot_name", "slot_type", "active"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }

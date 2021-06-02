@@ -3,7 +3,6 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -32,31 +31,31 @@ type postgresIndexesCollector struct {
 // For details see
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ALL-INDEXES-VIEW
 // https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STATIO-ALL-INDEXES-VIEW
-func NewPostgresIndexesCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresIndexesCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresIndexesCollector{
 		indexes: newBuiltinTypedDesc(
 			descOpts{"postgres", "index", "scans_total", "Total number of index scans initiated.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "schema", "table", "index", "key"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		tuples: newBuiltinTypedDesc(
 			descOpts{"postgres", "index", "tuples_total", "Total number of index entries processed by scans.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "schema", "table", "index", "tuples"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		io: newBuiltinTypedDesc(
 			descOpts{"postgres", "index_io", "blocks_total", "Total number of indexes' blocks processed.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "schema", "table", "index", "access"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		sizes: newBuiltinTypedDesc(
 			descOpts{"postgres", "index", "size_bytes", "Total size of the index, in bytes.", 0},
 			prometheus.GaugeValue,
 			[]string{"database", "schema", "table", "index"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 	}, nil
 }

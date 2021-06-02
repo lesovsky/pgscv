@@ -3,9 +3,9 @@ package collector
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 )
 
@@ -17,18 +17,15 @@ func TestFilesystemCollector_Update(t *testing.T) {
 			"node_filesystem_files",
 			"node_filesystem_files_total",
 		},
-		collector: NewFilesystemCollector,
+		collector:         NewFilesystemCollector,
+		collectorSettings: model.CollectorSettings{Filters: filter.New()},
 	}
 
 	pipeline(t, input)
 }
 
 func Test_getFilesystemStats(t *testing.T) {
-	ff := map[string]filter.Filter{
-		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^(tmpfs|ext)$`)},
-	}
-
-	got, err := getFilesystemStats(ff)
+	got, err := getFilesystemStats()
 	assert.NoError(t, err)
 	assert.NotNil(t, got)
 	assert.Greater(t, len(got), 0)
@@ -38,11 +35,7 @@ func Test_parseFilesystemStats(t *testing.T) {
 	file, err := os.Open(filepath.Clean("testdata/proc/mounts.golden"))
 	assert.NoError(t, err)
 
-	ff := map[string]filter.Filter{
-		"filesystem/fstype": {IncludeRE: regexp.MustCompile(`^tmpfs`)},
-	}
-
-	stats, err := parseFilesystemStats(file, ff)
+	stats, err := parseFilesystemStats(file)
 	assert.NoError(t, err)
 	assert.Greater(t, len(stats), 1)
 	assert.Greater(t, stats[0].size, float64(0))
@@ -57,7 +50,7 @@ func Test_parseFilesystemStats(t *testing.T) {
 	file, err = os.Open(filepath.Clean("testdata/proc/netdev.golden"))
 	assert.NoError(t, err)
 
-	stats, err = parseFilesystemStats(file, nil)
+	stats, err = parseFilesystemStats(file)
 	assert.Error(t, err)
 	assert.Nil(t, stats)
 	_ = file.Close()

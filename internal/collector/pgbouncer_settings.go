@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -27,25 +26,25 @@ type pgbouncerSettingsCollector struct {
 
 // NewPgbouncerSettingsCollector returns a new Collector exposing pgbouncer configuration.
 // For details see https://www.pgbouncer.org/usage.html#show-config.
-func NewPgbouncerSettingsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPgbouncerSettingsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &pgbouncerSettingsCollector{
 		settings: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "service", "settings_info", "Labeled information about Pgbouncer configuration settings.", 0},
 			prometheus.GaugeValue,
 			[]string{"name", "setting"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		dbSettings: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "service", "database_settings_info", "Labeled information about Pgbouncer's per-database configuration settings.", 0},
 			prometheus.GaugeValue,
 			[]string{"database", "mode", "size"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		poolSize: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "service", "database_pool_size", "Maximum size of pools for the database.", 0},
 			prometheus.GaugeValue,
 			[]string{"database"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 	}, nil
 }

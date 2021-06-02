@@ -3,7 +3,6 @@ package collector
 import (
 	"context"
 	"github.com/jackc/pgx/v4"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -25,8 +24,6 @@ type Config struct {
 	PostgresServiceConfig
 	// DatabasesRE defines regexp with databases from which builtin metrics should be collected.
 	DatabasesRE *regexp.Regexp
-	// Filters are user-defined regular expressions allow to include/exclude collecting various stats.
-	Filters map[string]filter.Filter
 	// Settings defines collectors settings propagated from main YAML configuration.
 	Settings model.CollectorsSettings
 }

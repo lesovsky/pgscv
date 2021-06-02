@@ -31,25 +31,25 @@ type postgresLocksCollector struct {
 }
 
 // NewPostgresLocksCollector creates new postgresLocksCollector.
-func NewPostgresLocksCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresLocksCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresLocksCollector{
 		locks: newBuiltinTypedDesc(
 			descOpts{"postgres", "locks", "in_flight", "Number of in-flight locks held by active processes in each mode.", 0},
 			prometheus.GaugeValue,
 			[]string{"mode"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		locksAll: newBuiltinTypedDesc(
 			descOpts{"postgres", "locks", "all_in_flight", "Total number of all in-flight locks held by active processes.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		notgranted: newBuiltinTypedDesc(
 			descOpts{"postgres", "locks", "not_granted_in_flight", "Number of in-flight not granted locks held by active processes.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }

@@ -60,22 +60,9 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid: with filters",
-			valid: true,
-			file:  "testdata/pgscv-filters-example.yaml",
-			want: &Config{
-				ListenAddress: "127.0.0.1:8080",
-				Defaults:      map[string]string{},
-				Filters: map[string]filter.Filter{
-					"diskstats/device": {Exclude: "^(test|example)$"},
-					"netdev/device":    {Include: "^(test|example)$"},
-				},
-			},
-		},
-		{
 			name:  "valid: with filters V2",
 			valid: true,
-			file:  "testdata/pgscv-filters-example-v2.yaml",
+			file:  "testdata/pgscv-filters-example.yaml",
 			want: &Config{
 				ListenAddress: "127.0.0.1:8080",
 				Defaults:      map[string]string{},
@@ -207,11 +194,6 @@ func TestConfig_Validate(t *testing.T) {
 			}},
 		},
 		{
-			name:  "invalid config: invalid filter",
-			valid: false,
-			in:    &Config{ListenAddress: "127.0.0.1:8080", Filters: map[string]filter.Filter{"test": {Include: "["}}},
-		},
-		{
 			name:  "invalid config: invalid databases string",
 			valid: false,
 			in:    &Config{ListenAddress: "127.0.0.1:8080", Databases: "["},
@@ -223,7 +205,6 @@ func TestConfig_Validate(t *testing.T) {
 			err := tc.in.Validate()
 			if tc.valid {
 				assert.NoError(t, err)
-				assert.NotNil(t, tc.in.Filters)
 			} else {
 				assert.Error(t, err)
 			}

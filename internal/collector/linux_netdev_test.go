@@ -3,9 +3,9 @@ package collector
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"path/filepath"
-	"regexp"
 	"testing"
 )
 
@@ -16,7 +16,8 @@ func TestNetdevCollector_Update(t *testing.T) {
 			"node_network_packets_total",
 			"node_network_events_total",
 		},
-		collector: NewNetdevCollector,
+		collector:         NewNetdevCollector,
+		collectorSettings: model.CollectorSettings{Filters: filter.New()},
 	}
 
 	pipeline(t, input)
@@ -27,8 +28,7 @@ func Test_parseNetdevStats(t *testing.T) {
 	assert.NoError(t, err)
 	defer func() { _ = file.Close() }()
 
-	f := filter.Filter{ExcludeRE: regexp.MustCompile(`docker|br-ed|virbr`)}
-	stats, err := parseNetdevStats(file, f)
+	stats, err := parseNetdevStats(file)
 	assert.NoError(t, err)
 
 	want := map[string][]float64{

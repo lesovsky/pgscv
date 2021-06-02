@@ -9,7 +9,6 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/process"
 	"github.com/weaponry/pgscv/internal/collector"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -56,7 +55,6 @@ type Config struct {
 	NoTrackMode   bool
 	ConnDefaults  map[string]string `yaml:"defaults"` // Defaults
 	ConnsSettings ConnsSettings
-	Filters       map[string]filter.Filter
 	// DatabasesRE defines regexp with databases from which builtin metrics should be collected.
 	DatabasesRE        *regexp.Regexp
 	DisabledCollectors []string
@@ -350,7 +348,6 @@ func (repo *Repository) setupServices(config Config) error {
 				NoTrackMode: config.NoTrackMode,
 				ServiceType: service.ConnSettings.ServiceType,
 				ConnString:  service.ConnSettings.Conninfo,
-				Filters:     config.Filters,
 				Settings:    config.CollectorsSettings,
 				DatabasesRE: config.DatabasesRE,
 			}

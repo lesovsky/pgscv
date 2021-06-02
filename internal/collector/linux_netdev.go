@@ -20,32 +20,46 @@ type netdevCollector struct {
 }
 
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
-func NewNetdevCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewNetdevCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
+
+	// Define default filters (if no already present) to avoid collecting metrics about virtual interfaces.
+	if _, ok := settings.Filters["device"]; !ok {
+		if settings.Filters == nil {
+			settings.Filters = filter.New()
+		}
+
+		settings.Filters.Add("device", filter.Filter{Exclude: `docker|virbr`})
+		err := settings.Filters.Compile()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &netdevCollector{
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "network", "bytes_total", "Total number of bytes processed by network device, by each direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		packets: newBuiltinTypedDesc(
 			descOpts{"node", "network", "packets_total", "Total number of packets processed by network device, by each direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		events: newBuiltinTypedDesc(
 			descOpts{"node", "network", "events_total", "Total number of events occurred on network device, by each type and direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type", "event"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }
 
 // Update method collects network interfaces statistics
 func (c *netdevCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	stats, err := getNetdevStats(config.Filters["netdev/device"])
+	stats, err := getNetdevStats()
 	if err != nil {
 		return fmt.Errorf("get /proc/net/dev stats failed: %s", err)
 	}
@@ -81,18 +95,18 @@ func (c *netdevCollector) Update(config Config, ch chan<- prometheus.Metric) err
 }
 
 // getNetdevStats is the intermediate function which opens stats file and run stats parser for extracting stats.
-func getNetdevStats(filter filter.Filter) (map[string][]float64, error) {
+func getNetdevStats() (map[string][]float64, error) {
 	file, err := os.Open("/proc/net/dev")
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = file.Close() }()
 
-	return parseNetdevStats(file, filter)
+	return parseNetdevStats(file)
 }
 
 // parseNetdevStats accepts file descriptor, reads file content and produces stats.
-func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, error) {
+func parseNetdevStats(r io.Reader) (map[string][]float64, error) {
 	log.Debug("parse network devices stats")
 
 	scanner := bufio.NewScanner(r)
@@ -112,11 +126,6 @@ func parseNetdevStats(r io.Reader, filter filter.Filter) (map[string][]float64, 
 		values := strings.Fields(scanner.Text())
 
 		device := strings.TrimRight(values[0], ":")
-		if !filter.Pass(device) {
-			//log.Debugf("ignore device %s", device)
-			continue
-		}
-		//log.Debugf("pass device %s", device)
 
 		// Create float64 slice for values, parse line except first three values (major/minor/device)
 		stat := make([]float64, len(values)-1)

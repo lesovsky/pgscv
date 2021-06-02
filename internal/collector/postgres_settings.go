@@ -21,19 +21,19 @@ type postgresSettingsCollector struct {
 // NewPostgresSettingsCollector returns a new Collector exposing postgres settings stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-settings.html
 // and https://www.postgresql.org/docs/current/view-pg-file-settings.html
-func NewPostgresSettingsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresSettingsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresSettingsCollector{
 		settings: newBuiltinTypedDesc(
 			descOpts{"postgres", "service", "settings_info", "Labeled information about Postgres configuration settings.", 0},
 			prometheus.GaugeValue,
 			[]string{"name", "setting", "unit", "vartype", "source"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 		files: newBuiltinTypedDesc(
 			descOpts{"postgres", "service", "files_info", "Labeled information about Postgres system files.", 0},
 			prometheus.GaugeValue,
 			[]string{"guc", "mode", "path"}, constLabels,
-			subsystems.Filters,
+			settings.Filters,
 		),
 	}, nil
 }

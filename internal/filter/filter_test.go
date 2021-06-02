@@ -6,42 +6,6 @@ import (
 	"testing"
 )
 
-func TestFilters_SetDefault(t *testing.T) {
-	var testcases = []struct {
-		name string
-		in   Filters
-		want Filters
-	}{
-		{name: "empty map", in: New(), want: Filters{
-			"diskstats/device":  {Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`},
-			"netdev/device":     {Exclude: `docker|virbr`},
-			"filesystem/fstype": {Include: `^(ext3|ext4|xfs|btrfs)$`},
-		}},
-		{
-			name: "defined filters",
-			in: Filters{
-				"diskstats/device":  {Include: "^(test123|example123)$"},
-				"netdev/device":     {Include: "^(test456|example456)$"},
-				"filesystem/fstype": {Exclude: "^(test789|example789)$"},
-				"test/example":      {Exclude: "^(test|example)$"},
-			},
-			want: Filters{
-				"diskstats/device":  {Include: "^(test123|example123)$"},
-				"netdev/device":     {Include: "^(test456|example456)$"},
-				"filesystem/fstype": {Exclude: "^(test789|example789)$"},
-				"test/example":      {Exclude: "^(test|example)$"},
-			},
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			tc.in.SetDefault()
-			assert.Equal(t, tc.want, tc.in)
-		})
-	}
-}
-
 func TestFilters_Compile(t *testing.T) {
 	var testcases = []struct {
 		name  string
@@ -95,7 +59,7 @@ func TestFilter_Pass(t *testing.T) {
 	}
 }
 
-// Pass2 test for passing default filters.
+// Pass2 extra tests for filters.
 func TestFilter_Pass2(t *testing.T) {
 	testcases := []struct {
 		in    string
@@ -128,7 +92,9 @@ func TestFilter_Pass2(t *testing.T) {
 	}
 
 	filters := New()
-	filters.SetDefault()
+	filters.Add("diskstats/device", Filter{Exclude: `^(ram|loop|fd|sr|(h|s|v|xv)d[a-z]|nvme\d+n\d+p)\d+$`})
+	filters.Add("netdev/device", Filter{Exclude: `docker|virbr`})
+	filters.Add("filesystem/fstype", Filter{Include: `^(ext3|ext4|xfs|btrfs)$`})
 
 	assert.NoError(t, filters.Compile())
 

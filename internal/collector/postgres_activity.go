@@ -3,7 +3,6 @@ package collector
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -70,49 +69,49 @@ type postgresActivityCollector struct {
 // For details see
 // 1. https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ACTIVITY-VIEW
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
-func NewPostgresActivityCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
+func NewPostgresActivityCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
 		waitEvents: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "wait_events_in_flight", "Number of wait events in-flight in each state.", 0},
 			prometheus.GaugeValue,
 			[]string{"type", "event"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		states: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "connections_in_flight", "Number of connections in-flight in each state.", 0},
 			prometheus.GaugeValue,
 			[]string{"state"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		statesAll: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "connections_all_in_flight", "Number of all connections in-flight.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		activity: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "max_seconds", "Longest activity for each user, database and activity type.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "state", "type"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		prepared: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "prepared_transactions_in_flight", "Number of transactions that are currently prepared for two-phase commit.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		inflight: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "queries_in_flight", "Number of queries running in-flight of each type.", 0},
 			prometheus.GaugeValue,
 			[]string{"type"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		vacuums: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "vacuums_in_flight", "Number of vacuum operations running in-flight of each type.", 0},
 			prometheus.GaugeValue,
 			[]string{"type"}, constLabels,
-			filter.New(),
+			settings.Filters,
 		),
 		re: newQueryRegexp(),
 	}, nil
