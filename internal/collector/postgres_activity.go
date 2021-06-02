@@ -70,7 +70,7 @@ type postgresActivityCollector struct {
 // For details see
 // 1. https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-ACTIVITY-VIEW
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
-func NewPostgresActivityCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresActivityCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
 		waitEvents: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "wait_events_in_flight", "Number of wait events in-flight in each state.", 0},

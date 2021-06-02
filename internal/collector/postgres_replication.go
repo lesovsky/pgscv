@@ -3,7 +3,6 @@ package collector
 import (
 	"context"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -53,7 +52,7 @@ type postgresReplicationCollector struct {
 
 // NewPostgresReplicationCollector returns a new Collector exposing postgres replication stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-REPLICATION-VIEW
-func NewPostgresReplicationCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresReplicationCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"client_addr", "user", "application_name", "state", "lag"}
 
 	return &postgresReplicationCollector{
@@ -62,37 +61,37 @@ func NewPostgresReplicationCollector(constLabels labels, _ model.CollectorSettin
 			descOpts{"postgres", "recovery", "info", "Current recovery state, 0 - not in recovery; 1 - in recovery.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		wal: newBuiltinTypedDesc(
 			descOpts{"postgres", "wal", "written_bytes_total", "Total amount of WAL written (or received in case of standby), in bytes.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		lagbytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication", "lag_bytes", "Number of bytes standby is behind than primary in each WAL processing phase.", 0},
 			prometheus.GaugeValue,
 			labelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		lagseconds: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication", "lag_seconds", "Number of seconds standby is behind than primary in each WAL processing phase.", 0},
 			prometheus.GaugeValue,
 			labelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		lagtotalbytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication", "lag_all_bytes", "Number of bytes standby is behind than primary including all phases.", 0},
 			prometheus.GaugeValue,
 			[]string{"client_addr", "user", "application_name", "state"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		lagtotalseconds: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication", "lag_all_seconds", "Number of seconds standby is behind than primary including all phases.", 0},
 			prometheus.GaugeValue,
 			[]string{"client_addr", "user", "application_name", "state"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

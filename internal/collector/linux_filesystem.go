@@ -22,7 +22,7 @@ type filesystemCollector struct {
 }
 
 // NewFilesystemCollector returns a new Collector exposing filesystem stats.
-func NewFilesystemCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewFilesystemCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &filesystemCollector{
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "filesystem", "bytes", "Number of bytes of filesystem by usage.", 0},

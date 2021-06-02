@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -41,7 +40,7 @@ type postgresDatabasesCollector struct {
 
 // NewPostgresDatabasesCollector returns a new Collector exposing postgres databases stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-DATABASE-VIEW
-func NewPostgresDatabasesCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresDatabasesCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	var labels = []string{"database"}
 
 	return &postgresDatabasesCollector{
@@ -50,73 +49,73 @@ func NewPostgresDatabasesCollector(constLabels labels, _ model.CollectorSettings
 			descOpts{"postgres", "database", "xact_commits_total", "Total number of transactions had been committed.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		rollbacks: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "xact_rollbacks_total", "Total number of transactions had been rolled back.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		conflicts: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "conflicts_total", "Total number of recovery conflicts occurred.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		deadlocks: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "deadlocks_total", "Total number of deadlocks occurred.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		blocks: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "blocks_total", "Total number of disk blocks had been accessed by each type of access.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "access"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		tuples: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "tuples_total", "Total number of rows processed by each type of operation.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "tuples"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		tempbytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "temp_bytes_total", "Total amount of data written to temporary files by queries.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		tempfiles: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "temp_files_total", "Total number of temporary files created by queries.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		blockstime: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "blk_time_seconds_total", "Total time spent accessing data blocks by backends in this database in each access type, in seconds.", .001},
 			prometheus.CounterValue,
 			[]string{"database", "type"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sizes: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "size_bytes", "Total size of the database, in bytes.", 0},
 			prometheus.GaugeValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		statsage: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "stats_age_seconds_total", "The age of the databases activity statistics, in seconds.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		xidlimit: newBuiltinTypedDesc(
 			descOpts{"postgres", "xacts", "left_before_wraparound", "The number of transactions left before force shutdown due to XID wraparound.", 0},
 			prometheus.CounterValue,
 			[]string{"xid_from"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

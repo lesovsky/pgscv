@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -25,7 +24,7 @@ type pgbouncerPoolsCollector struct {
 
 // NewPgbouncerPoolsCollector returns a new Collector exposing pgbouncer pools connections usage stats.
 // For details see https://www.pgbouncer.org/usage.html#show-pools.
-func NewPgbouncerPoolsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPgbouncerPoolsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	var poolsLabelNames = []string{"user", "database", "pool_mode", "state"}
 
 	return &pgbouncerPoolsCollector{
@@ -33,19 +32,19 @@ func NewPgbouncerPoolsCollector(constLabels labels, _ model.CollectorSettings) (
 			descOpts{"pgbouncer", "pool", "connections_in_flight", "The total number of connections established by each state.", 0},
 			prometheus.GaugeValue,
 			poolsLabelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		maxwait: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "pool", "max_wait_seconds", "Total time the first (oldest) client in the queue has waited, in seconds.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "pool_mode"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		clients: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "client", "connections_in_flight", "The total number of client connections established by source address.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "address"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		labelNames: poolsLabelNames,
 	}, nil

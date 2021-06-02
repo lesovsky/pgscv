@@ -170,6 +170,11 @@ func validateCollectorSettings(cs model.CollectorsSettings) error {
 			return fmt.Errorf("invalid collector name: %s", csName)
 		}
 
+		err := settings.Filters.Compile()
+		if err != nil {
+			return err
+		}
+
 		// Validate subsystems level
 		for ssName, subsys := range settings.Subsystems {
 			re2 := regexp.MustCompilePOSIX(`^[a-zA-Z0-9_]+$`)

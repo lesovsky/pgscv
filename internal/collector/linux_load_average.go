@@ -18,7 +18,7 @@ type loadaverageCollector struct {
 }
 
 // NewLoadAverageCollector returns a new Collector exposing load average statistics.
-func NewLoadAverageCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewLoadAverageCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &loadaverageCollector{
 		load1: newBuiltinTypedDesc(
 			descOpts{"node", "", "load1", "1m load average.", 0},

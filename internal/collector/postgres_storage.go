@@ -36,7 +36,7 @@ type postgresStorageCollector struct {
 
 // NewPostgresStorageCollector returns a new Collector exposing various stats related to Postgres storage layer.
 // This stats observed using different stats sources.
-func NewPostgresStorageCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresStorageCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresStorageCollector{
 		tempFiles: newBuiltinTypedDesc(
 			descOpts{"postgres", "temp_files", "in_flight", "Number of temporary files processed in flight.", 0},

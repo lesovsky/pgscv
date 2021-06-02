@@ -3,7 +3,6 @@ package collector
 import (
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -22,7 +21,7 @@ type postgresFunctionsCollector struct {
 
 // NewPostgresFunctionsCollector returns a new Collector exposing postgres SQL functions stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-USER-FUNCTIONS-VIEW
-func NewPostgresFunctionsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresFunctionsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	var labelNames = []string{"database", "schema", "function"}
 
 	return &postgresFunctionsCollector{
@@ -31,19 +30,19 @@ func NewPostgresFunctionsCollector(constLabels labels, _ model.CollectorSettings
 			descOpts{"postgres", "function", "calls_total", "Total number of times functions had been called.", 0},
 			prometheus.CounterValue,
 			labelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		totaltime: newBuiltinTypedDesc(
 			descOpts{"postgres", "function", "total_time_seconds_total", "Total time spent in function and all other functions called by it, in seconds.", .001},
 			prometheus.CounterValue,
 			labelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		selftime: newBuiltinTypedDesc(
 			descOpts{"postgres", "function", "self_time_seconds_total", "Total time spent in function itself, not including other functions called by it, in seconds.", .001},
 			prometheus.CounterValue,
 			labelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

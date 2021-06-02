@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -21,7 +20,7 @@ type pgbouncerStatsCollector struct {
 
 // NewPgbouncerStatsCollector returns a new Collector exposing pgbouncer pools usage stats (except averages).
 // For details see https://www.pgbouncer.org/usage.html#show-stats.
-func NewPgbouncerStatsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPgbouncerStatsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	var pgbouncerLabelNames = []string{"database"}
 
 	return &pgbouncerStatsCollector{
@@ -30,19 +29,19 @@ func NewPgbouncerStatsCollector(constLabels labels, _ model.CollectorSettings) (
 			descOpts{"pgbouncer", "", "transactions_total", "Total number of SQL transactions processed, for each database.", 0},
 			prometheus.CounterValue,
 			pgbouncerLabelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		queries: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "", "queries_total", "Total number of SQL queries processed, for each database.", 0},
 			prometheus.CounterValue,
 			pgbouncerLabelNames, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		bytes: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "", "bytes_total", "Total volume of network traffic processed by pgbouncer in each direction, in bytes.", 0},
 			prometheus.CounterValue,
 			[]string{"database", "type"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		time: newBuiltinTypedDesc(
 			descOpts{
@@ -52,7 +51,7 @@ func NewPgbouncerStatsCollector(constLabels labels, _ model.CollectorSettings) (
 			},
 			prometheus.CounterValue,
 			[]string{"database", "type", "mode"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

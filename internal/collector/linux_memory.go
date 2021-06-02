@@ -15,28 +15,30 @@ import (
 )
 
 type meminfoCollector struct {
-	re          *regexp.Regexp
-	constLabels labels
-	memused     typedDesc
-	swapused    typedDesc
+	re            *regexp.Regexp
+	subsysFilters filter.Filters
+	constLabels   labels
+	memused       typedDesc
+	swapused      typedDesc
 }
 
 // NewMeminfoCollector returns a new Collector exposing memory stats.
-func NewMeminfoCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewMeminfoCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &meminfoCollector{
-		re:          regexp.MustCompile(`\((.*)\)`),
-		constLabels: constLabels,
+		re:            regexp.MustCompile(`\((.*)\)`),
+		subsysFilters: subsystems.Filters,
+		constLabels:   constLabels,
 		memused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "MemUsed", "Memory information composite field MemUsed.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		swapused: newBuiltinTypedDesc(
 			descOpts{"node", "memory", "SwapUsed", "Memory information composite field SwapUsed.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }
@@ -60,7 +62,7 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 			descOpts{"node", "memory", param, fmt.Sprintf("Memory information field %s.", param), 0},
 			prometheus.GaugeValue,
 			nil, c.constLabels,
-			filter.New(),
+			c.subsysFilters,
 		)
 
 		ch <- desc.newConstMetric(value)
@@ -84,7 +86,7 @@ func (c *meminfoCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 
 		desc := newBuiltinTypedDesc(
 			descOpts{"node", "vmstat", param, fmt.Sprintf("Vmstat information field %s.", param), 0},
-			t, nil, c.constLabels, filter.New(),
+			t, nil, c.constLabels, c.subsysFilters,
 		)
 
 		ch <- desc.newConstMetric(value)

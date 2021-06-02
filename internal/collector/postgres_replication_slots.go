@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -25,13 +24,13 @@ type postgresReplicationSlotCollector struct {
 
 // NewPostgresReplicationSlotsCollector returns a new Collector exposing postgres replication slots stats.
 // For details see https://www.postgresql.org/docs/current/view-pg-replication-slots.html
-func NewPostgresReplicationSlotsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresReplicationSlotsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresReplicationSlotCollector{
 		restart: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication_slot", "wal_retain_bytes", "Number of WAL retained and required by consumers, in bytes.", 0},
 			prometheus.GaugeValue,
 			[]string{"database", "slot_name", "slot_type", "active"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

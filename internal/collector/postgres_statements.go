@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -63,115 +62,115 @@ type postgresStatementsCollector struct {
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
 // For details see https://www.postgresql.org/docs/current/pgstatstatements.html
-func NewPostgresStatementsCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresStatementsCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresStatementsCollector{
 		query: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "query_info", "Labeled info about statements has been executed.", 0},
 			prometheus.GaugeValue,
 			[]string{"user", "database", "md5", "query"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		calls: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "calls_total", "Total number of times statement has been executed.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		rows: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "rows_total", "Total number of rows retrieved or affected by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		times: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "time_seconds_total", "Time spent by the statement in each mode, in seconds.", .001},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5", "mode"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		allTimes: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "time_seconds_all_total", "Total time spent by the statement, in seconds.", .001},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sharedHit: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_hit_bytes_total", "Total number of bytes found in shared buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sharedRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sharedDirtied: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_dirtied_bytes_total", "Total number of bytes dirtied in shared buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sharedWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_written_bytes_total", "Total number of bytes written to shared buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		localHit: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_hit_bytes_total", "Total number of bytes found in local buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		localRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		localDirtied: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_dirtied_bytes_total", "Total number of bytes dirtied in local buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		localWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_written_bytes_total", "Total number of bytes written to local buffers by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		tempRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "temp_read_bytes_total", "Total number of bytes read from temporary files by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		tempWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "temp_written_bytes_total", "Total number of bytes written to temporary files by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		walRecords: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_records_total", "Total number of WAL records generated by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		walFPI: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_fpi_bytes_total", "Total number of WAL full-page images generated by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		walBytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_bytes_total", "Total number of WAL bytes (not including FPI) generated by the statement.", 0},
 			prometheus.CounterValue,
 			[]string{"user", "database", "md5"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		chain: newNormalizationChain(),
 	}, nil

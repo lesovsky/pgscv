@@ -15,7 +15,7 @@ type networkCollector struct {
 	publicAddresses  typedDesc
 }
 
-func NewNetworkCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewNetworkCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &networkCollector{
 		publicAddresses: newBuiltinTypedDesc(
 			descOpts{"node", "network", "public_addresses", "Number of public network addresses present on the system, by type.", 0},

@@ -20,25 +20,25 @@ type netdevCollector struct {
 }
 
 // NewNetdevCollector returns a new Collector exposing network interfaces stats.
-func NewNetdevCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewNetdevCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &netdevCollector{
 		bytes: newBuiltinTypedDesc(
 			descOpts{"node", "network", "bytes_total", "Total number of bytes processed by network device, by each direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		packets: newBuiltinTypedDesc(
 			descOpts{"node", "network", "packets_total", "Total number of packets processed by network device, by each direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		events: newBuiltinTypedDesc(
 			descOpts{"node", "network", "events_total", "Total number of events occurred on network device, by each type and direction.", 0},
 			prometheus.CounterValue,
 			[]string{"device", "type", "event"}, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/weaponry/pgscv/internal/filter"
 	"regexp"
 )
 
@@ -29,7 +30,9 @@ type PGResult struct {
 //
 //  collectors:                                                 <- Collectors (root level in YAML)
 //    postgres/archiver:                                        <- CollectorSettings
-//      echo: "example"                                         <- CollectorSettings.Echo (example)
+//      filters:                                                <- CollectorSettings.Filters
+//        query:                                                <- label
+//          exclude: "(UPDATE|DELETE)"                          <- exclude metrics with labels contains these values
 //      subsystems:                                             <- Subsystems
 //        activity:                                             <- MetricsSubsystem
 //          databases: "^db(1|2)$"                              <- MetricsSubsystem.Databases
@@ -51,8 +54,8 @@ type CollectorsSettings map[string]CollectorSettings
 
 // CollectorSettings unions all settings related to a single collector.
 type CollectorSettings struct {
-	//
-	//Filters filter.Filters `yaml:"filters"`
+	// Filters defines label-based filters applied to metrics.
+	Filters filter.Filters `yaml:"filters"`
 	// Subsystems defines subsystem with user-defined metrics.
 	Subsystems Subsystems `yaml:"subsystems"`
 }

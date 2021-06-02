@@ -24,38 +24,38 @@ type postgresBgwriterCollector struct {
 
 // NewPostgresBgwriterCollector returns a new Collector exposing postgres bgwriter and checkpointer stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#PG-STAT-BGWRITER-VIEW
-func NewPostgresBgwriterCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresBgwriterCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresBgwriterCollector{
 		descs: map[string]typedDesc{
 			"checkpoints": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "total", "Total number of checkpoints that have been performed of each type.", 0},
 				prometheus.CounterValue,
 				[]string{"checkpoint"}, constLabels,
-				filter.New(),
+				subsystems.Filters,
 			),
 			"checkpoints_all": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "all_total", "Total number of checkpoints that have been performed.", 0},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				subsystems.Filters,
 			),
 			"checkpoint_time": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "seconds_total", "Total amount of time that has been spent processing data during checkpoint in each stage, in seconds.", .001},
 				prometheus.CounterValue,
 				[]string{"stage"}, constLabels,
-				filter.New(),
+				subsystems.Filters,
 			),
 			"checkpoint_time_all": newBuiltinTypedDesc(
 				descOpts{"postgres", "checkpoints", "seconds_all_total", "Total amount of time that has been spent processing data during checkpoint, in seconds.", .001},
 				prometheus.CounterValue,
 				nil, constLabels,
-				filter.New(),
+				subsystems.Filters,
 			),
 			"written_bytes": newBuiltinTypedDesc(
 				descOpts{"postgres", "written", "bytes_total", "Total number of bytes written by each subsystem, in bytes.", 0},
 				prometheus.CounterValue,
 				[]string{"process"}, constLabels,
-				filter.New(),
+				subsystems.Filters,
 			),
 			"maxwritten_clean": newBuiltinTypedDesc(
 				descOpts{"postgres", "bgwriter", "maxwritten_clean_total", "Total number of times the background writer stopped a cleaning scan because it had written too many buffers.", 0},

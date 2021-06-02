@@ -2,7 +2,6 @@ package collector
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
@@ -23,31 +22,31 @@ type postgresWalArchivingCollector struct {
 
 // NewPostgresWalArchivingCollector returns a new Collector exposing postgres WAL archiving stats.
 // For details see https://www.postgresql.org/docs/current/monitoring-stats.html#MONITORING-PG-STAT-ARCHIVER-VIEW
-func NewPostgresWalArchivingCollector(constLabels labels, _ model.CollectorSettings) (Collector, error) {
+func NewPostgresWalArchivingCollector(constLabels labels, subsystems model.CollectorSettings) (Collector, error) {
 	return &postgresWalArchivingCollector{
 		archived: newBuiltinTypedDesc(
 			descOpts{"postgres", "archiver", "archived_total", "Total number of WAL segments had been successfully archived.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		failed: newBuiltinTypedDesc(
 			descOpts{"postgres", "archiver", "failed_total", "Total number of attempts when WAL segments had been failed to archive.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		sinceArchivedSeconds: newBuiltinTypedDesc(
 			descOpts{"postgres", "archiver", "since_last_archive_seconds", "Number of seconds since last WAL segment had been successfully archived.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 		archivingLag: newBuiltinTypedDesc(
 			descOpts{"postgres", "archiver", "lag_bytes", "Amount of WAL segments ready, but not archived, in bytes.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
-			filter.New(),
+			subsystems.Filters,
 		),
 	}, nil
 }

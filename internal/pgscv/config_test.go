@@ -73,6 +73,22 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
+			name:  "valid: with filters V2",
+			valid: true,
+			file:  "testdata/pgscv-filters-example-v2.yaml",
+			want: &Config{
+				ListenAddress: "127.0.0.1:8080",
+				Defaults:      map[string]string{},
+				CollectorsSettings: model.CollectorsSettings{
+					"postgres/custom": {
+						Filters: filter.Filters{
+							"device": {Exclude: "^(test|example)$"},
+						},
+					},
+				},
+			},
+		},
+		{
 			name:  "valid: with collectors settings",
 			valid: true,
 			file:  "testdata/pgscv-collectors-settings-example.yaml",
@@ -263,6 +279,15 @@ func Test_validateCollectorSettings(t *testing.T) {
 			valid: false, // Invalid subsystem name for metric
 			settings: map[string]model.CollectorSettings{
 				"example/example": {Subsystems: map[string]model.MetricsSubsystem{"inva:lid": {}}},
+			},
+		},
+		{
+			valid: false, // Invalid filters specified
+			settings: map[string]model.CollectorSettings{
+				"example/example": {
+					Filters:    filter.Filters{"test": filter.Filter{Exclude: "["}},
+					Subsystems: map[string]model.MetricsSubsystem{"example": {}},
+				},
 			},
 		},
 		{
