@@ -338,6 +338,10 @@ func (s *sendClient) sendMetrics(buf []byte) error {
 	req.Header.Set("User-Agent", "pgSCV")
 	req.Header.Add("X-Weaponry-Api-Key", s.apiKey)
 
+	q := req.URL.Query()
+	q.Add("timestamp", fmt.Sprintf("%d", time.Now().UnixNano()/1000000))
+	req.URL.RawQuery = q.Encode()
+
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
 	defer cancel()
 
