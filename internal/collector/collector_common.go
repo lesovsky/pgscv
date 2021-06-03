@@ -55,6 +55,7 @@ func newBuiltinTypedDesc(opts descOpts, dtype prometheus.ValueType, varLabelName
 			varLabelNames,
 			prometheus.Labels(constLabels),
 		),
+		factor:     opts.factor,
 		valueType:  dtype,
 		labelNames: varLabelNames,
 		labels:     map[string]string{},
