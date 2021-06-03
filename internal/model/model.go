@@ -65,10 +65,9 @@ type Subsystems map[string]MetricsSubsystem
 
 // MetricsSubsystem describes a single subsystem.
 type MetricsSubsystem struct {
-	// TODO: this should be an interface because use cases are not limited by queries only,
-	//   there could by system commands, HTTP requests, etc...
 	// Databases defines which databases should be visited for collecting metrics.
-	Databases   string `yaml:"databases"`
+	Databases string `yaml:"databases"`
+	// DatabasesRE defines regexp object based on Databases.
 	DatabasesRE *regexp.Regexp
 	// Query defines a SQL statement used for getting label/values for metrics.
 	Query string `yaml:"query"`
