@@ -12,6 +12,7 @@ import (
 func TestPgbouncerStatsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
+			"pgbouncer_up",
 			"pgbouncer_transactions_total",
 			"pgbouncer_queries_total",
 			"pgbouncer_bytes_total",

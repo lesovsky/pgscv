@@ -11,6 +11,7 @@ import (
 const pgbouncerStatsQuery = "SHOW STATS"
 
 type pgbouncerStatsCollector struct {
+	up         typedDesc
 	xacts      typedDesc
 	queries    typedDesc
 	bytes      typedDesc
@@ -25,6 +26,12 @@ func NewPgbouncerStatsCollector(constLabels labels, settings model.CollectorSett
 
 	return &pgbouncerStatsCollector{
 		labelNames: pgbouncerLabelNames,
+		up: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "", "up", "State of Pgbouncer service: 0 is down, 1 is up.", 0},
+			prometheus.CounterValue,
+			nil, constLabels,
+			settings.Filters,
+		),
 		xacts: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "", "transactions_total", "Total number of SQL transactions processed, for each database.", 0},
 			prometheus.CounterValue,
@@ -60,6 +67,7 @@ func NewPgbouncerStatsCollector(constLabels labels, settings model.CollectorSett
 func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	conn, err := store.New(config.ConnString)
 	if err != nil {
+		ch <- c.up.newConstMetric(0)
 		return err
 	}
 	defer conn.Close()
@@ -80,6 +88,9 @@ func (c *pgbouncerStatsCollector) Update(config Config, ch chan<- prometheus.Met
 		ch <- c.time.newConstMetric(stat.querytime, stat.database, "running", "query")
 		ch <- c.time.newConstMetric(stat.waittime, stat.database, "waiting", "none")
 	}
+
+	// All is ok, collect up metric.
+	ch <- c.up.newConstMetric(1)
 
 	return nil
 }

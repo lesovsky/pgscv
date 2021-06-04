@@ -76,7 +76,7 @@ type postgresActivityCollector struct {
 func NewPostgresActivityCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
 		up: newBuiltinTypedDesc(
-			descOpts{"postgres", "", "up", "State of Postgres service: 0 is down, 1 is up.", 0},
+			descOpts{"postgres", "", "up", "State of PostgreSQL service: 0 is down, 1 is up.", 0},
 			prometheus.GaugeValue,
 			nil, constLabels,
 			settings.Filters,
