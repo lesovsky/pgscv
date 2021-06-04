@@ -11,6 +11,8 @@ import (
 func TestPostgresActivityCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
+			"postgres_up",
+			"postgres_start_time_seconds",
 			"postgres_activity_wait_events_in_flight",
 			"postgres_activity_connections_in_flight",
 			"postgres_activity_connections_all_in_flight",

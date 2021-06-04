@@ -40,6 +40,8 @@ const (
 
 	postgresPreparedXactQuery = "SELECT count(*) AS total FROM pg_prepared_xacts"
 
+	postgresStartTimeQuery = "SELECT extract(epoch FROM pg_postmaster_start_time())"
+
 	// Backend states accordingly to pg_stat_activity.state
 	stActive          = "active"
 	stIdle            = "idle"
@@ -55,6 +57,8 @@ const (
 
 // postgresActivityCollector ...
 type postgresActivityCollector struct {
+	up         typedDesc
+	startTime  typedDesc
 	waitEvents typedDesc
 	states     typedDesc
 	statesAll  typedDesc
@@ -71,6 +75,18 @@ type postgresActivityCollector struct {
 // 2. https://www.postgresql.org/docs/current/view-pg-prepared-xacts.html
 func NewPostgresActivityCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &postgresActivityCollector{
+		up: newBuiltinTypedDesc(
+			descOpts{"postgres", "", "up", "State of Postgres service: 0 is down, 1 is up.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			settings.Filters,
+		),
+		startTime: newBuiltinTypedDesc(
+			descOpts{"postgres", "", "start_time_seconds", "Postgres start time, in unixtime.", 0},
+			prometheus.GaugeValue,
+			nil, constLabels,
+			settings.Filters,
+		),
 		waitEvents: newBuiltinTypedDesc(
 			descOpts{"postgres", "activity", "wait_events_in_flight", "Number of wait events in-flight in each state.", 0},
 			prometheus.GaugeValue,
@@ -121,6 +137,7 @@ func NewPostgresActivityCollector(constLabels labels, settings model.CollectorSe
 func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	conn, err := store.New(config.ConnString)
 	if err != nil {
+		ch <- c.up.newConstMetric(0)
 		return err
 	}
 	defer conn.Close()
@@ -141,6 +158,15 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		log.Warnf("query pg_prepared_xacts failed: %s; skip", err)
 	} else {
 		stats.prepared = float64(count)
+	}
+
+	// get postmaster start time
+	var startTime float64
+	err = conn.Conn().QueryRow(context.Background(), postgresStartTimeQuery).Scan(&startTime)
+	if err != nil {
+		log.Warnf("query postmaster start time failed: %s; skip", err)
+	} else {
+		stats.startTime = startTime
 	}
 
 	// Send collected metrics.
@@ -236,6 +262,12 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 		ch <- c.vacuums.newConstMetric(v, k)
 	}
 
+	// postmaster start time
+	ch <- c.startTime.newConstMetric(stats.startTime)
+
+	// All activity metrics collected successfully, now we can collect up metric.
+	ch <- c.up.newConstMetric(1)
+
 	return nil
 }
 
@@ -291,6 +323,7 @@ type postgresActivityStat struct {
 	queryCopy      float64            // number of COPY queries
 	queryOther     float64            // number of queries of other types: BEGIN, END, COMMIT, ABORT, SET, etc...
 	vacuumOps      map[string]float64 // vacuum operations by type
+	startTime      float64            // unix time when postmaster has been started
 
 	re queryRegexp // regexps used for query classification, it comes from postgresActivityCollector.
 }
