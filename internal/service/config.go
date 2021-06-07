@@ -19,7 +19,7 @@ type ConnsSettings map[string]ConnSetting
 
 // ParsePostgresDSNEnv is a public wrapper over parseDSNEnv.
 func ParsePostgresDSNEnv(key, value string) (string, ConnSetting, error) {
-	return parseDSNEnv("POSTGRES_DSN", key, value)
+	return parseDSNEnv("POSTGRES_DSN", strings.Replace(key, "DATABASE_DSN", "POSTGRES_DSN", 1), value)
 }
 
 // ParsePgbouncerDSNEnv is a public wrapper over parseDSNEnv.

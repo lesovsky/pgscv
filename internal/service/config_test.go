@@ -11,6 +11,11 @@ func Test_ParsePostgresDSNEnv(t *testing.T) {
 	assert.Equal(t, "postgres", gotID)
 	assert.Equal(t, ConnSetting{ServiceType: "postgres", Conninfo: "conninfo"}, gotCS)
 
+	gotID, gotCS, err = ParsePostgresDSNEnv("DATABASE_DSN", "conninfo")
+	assert.NoError(t, err)
+	assert.Equal(t, "postgres", gotID)
+	assert.Equal(t, ConnSetting{ServiceType: "postgres", Conninfo: "conninfo"}, gotCS)
+
 	_, _, err = ParsePostgresDSNEnv("INVALID", "conninfo")
 	assert.Error(t, err)
 }

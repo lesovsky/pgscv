@@ -225,6 +225,7 @@ func newConfigFromEnv() (*Config, error) {
 	for _, env := range os.Environ() {
 		if !strings.HasPrefix(env, "PGSCV_") &&
 			!strings.HasPrefix(env, "POSTGRES_DSN") &&
+			!strings.HasPrefix(env, "DATABASE_DSN") &&
 			!strings.HasPrefix(env, "PGBOUNCER_DSN") {
 			continue
 		}
@@ -233,8 +234,8 @@ func newConfigFromEnv() (*Config, error) {
 
 		key, value := ff[0], ff[1]
 
-		// Parse POSTGRES_DSN.
-		if strings.HasPrefix(key, "POSTGRES_DSN") {
+		// Parse POSTGRES_DSN (or its alias DATABASE_DSN).
+		if strings.HasPrefix(key, "POSTGRES_DSN") || strings.HasPrefix(key, "DATABASE_DSN") {
 			id, cs, err := service.ParsePostgresDSNEnv(key, value)
 			if err != nil {
 				return nil, err
