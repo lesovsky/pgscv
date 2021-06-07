@@ -68,18 +68,6 @@ type Collector interface {
 	Collect(chan<- prometheus.Metric)
 }
 
-// ConnSetting describes connection settings required for connecting to particular service. This struct primarily
-// is used for representing services defined by user in the config file.
-type ConnSetting struct {
-	// ServiceType defines type of service for which these connection settings are used.
-	ServiceType string `yaml:"service_type"`
-	// Conninfo is the connection string in service-specific format.
-	Conninfo string `yaml:"conninfo"`
-}
-
-// ConnsSettings defines a set of all connection settings of exact services.
-type ConnsSettings map[string]ConnSetting
-
 // connectionParams is the set of parameters that may be required when constructing connection string.
 // For example, this struct describes the postmaster.pid representation https://www.postgresql.org/docs/current/storage-file-layout.html
 type connectionParams struct {

@@ -5,6 +5,7 @@ import (
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
+	"os"
 	"testing"
 )
 
@@ -379,6 +380,76 @@ func Test_validateCollectorSettings(t *testing.T) {
 			assert.NoError(t, validateCollectorSettings(tc.settings))
 		} else {
 			assert.Error(t, validateCollectorSettings(tc.settings))
+		}
+	}
+}
+
+func Test_newConfigFromEnv(t *testing.T) {
+	testcases := []struct {
+		valid   bool
+		envvars map[string]string
+		want    *Config
+	}{
+		{
+			valid:   true, // No env variables
+			envvars: map[string]string{},
+			want:    &Config{Defaults: map[string]string{}},
+		},
+		{
+			valid: true, // Completely valid variables
+			envvars: map[string]string{
+				"PGSCV_LISTEN_ADDRESS":   "127.0.0.1:12345",
+				"PGSCV_AUTOUPDATE":       "1",
+				"PGSCV_NO_TRACK_MODE":    "yes",
+				"PGSCV_SEND_METRICS_URL": "127.0.0.1:54321",
+				"PGSCV_API_KEY":          "example",
+				"PGSCV_DATABASES":        "exampledb",
+				"POSTGRES_DSN":           "example_dsn",
+				"POSTGRES_DSN_EXAMPLE1":  "example_dsn",
+				"PGBOUNCER_DSN":          "example_dsn",
+				"PGBOUNCER_DSN_EXAMPLE2": "example_dsn",
+			},
+			want: &Config{
+				ListenAddress:  "127.0.0.1:12345",
+				AutoUpdate:     "1",
+				NoTrackMode:    true,
+				SendMetricsURL: "127.0.0.1:54321",
+				APIKey:         "example",
+				Databases:      "exampledb",
+				ServicesConnsSettings: map[string]service.ConnSetting{
+					"postgres":  {ServiceType: "postgres", Conninfo: "example_dsn"},
+					"EXAMPLE1":  {ServiceType: "postgres", Conninfo: "example_dsn"},
+					"pgbouncer": {ServiceType: "pgbouncer", Conninfo: "example_dsn"},
+					"EXAMPLE2":  {ServiceType: "pgbouncer", Conninfo: "example_dsn"},
+				},
+				Defaults: map[string]string{},
+			},
+		},
+		{
+			valid:   false, // Invalid postgres DSN key
+			envvars: map[string]string{"POSTGRES_DSN_": "example_dsn"},
+		},
+		{
+			valid:   false, // Invalid pgbouncer DSN key
+			envvars: map[string]string{"PGBOUNCER_DSN_": "example_dsn"},
+		},
+	}
+
+	for _, tc := range testcases {
+		for k, v := range tc.envvars {
+			assert.NoError(t, os.Setenv(k, v))
+		}
+
+		got, err := newConfigFromEnv()
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		} else {
+			assert.Error(t, err)
+		}
+
+		for k := range tc.envvars {
+			assert.NoError(t, os.Unsetenv(k))
 		}
 	}
 }

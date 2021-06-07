@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 )
 
@@ -41,10 +42,10 @@ type Config struct {
 	DatabasesRE           *regexp.Regexp           // Regular expression object compiled from Databases
 }
 
-// NewConfig creates new config based on config file or return default config of config is not exists.
+// NewConfig creates new config based on config file or return default config if config file is not specified.
 func NewConfig(configFilePath string) (*Config, error) {
 	if configFilePath == "" {
-		return &Config{Defaults: map[string]string{}}, nil
+		return newConfigFromEnv()
 	}
 
 	content, err := os.ReadFile(filepath.Clean(configFilePath))
@@ -52,14 +53,15 @@ func NewConfig(configFilePath string) (*Config, error) {
 		return nil, err
 	}
 
-	config := Config{Defaults: map[string]string{}}
-	err = yaml.Unmarshal(content, &config)
+	config := &Config{Defaults: map[string]string{}}
+
+	err = yaml.Unmarshal(content, config)
 	if err != nil {
 		return nil, err
 	}
 
 	log.Infoln("read configuration from ", configFilePath)
-	return &config, nil
+	return config, nil
 }
 
 // Validate checks configuration for stupid values and set defaults
@@ -212,6 +214,75 @@ func validateCollectorSettings(cs model.CollectorsSettings) error {
 	}
 
 	return nil
+}
+
+// newConfigFromEnv create config using environment variables.
+func newConfigFromEnv() (*Config, error) {
+	config := &Config{
+		Defaults: map[string]string{},
+	}
+
+	for _, env := range os.Environ() {
+		if !strings.HasPrefix(env, "PGSCV_") &&
+			!strings.HasPrefix(env, "POSTGRES_DSN") &&
+			!strings.HasPrefix(env, "PGBOUNCER_DSN") {
+			continue
+		}
+
+		ff := strings.SplitN(env, "=", 2)
+
+		key, value := ff[0], ff[1]
+
+		// Parse POSTGRES_DSN.
+		if strings.HasPrefix(key, "POSTGRES_DSN") {
+			id, cs, err := service.ParsePostgresDSNEnv(key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			if config.ServicesConnsSettings == nil {
+				config.ServicesConnsSettings = map[string]service.ConnSetting{}
+			}
+
+			config.ServicesConnsSettings[id] = cs
+		}
+
+		// Parse PGBOUNCER_DSN.
+		if strings.HasPrefix(key, "PGBOUNCER_DSN") {
+			id, cs, err := service.ParsePgbouncerDSNEnv(key, value)
+			if err != nil {
+				return nil, err
+			}
+
+			if config.ServicesConnsSettings == nil {
+				config.ServicesConnsSettings = map[string]service.ConnSetting{}
+			}
+
+			config.ServicesConnsSettings[id] = cs
+		}
+
+		switch key {
+		case "PGSCV_LISTEN_ADDRESS":
+			config.ListenAddress = value
+		case "PGSCV_AUTOUPDATE":
+			config.AutoUpdate = value
+		case "PGSCV_NO_TRACK_MODE":
+			switch value {
+			case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1", "on":
+				config.NoTrackMode = true
+			default:
+				config.NoTrackMode = false
+			}
+		case "PGSCV_SEND_METRICS_URL":
+			config.SendMetricsURL = value
+		case "PGSCV_API_KEY":
+			config.APIKey = value
+		case "PGSCV_DATABASES":
+			config.Databases = value
+		}
+	}
+
+	return config, nil
 }
 
 // toggleAutoupdate control auto-update setting.
