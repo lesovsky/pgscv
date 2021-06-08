@@ -102,11 +102,6 @@ func NewPostgresStorageCollector(constLabels labels, settings model.CollectorSet
 
 // Update method collects statistics, parse it and produces metrics.
 func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	if !config.LocalService {
-		log.Debugln("[postgres storage collector]: skip collecting metrics from remote services")
-		return nil
-	}
-
 	// Following directory listing functions are available since:
 	// - pg_ls_dir(), pg_ls_waldir() since Postgres 10
 	// - pg_ls_tmpdir() since Postgres 12
@@ -137,6 +132,14 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 		}
 	}
 
+	// Collecting metrics about directories requires direct access to filesystems, which is
+	// impossible for remote services. If service is remote, stop here and return.
+
+	if !config.LocalService {
+		log.Debugln("[postgres storage collector]: skip collecting directories metrics from remote services")
+		return nil
+	}
+
 	// Collecting other server-directories stats (DATADIR and tablespaces, WALDIR, LOGDIR, TEMPDIR).
 	dirstats, tblspcStats, err := newPostgresDirStat(conn, config.DataDirectory, config.LoggingCollector, config.ServerVersionNum)
 	if err != nil {
@@ -154,9 +157,11 @@ func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Me
 	ch <- c.waldirBytes.newConstMetric(dirstats.waldirSizeBytes, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
 	ch <- c.waldirFiles.newConstMetric(dirstats.waldirFilesCount, dirstats.waldirDevice, dirstats.waldirMountpoint, dirstats.waldirPath)
 
-	// Log directory
-	ch <- c.logdirBytes.newConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
-	ch <- c.logdirFiles.newConstMetric(dirstats.logdirFilesCount, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+	// Log directory (only if logging_collector is enabled).
+	if config.LoggingCollector {
+		ch <- c.logdirBytes.newConstMetric(dirstats.logdirSizeBytes, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+		ch <- c.logdirFiles.newConstMetric(dirstats.logdirFilesCount, dirstats.logdirDevice, dirstats.logdirMountpoint, dirstats.logdirPath)
+	}
 
 	// Temp directory
 	if config.ServerVersionNum >= PostgresV12 {
