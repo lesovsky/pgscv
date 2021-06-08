@@ -30,6 +30,8 @@ type Config struct {
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
 type PostgresServiceConfig struct {
+	// LocalService defines service is running on the local host.
+	LocalService bool
 	// BlockSize defines size of data block Postgres operates.
 	BlockSize uint64
 	// WalSegmentSize defines size of WAL segment Postgres operates.
@@ -56,6 +58,9 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	if err != nil {
 		return config, err
 	}
+
+	// Determine is service running locally.
+	config.LocalService = isAddressLocal(pgconfig.Host)
 
 	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
@@ -139,6 +144,14 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	config.PgStatStatementsSchema = schema
 
 	return config, nil
+}
+
+// isAddressLocal return true if passed address is local, and return false otherwise.
+func isAddressLocal(addr string) bool {
+	if strings.HasPrefix(addr, "/") || strings.HasPrefix(addr, "127.") || addr == "localhost" {
+		return true
+	}
+	return false
 }
 
 // discoverPgStatStatements discovers pg_stat_statements, what database and schema it is installed.

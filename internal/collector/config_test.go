@@ -28,6 +28,24 @@ func TestNewPostgresServiceConfig(t *testing.T) {
 	}
 }
 
+func Test_isAddressLocal(t *testing.T) {
+	testcases := []struct {
+		addr string
+		want bool
+	}{
+		{addr: "127.0.0.1", want: true},
+		{addr: "127.1.2.3", want: true},
+		{addr: "/var/run/postgresql", want: true},
+		{addr: "localhost", want: true},
+		{addr: "", want: false},
+		{addr: "1.2.3.4", want: false},
+	}
+
+	for _, tc := range testcases {
+		assert.Equal(t, tc.want, isAddressLocal(tc.addr))
+	}
+}
+
 func Test_discoverPgStatStatements(t *testing.T) {
 	testcases := []struct {
 		valid   bool
