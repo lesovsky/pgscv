@@ -1,13 +1,11 @@
 package pgscv
 
 import (
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
 	"os"
-	"strings"
 	"testing"
 )
 
@@ -501,13 +499,5 @@ func Test_newDatabasesRegexp(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, got)
 		}
-	}
-}
-
-func Test_Example(t *testing.T) {
-	s := "system/loadaverage, system/cpu"
-	ss := strings.Split(strings.Replace(s, " ", "", -1), ",")
-	for i := range ss {
-		fmt.Println(ss[i])
 	}
 }
