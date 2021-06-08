@@ -2,7 +2,6 @@ package pgscv
 
 import (
 	"context"
-	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/service"
 	"io"
@@ -191,21 +190,4 @@ func Test_addDelay(t *testing.T) {
 
 	// at least 5 iterations should be done
 	assert.Greater(t, loop, 5)
-}
-
-func Test_Example(t *testing.T) {
-	req, err := http.NewRequest("GET", "http://api.themoviedb.org/3/tv/popular", nil)
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	q := req.URL.Query()
-	q.Add("timestamp", fmt.Sprintf("%d", time.Now().UnixNano()/1000000))
-
-	req.URL.RawQuery = q.Encode()
-
-	fmt.Println(req.URL.String())
-	// Output:
-	// http://api.themoviedb.org/3/tv/popular?another_thing=foo+%26+bar&api_key=key_from_environment_or_flag
 }

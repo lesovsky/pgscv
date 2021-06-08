@@ -280,6 +280,8 @@ func newConfigFromEnv() (*Config, error) {
 			config.APIKey = value
 		case "PGSCV_DATABASES":
 			config.Databases = value
+		case "PGSCV_DISABLE_COLLECTORS":
+			config.DisableCollectors = strings.Split(strings.Replace(value, " ", "", -1), ",")
 		}
 	}
 

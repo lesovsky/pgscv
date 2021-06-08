@@ -1,11 +1,13 @@
 package pgscv
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -398,24 +400,26 @@ func Test_newConfigFromEnv(t *testing.T) {
 		{
 			valid: true, // Completely valid variables
 			envvars: map[string]string{
-				"PGSCV_LISTEN_ADDRESS":   "127.0.0.1:12345",
-				"PGSCV_AUTOUPDATE":       "1",
-				"PGSCV_NO_TRACK_MODE":    "yes",
-				"PGSCV_SEND_METRICS_URL": "127.0.0.1:54321",
-				"PGSCV_API_KEY":          "example",
-				"PGSCV_DATABASES":        "exampledb",
-				"POSTGRES_DSN":           "example_dsn",
-				"POSTGRES_DSN_EXAMPLE1":  "example_dsn",
-				"PGBOUNCER_DSN":          "example_dsn",
-				"PGBOUNCER_DSN_EXAMPLE2": "example_dsn",
+				"PGSCV_LISTEN_ADDRESS":     "127.0.0.1:12345",
+				"PGSCV_AUTOUPDATE":         "1",
+				"PGSCV_NO_TRACK_MODE":      "yes",
+				"PGSCV_SEND_METRICS_URL":   "127.0.0.1:54321",
+				"PGSCV_API_KEY":            "example",
+				"PGSCV_DATABASES":          "exampledb",
+				"PGSCV_DISABLE_COLLECTORS": "example/1,example/2, example/3",
+				"POSTGRES_DSN":             "example_dsn",
+				"POSTGRES_DSN_EXAMPLE1":    "example_dsn",
+				"PGBOUNCER_DSN":            "example_dsn",
+				"PGBOUNCER_DSN_EXAMPLE2":   "example_dsn",
 			},
 			want: &Config{
-				ListenAddress:  "127.0.0.1:12345",
-				AutoUpdate:     "1",
-				NoTrackMode:    true,
-				SendMetricsURL: "127.0.0.1:54321",
-				APIKey:         "example",
-				Databases:      "exampledb",
+				ListenAddress:     "127.0.0.1:12345",
+				AutoUpdate:        "1",
+				NoTrackMode:       true,
+				SendMetricsURL:    "127.0.0.1:54321",
+				APIKey:            "example",
+				Databases:         "exampledb",
+				DisableCollectors: []string{"example/1", "example/2", "example/3"},
 				ServicesConnsSettings: map[string]service.ConnSetting{
 					"postgres":  {ServiceType: "postgres", Conninfo: "example_dsn"},
 					"EXAMPLE1":  {ServiceType: "postgres", Conninfo: "example_dsn"},
@@ -497,5 +501,13 @@ func Test_newDatabasesRegexp(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, got)
 		}
+	}
+}
+
+func Test_Example(t *testing.T) {
+	s := "system/loadaverage, system/cpu"
+	ss := strings.Split(strings.Replace(s, " ", "", -1), ",")
+	for i := range ss {
+		fmt.Println(ss[i])
 	}
 }
