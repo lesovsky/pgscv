@@ -100,8 +100,13 @@ func NewPostgresStorageCollector(constLabels labels, settings model.CollectorSet
 	}, nil
 }
 
-// Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
+// Update method collects statistics, parse it and produces metrics.
 func (c *postgresStorageCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+	if !config.LocalService {
+		log.Debugln("[postgres storage collector]: skip collecting metrics from remote services")
+		return nil
+	}
+
 	// Following directory listing functions are available since:
 	// - pg_ls_dir(), pg_ls_waldir() since Postgres 10
 	// - pg_ls_tmpdir() since Postgres 12
