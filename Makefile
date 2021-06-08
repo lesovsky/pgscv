@@ -43,9 +43,11 @@ build: dep ## Build
 docker-build: ## Build docker image
 	docker build -t ${DOCKER_ACCOUNT}/${APPNAME}:${TAG} .
 	docker image prune --force --filter label=stage=intermediate
+	docker tag ${DOCKER_ACCOUNT}/${APPNAME}:${TAG} ${DOCKER_ACCOUNT}/${APPNAME}:latest
 
 docker-push: ## Push docker image
 	docker push ${DOCKER_ACCOUNT}/${APPNAME}:${TAG}
+	docker push ${DOCKER_ACCOUNT}/${APPNAME}:latest
 
 docker-build-test-runner: ## Build docker image with testing environment for CI
 	$(eval VERSION := $(shell grep -E 'LABEL version' testing/docker-test-runner/Dockerfile |cut -d = -f2 |tr -d \"))
