@@ -471,12 +471,12 @@ type normalizationChain []normalizationPair
 // newNormalizationChain compiles normalizationChain from rules.
 func newNormalizationChain() normalizationChain {
 	patterns := [][2]string{
+		{`'.+?'`, "'?'"},          // looking for standalone text literals, like 'whatever'.
+		{`(--.*$|/\*.*?\*/)`, ""}, // looking for comment sequences, like '/* ... */ or starting from --.
 		{`[\n\r\t]+`, " "},        // looking for newline, carriage return, tabular characters.
-		{`(//.*$|/\*.*?\*/)`, ""}, // looking for comment sequences, like '/* ... */ or starting from //.
 		{`(?i)\s+VALUES\s*\(((.\S+),\s?)+(.+?)\)`, " VALUES (?)"}, // looking for 'VALUES ($1, $2, ..., $123)' sequences.
 		{`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`, " IN (?)"},         // looking for 'IN ($1, $2, ..., $123)' sequences.
 		{`\(([$\d,\s]+)\)`, "(?)"},                                // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.
-		{`'.+?'`, "'?'"},                                          // looking for standalone quoted values, like 'whatever'.
 		{`(?i)(^SET .+(=|TO))(.+)`, "SET ? TO ?"},                 // looking for SET commands.
 		{`_(\d|_)+`, "_?"},                                        // looking for digits starting with underscore, like '_2020' or '_2020_10'.
 		{`\$?\b\d+\b`, "?"},                                       // looking for standalone digits, like '10'.
