@@ -60,6 +60,14 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 		ch <- c.settings.newConstMetric(s.value, s.name, s.setting, s.unit, s.vartype, "main")
 	}
 
+	// Collecting metrics about filesystem attributes of configuration files, requires
+	// direct access to filesystem, which is impossible for remote services. If service
+	// is remote, stop here and return.
+
+	if !config.LocalService {
+		return nil
+	}
+
 	query = `SELECT name, setting FROM pg_show_all_settings() WHERE name IN ('config_file','hba_file','ident_file','data_directory')`
 	res, err = conn.Query(query)
 	if err != nil {
