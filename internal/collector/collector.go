@@ -5,7 +5,6 @@ import (
 	"github.com/weaponry/pgscv/internal/filter"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
-	"os"
 	"sync"
 )
 
@@ -126,13 +125,8 @@ type PgscvCollector struct {
 
 // NewPgscvCollector accepts Factories and creates per-service instance of Collector.
 func NewPgscvCollector(serviceID string, factories Factories, config Config) (*PgscvCollector, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-
 	collectors := make(map[string]Collector)
-	constLabels := labels{"instance": hostname, "service_id": serviceID}
+	constLabels := labels{"service_id": serviceID}
 
 	for key := range factories {
 		settings := config.Settings[key]

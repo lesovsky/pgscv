@@ -272,6 +272,7 @@ func lastSendStaleness(v int64, limit time.Duration) time.Duration {
 // sendClient defines worker which read metrics from local source and send metrics to remote URL.
 type sendClient struct {
 	apiKey   string   // API key used for communicating with remote HTTP service
+	hostname string   // System hostname used as value of 'instance'
 	readURL  *url.URL // local URL for reading metrics
 	writeURL *url.URL // remote URL for sending metrics
 	timeout  time.Duration
@@ -290,8 +291,14 @@ func newSendClient(config *Config) (sendClient, error) {
 		return sendClient{}, err
 	}
 
+	hostname, err := os.Hostname()
+	if err != nil {
+		return sendClient{}, err
+	}
+
 	return sendClient{
 		apiKey:   config.APIKey,
+		hostname: hostname,
 		readURL:  readURL,
 		writeURL: writeURL,
 		timeout:  10 * time.Second,
@@ -340,6 +347,7 @@ func (s *sendClient) sendMetrics(buf []byte) error {
 
 	q := req.URL.Query()
 	q.Add("timestamp", fmt.Sprintf("%d", time.Now().UnixNano()/1000000))
+	q.Add("extra_label", fmt.Sprintf("instance=%s", s.hostname))
 	req.URL.RawQuery = q.Encode()
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
