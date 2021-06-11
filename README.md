@@ -8,6 +8,7 @@
 - **Pull mode**. pgSCV can listen on `/metrics` endpoint and serving requests from `Prometheus` or `Victoriametrics' Vmagent`.
 - **Push mode**. pgSCV can scrape its own `/metrics` endpoint and push scraped metrics to specified HTTP service.
   This feature primarily used for sending metrics to Weaponry SaaS, but not limited by this purpose.
+- **Collecting metrics from multiple services**. pgSCV can collect metrics from many databases instances.
 - **Services auto-discovery**. pgSCV can automatically discover Postgres and other Postgres-ecosystem services and
   start collecting metrics from them. In case of authentication, valid requisites should be specified.
 - **Remote services support**. pgSCV is recommended to start on the same systems where monitored services are running.
@@ -17,8 +18,8 @@
 - **Auto-update**. pgSCV can track new releases and update itself. This feature is mostly useful for Weaponry users. **Requires root privileges.**
 - **User-defined metrics**. pgSCV could be configured in a way to collect metrics defined by user.
 - **Collectors management**. Collectors could be disabled if necessary.
-- **Collectors filters**. Some collectors could be adjusted to skip collecting metrics about unnecessary stuff, like
-  block devices, network interfaces, filesystems, etc.
+- **Collectors filters**. Collectors could be adjusted to skip collecting metrics based on labels values, like
+  block devices, network interfaces, filesystems, users, databases, etc.
 
 ### Requirements
 - can run on Linux only; can connect to remote services running on other OS/PaaS.
@@ -30,9 +31,15 @@
 Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-wget https://github.com/weaponry/pgscv/releases/download/v0.5.0/pgscv_0.5.0_linux_amd64.tar.gz
-tar xvzf pgscv_0.5.0_linux_amd64.tar.gz
+wget https://github.com/weaponry/pgscv/releases/download/v0.6.0/pgscv_0.6.0_linux_amd64.tar.gz
+tar xvzf pgscv_0.6.0_linux_amd64.tar.gz
 sudo -u postgres ./pgscv 
+```
+
+or using Docker, use `DATABASE_DSN` for setting up a connection to Postgres:
+```
+docker pull weaponry/pgscv:latest
+docker run -ti -e PGSCV_LISTEN_ADDRESS=0.0.0.0:9890 -e PGSCV_DISABLE_COLLECTORS="system" -e DATABASE_DSN="postgresql://postgres@dbhost/postgres" -p 9890:9890 weaponry/pgscv:latest
 ```
 
 When pgSCV has been started it is ready to accept HTTP requests at `http://127.0.0.1:9890/metrics`.
