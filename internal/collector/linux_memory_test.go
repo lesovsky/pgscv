@@ -76,7 +76,9 @@ func TestMeminfoCollector_Update(t *testing.T) {
 			"node_vmstat_thp_split_pmd", "node_vmstat_thp_split_pud", "node_vmstat_thp_zero_page_alloc",
 			"node_vmstat_thp_zero_page_alloc_failed", "node_vmstat_thp_swpout", "node_vmstat_thp_swpout_fallback",
 			"node_vmstat_balloon_inflate", "node_vmstat_balloon_deflate", "node_vmstat_balloon_migrate",
-			"node_vmstat_swap_ra", "node_vmstat_swap_ra_hit",
+			"node_vmstat_swap_ra", "node_vmstat_swap_ra_hit", "node_vmstat_nr_foll_pin_acquired", "node_vmstat_pgsteal_anon",
+			"node_vmstat_pgsteal_file", "node_vmstat_pgscan_file", "node_vmstat_pgscan_anon", "node_vmstat_thp_file_fallback_charge",
+			"node_vmstat_nr_foll_pin_released", "node_vmstat_thp_file_fallback", "node_vmstat_thp_fault_fallback_charge",
 		},
 		collector: NewMeminfoCollector,
 	}
