@@ -16,7 +16,7 @@ const (
 		"n_mod_since_analyze, extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds, " +
 		"extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds, " +
 		"vacuum_count, autovacuum_count, analyze_count, autoanalyze_count, heap_blks_read, heap_blks_hit, idx_blks_read, " +
-		"idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit, pg_relation_size(s1.relid) AS size_bytes " +
+		"idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit, pg_table_size(s1.relid) AS size_bytes " +
 		"FROM pg_stat_user_tables s1 JOIN pg_statio_user_tables s2 USING (schemaname, relname) " +
 		"WHERE NOT EXISTS (SELECT 1 FROM pg_locks WHERE relation = s1.relid AND mode = 'AccessExclusiveLock' AND granted)"
 )
@@ -142,7 +142,7 @@ func NewPostgresTablesCollector(constLabels labels, settings model.CollectorSett
 			settings.Filters,
 		),
 		sizes: newBuiltinTypedDesc(
-			descOpts{"postgres", "table", "size_bytes", "Total size of the table, in bytes.", 0},
+			descOpts{"postgres", "table", "size_bytes", "Total size of the table (including all forks and TOASTed data), in bytes.", 0},
 			prometheus.GaugeValue,
 			labels, constLabels,
 			settings.Filters,
