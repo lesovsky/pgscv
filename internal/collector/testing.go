@@ -42,7 +42,7 @@ func pipeline(t *testing.T, input pipelineInput) {
 		config.ConnString = "postgres://pgscv@127.0.0.1/postgres"
 		cfg, err := newPostgresServiceConfig(config.ConnString)
 		assert.NoError(t, err)
-		config.PostgresServiceConfig = cfg
+		config.postgresServiceConfig = cfg
 	case model.ServiceTypePgbouncer:
 		config.ConnString = "postgres://pgscv@127.0.0.1:6432/pgbouncer"
 	}

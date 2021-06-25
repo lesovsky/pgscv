@@ -143,7 +143,7 @@ func (c *postgresActivityCollector) Update(config Config, ch chan<- prometheus.M
 	defer conn.Close()
 
 	// get pg_stat_activity stats
-	res, err := conn.Query(selectActivityQuery(config.ServerVersionNum))
+	res, err := conn.Query(selectActivityQuery(config.serverVersionNum))
 	if err != nil {
 		return err
 	}

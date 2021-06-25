@@ -179,7 +179,7 @@ func NewPostgresStatementsCollector(constLabels labels, settings model.Collector
 // Update method collects statistics, parse it and produces metrics that are sent to Prometheus.
 func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
 	// nothing to do, pg_stat_statements not found in shared_preload_libraries
-	if !config.PgStatStatements {
+	if !config.pgStatStatements {
 		return nil
 	}
 
@@ -193,7 +193,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		return err
 	}
 
-	pgconfig.Database = config.PgStatStatementsDatabase
+	pgconfig.Database = config.pgStatStatementsDatabase
 
 	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
@@ -201,7 +201,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	}
 
 	// get pg_stat_statements stats
-	res, err := conn.Query(selectStatementsQuery(config.ServerVersionNum, config.PgStatStatementsSchema))
+	res, err := conn.Query(selectStatementsQuery(config.serverVersionNum, config.pgStatStatementsSchema))
 	if err != nil {
 		return err
 	}
@@ -211,7 +211,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	// parse pg_stat_statements stats
 	stats := parsePostgresStatementsStats(res, c.chain, []string{"user", "database", "queryid", "query"})
 
-	blockSize := float64(config.BlockSize)
+	blockSize := float64(config.blockSize)
 
 	for _, stat := range stats {
 		var query string

@@ -164,7 +164,7 @@ func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
 		return
 	}
 
-	n.Config.PostgresServiceConfig = cfg
+	n.Config.postgresServiceConfig = cfg
 
 	wgCollector := sync.WaitGroup{}
 	wgSender := sync.WaitGroup{}
