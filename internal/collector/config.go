@@ -29,6 +29,7 @@ type Config struct {
 }
 
 // PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
+// TODO: make struct and fields private
 type PostgresServiceConfig struct {
 	// LocalService defines service is running on the local host.
 	LocalService bool
@@ -50,9 +51,14 @@ type PostgresServiceConfig struct {
 	PgStatStatementsSchema string
 }
 
-// NewPostgresServiceConfig defines new config for Postgres-based collectors
-func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
+// newPostgresServiceConfig defines new config for Postgres-based collectors.
+func newPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	var config = PostgresServiceConfig{}
+
+	// Return empty config if empty connection string.
+	if connStr == "" {
+		return config, nil
+	}
 
 	pgconfig, err := pgx.ParseConfig(connStr)
 	if err != nil {

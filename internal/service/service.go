@@ -345,12 +345,6 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterSystemCollectors(config.DisabledCollectors)
 			case model.ServiceTypePostgresql:
 				factories.RegisterPostgresCollectors(config.DisabledCollectors)
-				cfg, err := collector.NewPostgresServiceConfig(collectorConfig.ConnString)
-				if err != nil {
-					log.Errorf("service [%s] setup failed: %s; skip", service.ServiceID, err)
-					continue
-				}
-				collectorConfig.PostgresServiceConfig = cfg
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors(config.DisabledCollectors)
 			default:
