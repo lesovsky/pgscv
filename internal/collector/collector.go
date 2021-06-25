@@ -158,13 +158,15 @@ func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
 // Collect implements the prometheus.Collector interface.
 func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
 	// Update settings of Postgres collectors
-	cfg, err := newPostgresServiceConfig(n.Config.ConnString)
-	if err != nil {
-		log.Errorf("update service config failed: %s, skip collect", err.Error())
-		return
-	}
+	if n.Config.ServiceType == "postgres" {
+		cfg, err := newPostgresServiceConfig(n.Config.ConnString)
+		if err != nil {
+			log.Errorf("update service config failed: %s, skip collect", err.Error())
+			return
+		}
 
-	n.Config.postgresServiceConfig = cfg
+		n.Config.postgresServiceConfig = cfg
+	}
 
 	wgCollector := sync.WaitGroup{}
 	wgSender := sync.WaitGroup{}
