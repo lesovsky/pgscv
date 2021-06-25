@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestNewPostgresServiceConfig(t *testing.T) {
+func Test_newPostgresServiceConfig(t *testing.T) {
 	var testCases = []struct {
 		name    string
 		connStr string
@@ -18,7 +18,7 @@ func TestNewPostgresServiceConfig(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			_, err := NewPostgresServiceConfig(tc.connStr)
+			_, err := newPostgresServiceConfig(tc.connStr)
 			if tc.valid {
 				assert.NoError(t, err)
 			} else {

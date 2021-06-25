@@ -20,39 +20,44 @@ type Config struct {
 	ConnString string
 	// NoTrackMode controls collector to gather and send sensitive information, such as queries texts.
 	NoTrackMode bool
-	// PostgresServiceConfig defines collector's options specific for Postgres service
-	PostgresServiceConfig
+	// postgresServiceConfig defines collector's options specific for Postgres service
+	postgresServiceConfig
 	// DatabasesRE defines regexp with databases from which builtin metrics should be collected.
 	DatabasesRE *regexp.Regexp
 	// Settings defines collectors settings propagated from main YAML configuration.
 	Settings model.CollectorsSettings
 }
 
-// PostgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
-type PostgresServiceConfig struct {
-	// LocalService defines service is running on the local host.
-	LocalService bool
-	// BlockSize defines size of data block Postgres operates.
-	BlockSize uint64
-	// WalSegmentSize defines size of WAL segment Postgres operates.
-	WalSegmentSize uint64
-	// ServerVersionNum defines version of Postgres in XXYYZZ format.
-	ServerVersionNum int
-	// DataDirectory defines filesystem path where Postgres' data files and directories resides.
-	DataDirectory string
-	// LoggingCollector defines value of 'logging_collector' GUC.
-	LoggingCollector bool
-	// PgStatStatements defines is pg_stat_statements available in shared_preload_libraries and available for queries
-	PgStatStatements bool
-	// PgStatStatementsDatabase defines the database name where pg_stat_statements is available
-	PgStatStatementsDatabase string
-	// PgStatStatementsSchema defines the schema name where pg_stat_statements is installed
-	PgStatStatementsSchema string
+// postgresServiceConfig defines Postgres-specific stuff required during collecting Postgres metrics.
+type postgresServiceConfig struct {
+	// localService defines service is running on the local host.
+	localService bool
+	// blockSize defines size of data block Postgres operates.
+	blockSize uint64
+	// walSegmentSize defines size of WAL segment Postgres operates.
+	walSegmentSize uint64
+	// serverVersionNum defines version of Postgres in XXYYZZ format.
+	serverVersionNum int
+	// dataDirectory defines filesystem path where Postgres' data files and directories resides.
+	dataDirectory string
+	// loggingCollector defines value of 'logging_collector' GUC.
+	loggingCollector bool
+	// pgStatStatements defines is pg_stat_statements available in shared_preload_libraries and available for queries
+	pgStatStatements bool
+	// pgStatStatementsDatabase defines the database name where pg_stat_statements is available
+	pgStatStatementsDatabase string
+	// pgStatStatementsSchema defines the schema name where pg_stat_statements is installed
+	pgStatStatementsSchema string
 }
 
-// NewPostgresServiceConfig defines new config for Postgres-based collectors
-func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
-	var config = PostgresServiceConfig{}
+// newPostgresServiceConfig defines new config for Postgres-based collectors.
+func newPostgresServiceConfig(connStr string) (postgresServiceConfig, error) {
+	var config = postgresServiceConfig{}
+
+	// Return empty config if empty connection string.
+	if connStr == "" {
+		return config, nil
+	}
 
 	pgconfig, err := pgx.ParseConfig(connStr)
 	if err != nil {
@@ -60,7 +65,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	}
 
 	// Determine is service running locally.
-	config.LocalService = isAddressLocal(pgconfig.Host)
+	config.localService = isAddressLocal(pgconfig.Host)
 
 	conn, err := store.NewWithConfig(pgconfig)
 	if err != nil {
@@ -80,7 +85,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		return config, err
 	}
 
-	config.BlockSize = bsize
+	config.blockSize = bsize
 
 	// Get Postgres WAL segment size.
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'wal_segment_size'").Scan(&setting)
@@ -92,7 +97,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		return config, err
 	}
 
-	config.WalSegmentSize = segSize
+	config.walSegmentSize = segSize
 
 	// Get Postgres server version
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
@@ -108,7 +113,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		log.Warnf("Postgres version is too old, some collectors functions won't work. Minimal required version is %s.", PostgresVMinStr)
 	}
 
-	config.ServerVersionNum = version
+	config.serverVersionNum = version
 
 	// Get Postgres data directory
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'data_directory'").Scan(&setting)
@@ -116,7 +121,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 		return config, err
 	}
 
-	config.DataDirectory = setting
+	config.dataDirectory = setting
 
 	// Get setting of 'logging_collector' GUC.
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'logging_collector'").Scan(&setting)
@@ -125,7 +130,7 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 	}
 
 	if setting == "on" {
-		config.LoggingCollector = true
+		config.loggingCollector = true
 	}
 
 	// Discover pg_stat_statements.
@@ -136,12 +141,12 @@ func NewPostgresServiceConfig(connStr string) (PostgresServiceConfig, error) {
 
 	if !exists {
 		log.Info("pg_stat_statements is not found in shared_preload_libraries, disable pg_stat_statements metrics collection")
-		config.PgStatStatements = false
+		config.pgStatStatements = false
 	}
 
-	config.PgStatStatements = true
-	config.PgStatStatementsDatabase = database
-	config.PgStatStatementsSchema = schema
+	config.pgStatStatements = true
+	config.pgStatStatementsDatabase = database
+	config.pgStatStatementsSchema = schema
 
 	return config, nil
 }

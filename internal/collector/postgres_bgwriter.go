@@ -98,7 +98,7 @@ func (c *postgresBgwriterCollector) Update(config Config, ch chan<- prometheus.M
 	}
 
 	stats := parsePostgresBgwriterStats(res)
-	blockSize := float64(config.BlockSize)
+	blockSize := float64(config.blockSize)
 
 	for name, desc := range c.descs {
 		switch name {

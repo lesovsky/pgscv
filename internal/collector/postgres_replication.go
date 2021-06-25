@@ -107,7 +107,7 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	// Get recovery state.
 	var recovery int
 	var walBytes int64
-	err = conn.Conn().QueryRow(context.TODO(), selectWalQuery(config.ServerVersionNum)).Scan(&recovery, &walBytes)
+	err = conn.Conn().QueryRow(context.TODO(), selectWalQuery(config.serverVersionNum)).Scan(&recovery, &walBytes)
 	if err != nil {
 		log.Warnf("get recovery state failed: %s; skip", err)
 	} else {
@@ -116,7 +116,7 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 	}
 
 	// Get replication stats.
-	res, err := conn.Query(selectReplicationQuery(config.ServerVersionNum))
+	res, err := conn.Query(selectReplicationQuery(config.serverVersionNum))
 	if err != nil {
 		return err
 	}

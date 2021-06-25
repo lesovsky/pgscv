@@ -59,7 +59,7 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	}
 	defer conn.Close()
 
-	if config.ServerVersionNum < PostgresV12 {
+	if config.serverVersionNum < PostgresV12 {
 		log.Debugln("[postgres WAL archiver collector]: some system functions are not available, required Postgres 12 or newer")
 		return nil
 	}
@@ -79,7 +79,7 @@ func (c *postgresWalArchivingCollector) Update(config Config, ch chan<- promethe
 	ch <- c.archived.newConstMetric(stats.archived)
 	ch <- c.failed.newConstMetric(stats.failed)
 	ch <- c.sinceArchivedSeconds.newConstMetric(stats.sinceArchivedSeconds)
-	ch <- c.archivingLag.newConstMetric(stats.lagFiles * float64(config.WalSegmentSize))
+	ch <- c.archivingLag.newConstMetric(stats.lagFiles * float64(config.walSegmentSize))
 
 	return nil
 }

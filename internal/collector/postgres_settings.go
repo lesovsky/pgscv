@@ -64,7 +64,7 @@ func (c *postgresSettingsCollector) Update(config Config, ch chan<- prometheus.M
 	// direct access to filesystem, which is impossible for remote services. If service
 	// is remote, stop here and return.
 
-	if !config.LocalService {
+	if !config.localService {
 		return nil
 	}
 

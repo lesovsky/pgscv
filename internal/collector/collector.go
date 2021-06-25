@@ -111,11 +111,11 @@ func (f Factories) register(collector string, factory func(labels, model.Collect
 
 // Collector is the interface a collector has to implement.
 type Collector interface {
-	// Get new metrics and expose them via prometheus registry.
+	// Update does collecting new metrics and expose them via prometheus registry.
 	Update(config Config, ch chan<- prometheus.Metric) error
 }
 
-// Collector implements the prometheus.Collector interface.
+// PgscvCollector implements the prometheus.Collector interface.
 type PgscvCollector struct {
 	Config     Config
 	Collectors map[string]Collector
@@ -157,6 +157,17 @@ func (n PgscvCollector) Describe(ch chan<- *prometheus.Desc) {
 
 // Collect implements the prometheus.Collector interface.
 func (n PgscvCollector) Collect(out chan<- prometheus.Metric) {
+	// Update settings of Postgres collectors
+	if n.Config.ServiceType == "postgres" {
+		cfg, err := newPostgresServiceConfig(n.Config.ConnString)
+		if err != nil {
+			log.Errorf("update service config failed: %s, skip collect", err.Error())
+			return
+		}
+
+		n.Config.postgresServiceConfig = cfg
+	}
+
 	wgCollector := sync.WaitGroup{}
 	wgSender := sync.WaitGroup{}
 
