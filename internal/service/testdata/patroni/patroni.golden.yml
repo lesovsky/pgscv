@@ -1,0 +1,14 @@
+scope: example
+name: example0
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: 1.2.3.4:8008
+  certfile: /etc/ssl/example.crt
+  authentication:
+    username: user
+    password: secret
+
+postgresql:
+  listen: 0.0.0.0:5432
+  data_dir: /home/postgres/data

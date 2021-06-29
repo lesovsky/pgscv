@@ -18,6 +18,8 @@ type Config struct {
 	ServiceType string
 	// ConnString defines a connection string used to connecting to the service
 	ConnString string
+	// BaseURL defines a URL string for connecting to HTTP service
+	BaseURL string
 	// NoTrackMode controls collector to gather and send sensitive information, such as queries texts.
 	NoTrackMode bool
 	// postgresServiceConfig defines collector's options specific for Postgres service
@@ -140,11 +142,10 @@ func newPostgresServiceConfig(connStr string) (postgresServiceConfig, error) {
 	}
 
 	if !exists {
-		log.Info("pg_stat_statements is not found in shared_preload_libraries, disable pg_stat_statements metrics collection")
-		config.pgStatStatements = false
+		log.Warnln("pg_stat_statements not found, skip collecting statements metrics")
 	}
 
-	config.pgStatStatements = true
+	config.pgStatStatements = exists
 	config.pgStatStatementsDatabase = database
 	config.pgStatStatementsSchema = schema
 

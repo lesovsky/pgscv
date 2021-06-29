@@ -409,6 +409,8 @@ func Test_newConfigFromEnv(t *testing.T) {
 				"POSTGRES_DSN_EXAMPLE1":    "example_dsn",
 				"PGBOUNCER_DSN":            "example_dsn",
 				"PGBOUNCER_DSN_EXAMPLE2":   "example_dsn",
+				"PATRONI_URL":              "example_url",
+				"PATRONI_URL_EXAMPLE3":     "example_url",
 			},
 			want: &Config{
 				ListenAddress:     "127.0.0.1:12345",
@@ -419,10 +421,12 @@ func Test_newConfigFromEnv(t *testing.T) {
 				Databases:         "exampledb",
 				DisableCollectors: []string{"example/1", "example/2", "example/3"},
 				ServicesConnsSettings: map[string]service.ConnSetting{
-					"postgres":  {ServiceType: "postgres", Conninfo: "example_dsn"},
-					"EXAMPLE1":  {ServiceType: "postgres", Conninfo: "example_dsn"},
-					"pgbouncer": {ServiceType: "pgbouncer", Conninfo: "example_dsn"},
-					"EXAMPLE2":  {ServiceType: "pgbouncer", Conninfo: "example_dsn"},
+					"postgres":  {ServiceType: model.ServiceTypePostgresql, Conninfo: "example_dsn"},
+					"EXAMPLE1":  {ServiceType: model.ServiceTypePostgresql, Conninfo: "example_dsn"},
+					"pgbouncer": {ServiceType: model.ServiceTypePgbouncer, Conninfo: "example_dsn"},
+					"EXAMPLE2":  {ServiceType: model.ServiceTypePgbouncer, Conninfo: "example_dsn"},
+					"patroni":   {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
+					"EXAMPLE3":  {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
 				},
 				Defaults: map[string]string{},
 			},
@@ -434,6 +438,10 @@ func Test_newConfigFromEnv(t *testing.T) {
 		{
 			valid:   false, // Invalid pgbouncer DSN key
 			envvars: map[string]string{"PGBOUNCER_DSN_": "example_dsn"},
+		},
+		{
+			valid:   false, // Invalid patroni URL key
+			envvars: map[string]string{"PATRONI_URL_": "example_dsn"},
 		},
 	}
 

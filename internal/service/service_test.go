@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -466,6 +468,21 @@ func Test_attemptConnect(t *testing.T) {
 	assert.Error(t, attemptConnect("host=127.0.0.1 port=12345 user=invalid dbname=invalid"))
 }
 
+func Test_attemptRequest(t *testing.T) {
+	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer ts1.Close()
+	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+	}))
+	defer ts2.Close()
+
+	assert.NoError(t, attemptRequest(ts1.URL))
+	assert.Error(t, attemptRequest(ts2.URL))
+	assert.Error(t, attemptRequest("http://127.0.0.1:30080"))
+}
+
 func Test_parsePgbouncerCmdline(t *testing.T) {
 	testcases := []struct {
 		cmdline string
@@ -475,6 +492,7 @@ func Test_parsePgbouncerCmdline(t *testing.T) {
 		{cmdline: "/usr/sbin/pgbouncer -d /etc/pgbouncer/pgbouncer.ini -R", want: "/etc/pgbouncer/pgbouncer.ini"},
 		// this is an unusual, but possible case.
 		{cmdline: "/usr/sbin/pgbouncer -d ./pgbouncer.ini -R", want: "./pgbouncer.ini"},
+		{cmdline: "/usr/sbin/pgbouncer -d pgbouncer.ini -R", want: "pgbouncer.ini"},
 	}
 
 	for _, tc := range testcases {
@@ -492,11 +510,11 @@ func Test_checkProcessProperties(t *testing.T) {
 	for _, pid := range pids {
 		name, cwd, cmdline, skip := checkProcessProperties(pid)
 
-		switch name {
-		case "postgres":
+		switch {
+		case name == "postgres":
 			assert.NotEqual(t, "", cwd)
 			assert.False(t, skip)
-		case "pgbouncer":
+		case name == "pgbouncer":
 			assert.NotEqual(t, "", cmdline)
 			assert.False(t, skip)
 		default:

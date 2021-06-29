@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/tls"
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
@@ -13,6 +14,7 @@ import (
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -196,7 +198,7 @@ func (repo *Repository) getServiceIDs() []string {
 
 // addServicesFromConfig reads info about services from the config file and fulfill the repo.
 func (repo *Repository) addServicesFromConfig(config Config) {
-	log.Debug("config: add services from config file")
+	log.Debug("config: add services from configuration")
 
 	// Always add system service.
 	repo.addService(Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
@@ -237,8 +239,16 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 
 		// Use entry key as ServiceID unique identifier.
 		repo.addService(s)
+
 		log.Infof("registered new service [%s]", s.ServiceID)
-		log.Debugf("new service available through: %s@%s:%d/%s", pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
+
+		var msg string
+		if s.ConnSettings.ServiceType == model.ServiceTypePatroni {
+			msg = fmt.Sprintf("service [%s] available through: %s", s.ServiceID, s.ConnSettings.BaseURL)
+		} else {
+			msg = fmt.Sprintf("service [%s] available through: %s@%s:%d/%s", s.ServiceID, pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
+		}
+		log.Debugln(msg)
 	}
 }
 
@@ -296,17 +306,23 @@ func (repo *Repository) lookupServices(config Config) error {
 		var service Service
 		var err error
 
-		switch name {
-		case "postgres":
+		switch {
+		case name == "postgres":
 			service, err = discoverPostgres(pid, cwd, config)
-		case "pgbouncer":
+		case name == "pgbouncer":
 			service, err = discoverPgbouncer(pid, cmdline, config)
+		case strings.HasPrefix(name, "python"):
+			service, skip, err = discoverPatroni(pid, cmdline, cwd)
 		default:
 			continue
 		}
 
 		if err != nil {
 			log.Warnf("auto-discovery [%s]: discovery failed: %s; skip", name, err)
+			continue
+		}
+
+		if skip {
 			continue
 		}
 
@@ -347,6 +363,9 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterPostgresCollectors(config.DisabledCollectors)
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors(config.DisabledCollectors)
+			case model.ServiceTypePatroni:
+				factories.RegisterPatroniCollectors(config.DisabledCollectors)
+				collectorConfig.BaseURL = service.ConnSettings.BaseURL
 			default:
 				continue
 			}
@@ -360,7 +379,7 @@ func (repo *Repository) setupServices(config Config) error {
 			// Register collector.
 			prometheus.MustRegister(service.Collector)
 
-			// put updated service copy into repo
+			// Put updated service into repo.
 			repo.addService(service)
 			log.Debugf("service configured [%s]", id)
 		}
@@ -377,29 +396,34 @@ func (repo *Repository) healthcheckServices() {
 	var errorThreshold = 10
 
 	for _, id := range repo.getServiceIDs() {
-		var service = repo.getService(id)
+		service := repo.getService(id)
+		totalErrors := repo.getServiceStatus(id)
+		var err error
 
 		switch service.ConnSettings.ServiceType {
 		case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
-			totalErrors := repo.getServiceStatus(id)
-			err := attemptConnect(service.ConnSettings.Conninfo)
-			if err != nil {
-				totalErrors++
-				if totalErrors < errorThreshold {
-					repo.markServiceFailed(id)
-					log.Warnf("service [%s] failed: tries remain %d/%d", id, totalErrors, errorThreshold)
-				} else {
-					// unregister collector and remove the service.
-					if repo.Services[id].Collector != nil {
-						prometheus.Unregister(repo.Services[id].Collector)
-					}
-
-					repo.removeService(id)
-					log.Errorf("service [%s] removed: too many failures %d/%d", id, totalErrors, errorThreshold)
-				}
-			}
+			err = attemptConnect(service.ConnSettings.Conninfo)
+		case model.ServiceTypePatroni:
+			err = attemptRequest(service.ConnSettings.BaseURL)
 		default:
 			continue
+		}
+
+		// Process errors if any.
+		if err != nil {
+			totalErrors++
+			if totalErrors < errorThreshold {
+				repo.markServiceFailed(id)
+				log.Warnf("service [%s] failed: tries remain %d/%d", id, totalErrors, errorThreshold)
+			} else {
+				// Unregister collector and remove the service.
+				if repo.Services[id].Collector != nil {
+					prometheus.Unregister(repo.Services[id].Collector)
+				}
+
+				repo.removeService(id)
+				log.Errorf("service [%s] removed: too many failures %d/%d", id, totalErrors, errorThreshold)
+			}
 		}
 	}
 
@@ -540,7 +564,7 @@ func discoverPgbouncer(pid int32, cmdline string, config Config) (Service, error
 	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", pid)
 
 	if len(cmdline) == 0 {
-		return Service{}, fmt.Errorf("empty cmdline")
+		return Service{}, fmt.Errorf("pgbouncer cmdline is empty")
 	}
 
 	// extract config file location from cmdline
@@ -677,6 +701,29 @@ func attemptConnect(connString string) error {
 	return nil
 }
 
+// attemptRequest tries to make a real HTTP request using passed URL string.
+func attemptRequest(baseurl string) error {
+	url := baseurl + "/health"
+	log.Debugln("making test http request: ", url)
+
+	var client = &http.Client{Timeout: time.Second}
+
+	if strings.HasPrefix(url, "https://") {
+		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402
+	}
+
+	resp, err := client.Get(url) // #nosec G107
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("bad response: %s", resp.Status)
+	}
+
+	return nil
+}
+
 // parsePgbouncerCmdline parses pgbouncer's cmdline and extract config file location.
 func parsePgbouncerCmdline(cmdline string) string {
 	parts := strings.Fields(cmdline)
@@ -717,8 +764,8 @@ func checkProcessProperties(pid int32) (string, string, string, bool) {
 		return "", "", "", true
 	}
 
-	// Skip processes which are not Postgres or Pgbouncer.
-	if name != "postgres" && name != "pgbouncer" {
+	// Skip processes which are not Postgres, Pgbouncer or Python.
+	if name != "postgres" && name != "pgbouncer" && !strings.HasPrefix(name, "python") {
 		return "", "", "", true
 	}
 

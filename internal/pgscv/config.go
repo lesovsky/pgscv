@@ -48,6 +48,7 @@ func NewConfig(configFilePath string) (*Config, error) {
 		return newConfigFromEnv()
 	}
 
+	log.Infoln("read configuration from ", configFilePath)
 	content, err := os.ReadFile(filepath.Clean(configFilePath))
 	if err != nil {
 		return nil, err
@@ -60,7 +61,6 @@ func NewConfig(configFilePath string) (*Config, error) {
 		return nil, err
 	}
 
-	log.Infoln("read configuration from ", configFilePath)
 	return config, nil
 }
 
@@ -77,11 +77,10 @@ func (c *Config) Validate() error {
 		c.ListenAddress = defaultListenAddress
 	}
 
-	log.Infoln("*** IMPORTANT ***: pgSCV by default collects information about user queries. Tracking queries can be disabled with 'no_track_mode: true' in config file.")
 	if c.NoTrackMode {
-		log.Infoln("no-track mode enabled: tracking disabled for [pg_stat_statements.query].")
+		log.Infoln("no-track enabled for [pg_stat_statements.query].")
 	} else {
-		log.Infoln("no-track mode disabled")
+		log.Infoln("no-track disabled, for details check the documentation about 'no_track_mode' option.")
 	}
 
 	// Process auto-update setting.
@@ -218,6 +217,8 @@ func validateCollectorSettings(cs model.CollectorsSettings) error {
 
 // newConfigFromEnv create config using environment variables.
 func newConfigFromEnv() (*Config, error) {
+	log.Infoln("read configuration from environment")
+
 	config := &Config{
 		Defaults: map[string]string{},
 	}
@@ -226,8 +227,13 @@ func newConfigFromEnv() (*Config, error) {
 		if !strings.HasPrefix(env, "PGSCV_") &&
 			!strings.HasPrefix(env, "POSTGRES_DSN") &&
 			!strings.HasPrefix(env, "DATABASE_DSN") &&
-			!strings.HasPrefix(env, "PGBOUNCER_DSN") {
+			!strings.HasPrefix(env, "PGBOUNCER_DSN") &&
+			!strings.HasPrefix(env, "PATRONI_URL") {
 			continue
+		}
+
+		if config.ServicesConnsSettings == nil {
+			config.ServicesConnsSettings = map[string]service.ConnSetting{}
 		}
 
 		ff := strings.SplitN(env, "=", 2)
@@ -241,10 +247,6 @@ func newConfigFromEnv() (*Config, error) {
 				return nil, err
 			}
 
-			if config.ServicesConnsSettings == nil {
-				config.ServicesConnsSettings = map[string]service.ConnSetting{}
-			}
-
 			config.ServicesConnsSettings[id] = cs
 		}
 
@@ -255,8 +257,14 @@ func newConfigFromEnv() (*Config, error) {
 				return nil, err
 			}
 
-			if config.ServicesConnsSettings == nil {
-				config.ServicesConnsSettings = map[string]service.ConnSetting{}
+			config.ServicesConnsSettings[id] = cs
+		}
+
+		// Parse PATRONI_URL.
+		if strings.HasPrefix(key, "PATRONI_URL") {
+			id, cs, err := service.ParsePatroniURLEnv(key, value)
+			if err != nil {
+				return nil, err
 			}
 
 			config.ServicesConnsSettings[id] = cs
