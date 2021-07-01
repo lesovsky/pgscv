@@ -9,6 +9,7 @@ import (
 const (
 	StatusOK         = http.StatusOK         // 200
 	StatusBadRequest = http.StatusBadRequest // 400
+	StatusNotFound   = http.StatusNotFound   // 404
 )
 
 type Client struct {

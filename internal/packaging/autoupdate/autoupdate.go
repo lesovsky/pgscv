@@ -8,11 +8,11 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/log"
 	"golang.org/x/sys/unix"
 	"io"
 	"math/rand"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -146,24 +146,13 @@ type githubAPI struct {
 func newGithubAPI(baseURL string) *githubAPI {
 	return &githubAPI{
 		baseURL: baseURL,
-		client: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:    5,
-				IdleConnTimeout: 60 * time.Second,
-			},
-			Timeout: 10 * time.Second,
-		},
+		client:  http.NewClient(http.ClientConfig{Timeout: 10 * time.Second}),
 	}
 }
 
 // request requests passed URL and returns raw response if request was successful.
 func (api *githubAPI) request(url string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, api.baseURL+url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	response, err := api.client.Do(req)
+	response, err := api.client.Get(api.baseURL + url)
 	if err != nil {
 		return nil, err
 	}
@@ -451,12 +440,11 @@ func downloadFile(url, file string) error {
 		return fmt.Errorf("invalid input: url '%s', file '%s'", url, file)
 	}
 
-	client := http.Client{Timeout: 10 * time.Second}
+	client := http.NewClient(http.ClientConfig{Timeout: 10 * time.Second})
 	resp, err := client.Get(url)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("download failed, %d", resp.StatusCode)
@@ -477,6 +465,9 @@ func downloadFile(url, file string) error {
 	if err != nil {
 		return err
 	}
+
+	_ = resp.Body.Close()
+
 	return nil
 }
 

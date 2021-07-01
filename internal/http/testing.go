@@ -22,3 +22,7 @@ func TestServer(t *testing.T, code int, response string) *httptest.Server {
 		}
 	}))
 }
+
+func TestFileServer(_ *testing.T, dir string) *httptest.Server {
+	return httptest.NewServer(http.FileServer(http.Dir(dir)))
+}
