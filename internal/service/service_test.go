@@ -5,10 +5,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -469,13 +468,9 @@ func Test_attemptConnect(t *testing.T) {
 }
 
 func Test_attemptRequest(t *testing.T) {
-	ts1 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	ts1 := http.TestServer(t, http.StatusOK, "")
 	defer ts1.Close()
-	ts2 := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusBadRequest)
-	}))
+	ts2 := http.TestServer(t, http.StatusBadRequest, "")
 	defer ts2.Close()
 
 	assert.NoError(t, attemptRequest(ts1.URL))

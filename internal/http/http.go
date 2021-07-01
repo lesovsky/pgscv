@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	StatusOK = http.StatusOK
+	StatusOK         = http.StatusOK         // 200
+	StatusBadRequest = http.StatusBadRequest // 400
 )
 
 type Client struct {
