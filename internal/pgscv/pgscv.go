@@ -1,18 +1,15 @@
 package pgscv
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"fmt"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/packaging/autoupdate"
 	"github.com/weaponry/pgscv/internal/service"
 	"io"
 	"math"
 	"math/rand"
-	"net/http"
 	"net/url"
 	"os"
 	"strconv"
@@ -112,28 +109,14 @@ func Start(ctx context.Context, config *Config) error {
 
 // runMetricsListener start HTTP listener accordingly to passed configuration.
 func runMetricsListener(ctx context.Context, config *Config) error {
-	log.Infof("accepting requests on %s", config.ListenAddress)
-
-	http.Handle("/metrics", promhttp.Handler())
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, err := w.Write([]byte(`<html>
-			<head><title>pgSCV / Weaponry metrics collector</title></head>
-			<body>
-			<h1>pgSCV / Weaponry metrics collector, for more info visit https://github.com/weaponry/pgscv</h1>
-			<p><a href="/metrics">Metrics</a></p>
-			</body>
-			</html>`))
-		if err != nil {
-			log.Warnln("response write failed: ", err)
-		}
-	})
+	srv := http.NewServer(config.ListenAddress)
 
 	errCh := make(chan error)
 	defer close(errCh)
 
-	// Run listener.
+	// Run default listener.
 	go func() {
-		errCh <- http.ListenAndServe(config.ListenAddress, nil)
+		errCh <- srv.Serve()
 	}()
 
 	// Waiting for errors or context cancelling.
@@ -271,12 +254,12 @@ func lastSendStaleness(v int64, limit time.Duration) time.Duration {
 
 // sendClient defines worker which read metrics from local source and send metrics to remote URL.
 type sendClient struct {
-	apiKey   string   // API key used for communicating with remote HTTP service
-	hostname string   // System hostname used as value of 'instance'
-	readURL  *url.URL // local URL for reading metrics
-	writeURL *url.URL // remote URL for sending metrics
-	timeout  time.Duration
-	Client   *http.Client
+	apiKey      string   // API key used for communicating with remote HTTP service
+	hostname    string   // System hostname used as value of 'instance'
+	readURL     *url.URL // local URL for reading metrics
+	readClient  *http.Client
+	writeURL    *url.URL // remote URL for sending metrics
+	writeClient *http.Client
 }
 
 // newSendClient creates new sendClient.
@@ -297,24 +280,18 @@ func newSendClient(config *Config) (sendClient, error) {
 	}
 
 	return sendClient{
-		apiKey:   config.APIKey,
-		hostname: hostname,
-		readURL:  readURL,
-		writeURL: writeURL,
-		timeout:  10 * time.Second,
-		Client: &http.Client{
-			Transport: &http.Transport{
-				MaxIdleConns:    5,
-				IdleConnTimeout: 120 * time.Second,
-			},
-			Timeout: 10 * time.Second,
-		},
+		apiKey:      config.APIKey,
+		hostname:    hostname,
+		readURL:     readURL,
+		readClient:  http.NewClient(http.ClientConfig{Timeout: 10 * time.Second}),
+		writeURL:    writeURL,
+		writeClient: http.NewClient(http.ClientConfig{Timeout: 10 * time.Second}),
 	}, nil
 }
 
 // readMetrics read metrics from configured URL and returns response.
 func (s *sendClient) readMetrics() ([]byte, error) {
-	resp, err := http.Get(s.readURL.String())
+	resp, err := s.readClient.Get(s.readURL.String())
 	if err != nil {
 		return nil, err
 	}
@@ -324,57 +301,25 @@ func (s *sendClient) readMetrics() ([]byte, error) {
 		return nil, err
 	}
 
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
+	// Read and close the rest of body.
+	_, _ = io.Copy(io.Discard, resp.Body)
+	_ = resp.Body.Close()
 
 	return body, nil
 }
 
 // sendMetrics wrap buffer data into POST HTTP request and send to remote URL.
 func (s *sendClient) sendMetrics(buf []byte) error {
-	log.Debugln("start sending metrics")
-
-	req, err := http.NewRequest("POST", s.writeURL.String(), bytes.NewReader(buf))
+	req, err := http.NewPushRequest(s.writeURL.String(), s.apiKey, s.hostname, buf)
 	if err != nil {
 		return err
 	}
 
-	req.Header.Set("Content-Type", "application/text")
-	req.Header.Set("User-Agent", "pgSCV")
-	req.Header.Add("X-Weaponry-Api-Key", s.apiKey)
-
-	q := req.URL.Query()
-	q.Add("timestamp", fmt.Sprintf("%d", time.Now().UnixNano()/1000000))
-	q.Add("extra_label", fmt.Sprintf("instance=%s", s.hostname))
-	req.URL.RawQuery = q.Encode()
-
-	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
-	defer cancel()
-
-	req = req.WithContext(ctx)
-
-	resp, err := s.Client.Do(req)
+	err = http.DoPushRequest(s.writeClient, req)
 	if err != nil {
 		return err
 	}
 
-	defer func() {
-		_, _ = io.Copy(io.Discard, resp.Body)
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode/100 != 2 {
-		scanner := bufio.NewScanner(io.LimitReader(resp.Body, 512))
-		line := ""
-		if scanner.Scan() {
-			line = scanner.Text()
-		}
-		return fmt.Errorf("server returned HTTP status %s: %s", resp.Status, line)
-	}
-
-	log.Debugln("sending metrics finished successfully: server returned HTTP status ", resp.Status)
 	return nil
 }
 

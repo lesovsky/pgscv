@@ -2,8 +2,7 @@ package autoupdate
 
 import (
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"net/http/httptest"
+	"github.com/weaponry/pgscv/internal/http"
 	"os"
 	"testing"
 )
@@ -17,7 +16,7 @@ func Test_githubAPI_request(t *testing.T) {
 	testcases := []struct {
 		valid           bool
 		apiResponseCode int
-		apiResponse     interface{}
+		apiResponse     string
 		want            string
 	}{
 		{valid: true, apiResponseCode: http.StatusOK, apiResponse: "OK", want: "v0.0.1"},
@@ -25,7 +24,7 @@ func Test_githubAPI_request(t *testing.T) {
 	}
 
 	for _, tc := range testcases {
-		s := mockHTTPServer(t, tc.apiResponseCode, tc.apiResponse)
+		s := http.TestServer(t, tc.apiResponseCode, tc.apiResponse)
 		api := newGithubAPI(s.URL)
 
 		got, err := api.request("/")
@@ -51,17 +50,17 @@ func Test_githubAPI_getLatestRelease(t *testing.T) {
 	testcases := []struct {
 		valid           bool
 		apiResponseCode int
-		apiResponse     interface{}
+		apiResponse     string
 		want            string
 	}{
-		{valid: true, apiResponseCode: http.StatusOK, apiResponse: map[string]string{"tag_name": "v0.0.1"}, want: "v0.0.1"},
+		{valid: true, apiResponseCode: http.StatusOK, apiResponse: `{"tag_name": "v0.0.1"}`, want: "v0.0.1"},
 		{valid: false, apiResponseCode: http.StatusNotFound},
 		{valid: false, apiResponseCode: http.StatusOK, apiResponse: "invalid"},
-		{valid: false, apiResponseCode: http.StatusOK, apiResponse: map[string]string{"test": "value"}},
+		{valid: false, apiResponseCode: http.StatusOK, apiResponse: `{"test": "value"}`},
 	}
 
 	for _, tc := range testcases {
-		s := mockHTTPServer(t, tc.apiResponseCode, tc.apiResponse)
+		s := http.TestServer(t, tc.apiResponseCode, tc.apiResponse)
 		api := newGithubAPI(s.URL)
 
 		got, err := api.getLatestRelease()
@@ -85,27 +84,23 @@ func Test_githubAPI_getLatestReleaseDownloadURL(t *testing.T) {
 	testcases := []struct {
 		valid           bool
 		apiResponseCode int
-		apiResponse     interface{}
+		apiResponse     string
 		wantDist        string
 		wantCsum        string
 	}{
 		{
-			valid: true, apiResponseCode: http.StatusOK,
-			apiResponse: map[string]interface{}{
-				"assets": []interface{}{
-					map[string]interface{}{"browser_download_url": "checksums.txt"},
-					map[string]interface{}{"browser_download_url": "asset.zip"},
-					map[string]interface{}{"browser_download_url": "asset.tar.gz"},
-				},
-			}, wantDist: "asset.tar.gz", wantCsum: "checksums.txt",
+			valid:           true,
+			apiResponseCode: http.StatusOK,
+			apiResponse:     `{"assets":[{"browser_download_url":"checksums.txt"},{"browser_download_url":"asset.zip"},{"browser_download_url":"asset.tar.gz"}]}`,
+			wantDist:        "asset.tar.gz", wantCsum: "checksums.txt",
 		},
 		{valid: false, apiResponseCode: http.StatusNotFound},
 		{valid: false, apiResponseCode: http.StatusOK, apiResponse: "invalid"},
-		{valid: false, apiResponseCode: http.StatusOK, apiResponse: map[string]string{"test": "value"}},
+		{valid: false, apiResponseCode: http.StatusOK, apiResponse: `{"test": "value"}`},
 	}
 
 	for _, tc := range testcases {
-		s := mockHTTPServer(t, tc.apiResponseCode, tc.apiResponse)
+		s := http.TestServer(t, tc.apiResponseCode, tc.apiResponse)
 		api := newGithubAPI(s.URL)
 
 		dist, csum, err := api.getLatestReleaseDownloadURL("v0.0.1")
@@ -127,8 +122,7 @@ func Test_githubAPI_getLatestReleaseDownloadURL(t *testing.T) {
 }
 
 func Test_downloadDistribution(t *testing.T) {
-	fs := http.FileServer(http.Dir("./testdata"))
-	s := httptest.NewServer(fs)
+	s := http.TestFileServer(t, "./testdata")
 
 	testcases := []struct {
 		valid    bool
@@ -267,8 +261,7 @@ func Test_downloadFile(t *testing.T) {
 		{valid: false, path: "/example.NOTFOUND.tar.gz", saveto: ""},
 	}
 
-	fs := http.FileServer(http.Dir("./testdata"))
-	s := httptest.NewServer(fs)
+	s := http.TestFileServer(t, "./testdata")
 
 	for _, tc := range testcases {
 		if tc.valid {

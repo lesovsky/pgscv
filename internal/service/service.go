@@ -4,17 +4,16 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/shirou/gopsutil/process"
 	"github.com/weaponry/pgscv/internal/collector"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
 	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -706,10 +705,10 @@ func attemptRequest(baseurl string) error {
 	url := baseurl + "/health"
 	log.Debugln("making test http request: ", url)
 
-	var client = &http.Client{Timeout: time.Second}
+	var client = http.NewClient(http.ClientConfig{Timeout: time.Second})
 
 	if strings.HasPrefix(url, "https://") {
-		client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402
+		client.EnableTLSInsecure()
 	}
 
 	resp, err := client.Get(url) // #nosec G107
