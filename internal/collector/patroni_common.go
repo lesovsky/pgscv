@@ -1,13 +1,12 @@
 package collector
 
 import (
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
-	"net/http"
 	"strings"
 	"time"
 )
@@ -25,7 +24,7 @@ type patroniCommonCollector struct {
 // For details see https://patroni.readthedocs.io/en/latest/rest_api.html#monitoring-endpoint
 func NewPatroniCommonCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &patroniCommonCollector{
-		client: &http.Client{Timeout: time.Second},
+		client: http.NewClient(http.ClientConfig{Timeout: time.Second}),
 		up: newBuiltinTypedDesc(
 			descOpts{"patroni", "", "up", "State of Patroni service: 0 is down, 1 is up.", 0},
 			prometheus.GaugeValue,
@@ -60,8 +59,8 @@ func NewPatroniCommonCollector(constLabels labels, settings model.CollectorSetti
 }
 
 func (c *patroniCommonCollector) Update(config Config, ch chan<- prometheus.Metric) error {
-	if strings.HasPrefix(config.BaseURL, "https://") && c.client.Transport == nil {
-		c.client.Transport = &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true}} // #nosec G402
+	if strings.HasPrefix(config.BaseURL, "https://") {
+		c.client.EnableTLSInsecure()
 	}
 
 	// Check liveness.
@@ -100,12 +99,10 @@ func (c *patroniCommonCollector) Update(config Config, ch chan<- prometheus.Metr
 
 // requestApiLiveness requests to /liveness endpoint of API and returns error if failed.
 func requestApiLiveness(c *http.Client, baseurl string) error {
-	req, err := http.NewRequest("GET", baseurl+"/liveness", nil)
+	_, err := c.Get(baseurl + "/liveness")
 	if err != nil {
 		return err
 	}
-
-	_, err = c.Do(req)
 
 	return err
 }
@@ -136,12 +133,7 @@ type apiPatroniResponse struct {
 
 // requestPatroniInfo requests to /patroni endpoint of API and returns parsed response.
 func requestApiPatroni(c *http.Client, baseurl string) (*apiPatroniResponse, error) {
-	req, err := http.NewRequest("GET", baseurl+"/patroni", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.Do(req)
+	resp, err := c.Get(baseurl + "/patroni")
 	if err != nil {
 		return nil, err
 	}
@@ -182,12 +174,7 @@ type patroniHistory struct {
 
 // requestApiHistory requests /history endpoint of API and returns parsed response.
 func requestApiHistory(c *http.Client, baseurl string) (apiHistoryResponse, error) {
-	req, err := http.NewRequest("GET", baseurl+"/history", nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.Do(req)
+	resp, err := c.Get(baseurl + "/history")
 	if err != nil {
 		return nil, err
 	}
