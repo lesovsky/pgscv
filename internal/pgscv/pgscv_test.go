@@ -3,10 +3,9 @@ package pgscv
 import (
 	"context"
 	"github.com/stretchr/testify/assert"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/service"
 	"io"
-	"net/http"
-	"net/http/httptest"
 	"os"
 	"strings"
 	"sync"
@@ -15,29 +14,20 @@ import (
 )
 
 func TestStart(t *testing.T) {
-	// Mock HTTP server which handles incoming requests.
-	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		assert.NoError(t, err)
-		assert.Greater(t, len(body), 0)
-		assert.NoError(t, r.Body.Close())
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer writeServer.Close()
+	writeSrv := http.TestServer(t, http.StatusOK, "")
+	defer writeSrv.Close()
 
 	// Create app config.
 	config := &Config{
 		ListenAddress:  "127.0.0.1:5002",
 		APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
-		SendMetricsURL: writeServer.URL, SendMetricsInterval: 1 * time.Second,
+		SendMetricsURL: writeSrv.URL, SendMetricsInterval: 1 * time.Second,
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
 	// Start app, wait until context expires and do cleanup.
 	assert.NoError(t, Start(ctx, config))
-	http.DefaultServeMux = new(http.ServeMux)
 }
 
 func Test_runMetricsListener(t *testing.T) {
@@ -59,16 +49,17 @@ func Test_runMetricsListener(t *testing.T) {
 	time.Sleep(500 * time.Millisecond)
 
 	// Make request to '/' and assert response.
-	resp, err := http.Get("http://127.0.0.1:5003/")
+	cl := http.NewClient(http.ClientConfig{})
+	resp, err := cl.Get("http://127.0.0.1:5003/")
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 	body, err := io.ReadAll(resp.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), "pgSCV / Weaponry metrics collector, for more info visit https://github.com/weaponry/pgscv")
+	assert.Contains(t, string(body), `pgSCV / <a href="https://weaponry.io">Weaponry</a> metrics collector, for more info visit <a href="https://github.com/weaponry/pgscv">Github</a> page.`)
 	assert.NoError(t, resp.Body.Close())
 
 	// Make request to '/metrics' and assert response.
-	resp, err = http.Get("http://127.0.0.1:5003/metrics")
+	resp, err = cl.Get("http://127.0.0.1:5003/metrics")
 	assert.NoError(t, err)
 	assert.Equal(t, resp.StatusCode, http.StatusOK)
 
@@ -81,37 +72,20 @@ func Test_runMetricsListener(t *testing.T) {
 
 	// Waiting for listener goroutine.
 	wg.Wait()
-
-	http.DefaultServeMux = new(http.ServeMux) // clean http environment (which may be dirtied by other concurrently running tests)
 }
 
 func Test_runSendMetricsLoop(t *testing.T) {
-	// Run test read/write servers which will accept HTTP requests.
-	readServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "/metrics", r.URL.String())
+	readSrv := http.TestServer(t, http.StatusOK, "example 1")
+	defer readSrv.Close()
 
-		w.WriteHeader(http.StatusOK)
-
-		_, err := w.Write([]byte(`"test_metric{example="example"}`))
-		assert.NoError(t, err)
-	}))
-	defer readServer.Close()
-
-	writeServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := io.ReadAll(r.Body)
-		assert.NoError(t, err)
-		assert.Greater(t, len(body), 0)
-		assert.NoError(t, r.Body.Close())
-
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer writeServer.Close()
+	writeSrv := http.TestServer(t, http.StatusOK, "")
+	defer writeSrv.Close()
 
 	// Prepare stuff, create repo with default 'system' service.
 	config := &Config{
-		ListenAddress:  strings.TrimPrefix(readServer.URL, "http://"),
+		ListenAddress:  strings.TrimPrefix(readSrv.URL, "http://"),
 		APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
-		SendMetricsURL: writeServer.URL, SendMetricsInterval: 600 * time.Millisecond,
+		SendMetricsURL: writeSrv.URL, SendMetricsInterval: 600 * time.Millisecond,
 	}
 	repo := service.NewRepository()
 	repo.AddServicesFromConfig(service.Config{
@@ -171,6 +145,38 @@ func Test_lastSendStaleness(t *testing.T) {
 	// test zero -- should be also stale
 	got = lastSendStaleness(0, time.Minute)
 	assert.Equal(t, int64(got), int64(0))
+}
+
+func Test_sendClient_readMetrics(t *testing.T) {
+	readSrv := http.TestServer(t, http.StatusOK, "example 1")
+	defer readSrv.Close()
+
+	sc, err := newSendClient(&Config{
+		ListenAddress: strings.TrimPrefix(readSrv.URL, "http://"),
+		APIKey:        "example",
+	})
+	assert.NoError(t, err)
+
+	got, err := sc.readMetrics()
+	assert.NoError(t, err)
+	assert.Equal(t, "example 1", string(got))
+}
+
+func Test_sendClient_sendMetrics(t *testing.T) {
+	readSrv := http.TestServer(t, http.StatusOK, "example 1")
+	defer readSrv.Close()
+
+	writeSrv := http.TestServer(t, http.StatusOK, "")
+	defer writeSrv.Close()
+
+	sc, err := newSendClient(&Config{
+		ListenAddress:  strings.TrimPrefix(readSrv.URL, "http://"),
+		SendMetricsURL: writeSrv.URL,
+		APIKey:         "example",
+	})
+	assert.NoError(t, err)
+
+	assert.NoError(t, sc.sendMetrics([]byte("example 1")))
 }
 
 func Test_addDelay(t *testing.T) {
