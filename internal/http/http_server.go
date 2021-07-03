@@ -82,8 +82,12 @@ func NewServer(cfg ServerConfig) *Server {
 
 // Serve method starts listening and serving requests.
 func (s *Server) Serve() error {
-	log.Infof("listen on %s", s.server.Addr)
+	if s.config.EnableTLS {
+		log.Infof("listen on https://%s", s.server.Addr)
+		return s.server.ListenAndServeTLS(s.config.Certfile, s.config.Keyfile)
+	}
 
+	log.Infof("listen on http://%s", s.server.Addr)
 	return s.server.ListenAndServe()
 }
 

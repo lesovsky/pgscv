@@ -39,7 +39,7 @@ func TestAuthConfig_Validate(t *testing.T) {
 	}
 }
 
-func TestServer_Serve(t *testing.T) {
+func TestServer_Serve_HTTP(t *testing.T) {
 	addr := "127.0.0.1:17890"
 	srv := NewServer(ServerConfig{Addr: addr})
 
@@ -57,8 +57,42 @@ func TestServer_Serve(t *testing.T) {
 	endpoints := []string{"/", "/metrics"}
 
 	for _, e := range endpoints {
-		_, err := cl.Get("http://" + addr + e)
+		resp, err := cl.Get("http://" + addr + e)
 		assert.NoError(t, err)
+		assert.Equal(t, StatusOK, resp.StatusCode)
+	}
+}
+
+func TestServer_Serve_HTTPS(t *testing.T) {
+	addr := "127.0.0.1:17891"
+	srv := NewServer(ServerConfig{Addr: addr, AuthConfig: AuthConfig{
+		EnableTLS: true,
+		Keyfile:   "./testdata/example.key",
+		Certfile:  "./testdata/example.crt",
+	}})
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		err := srv.Serve()
+		assert.NoError(t, err)
+		wg.Done()
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+
+	cl := NewClient(ClientConfig{})
+	cl.EnableTLSInsecure()
+	endpoints := []string{"/", "/metrics"}
+
+	for _, e := range endpoints {
+		resp, err := cl.Get("http://" + addr + e)
+		assert.NoError(t, err)
+		assert.NotEqual(t, StatusOK, resp.StatusCode)
+
+		resp, err = cl.Get("https://" + addr + e)
+		assert.NoError(t, err)
+		assert.Equal(t, StatusOK, resp.StatusCode)
 	}
 }
 
