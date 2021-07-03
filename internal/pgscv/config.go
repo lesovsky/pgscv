@@ -3,6 +3,7 @@ package pgscv
 import (
 	"fmt"
 	"github.com/jackc/pgx/v4"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
@@ -40,6 +41,7 @@ type Config struct {
 	CollectorsSettings    model.CollectorsSettings `yaml:"collectors"`         // Collectors settings propagated from main YAML configuration
 	Databases             string                   `yaml:"databases"`          // Regular expression string specifies databases from which metrics should be collected
 	DatabasesRE           *regexp.Regexp           // Regular expression object compiled from Databases
+	AuthConfig            http.AuthConfig          `yaml:"authentication"` // TLS and Basic auth configuration
 }
 
 // NewConfig creates new config based on config file or return default config if config file is not specified.
@@ -144,6 +146,14 @@ func (c *Config) Validate() error {
 	if err != nil {
 		return err
 	}
+
+	// Validate authentication settings.
+	enableAuth, enableTLS, err := c.AuthConfig.Validate()
+	if err != nil {
+		return err
+	}
+	c.AuthConfig.EnableAuth = enableAuth
+	c.AuthConfig.EnableTLS = enableTLS
 
 	return nil
 }
@@ -287,6 +297,14 @@ func newConfigFromEnv() (*Config, error) {
 			config.Databases = value
 		case "PGSCV_DISABLE_COLLECTORS":
 			config.DisableCollectors = strings.Split(strings.Replace(value, " ", "", -1), ",")
+		case "PGSCV_AUTH_USERNAME":
+			config.AuthConfig.Username = value
+		case "PGSCV_AUTH_PASSWORD":
+			config.AuthConfig.Password = value
+		case "PGSCV_AUTH_KEYFILE":
+			config.AuthConfig.Keyfile = value
+		case "PGSCV_AUTH_CERTFILE":
+			config.AuthConfig.Certfile = value
 		}
 	}
 

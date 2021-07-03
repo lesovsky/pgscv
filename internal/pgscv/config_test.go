@@ -3,6 +3,7 @@ package pgscv
 import (
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/filter"
+	"github.com/weaponry/pgscv/internal/http"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/service"
 	"os"
@@ -106,6 +107,21 @@ func TestNewConfig(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:  "valid: authentication",
+			valid: true,
+			file:  "testdata/pgscv-auth-example.yaml",
+			want: &Config{
+				ListenAddress: "127.0.0.1:8080",
+				Defaults:      map[string]string{},
+				AuthConfig: http.AuthConfig{
+					Username: "user",
+					Password: "supersecret",
+					Keyfile:  "example.key",
+					Certfile: "example.cert",
+				},
+			},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -198,6 +214,16 @@ func TestConfig_Validate(t *testing.T) {
 			name:  "invalid config: invalid databases string",
 			valid: false,
 			in:    &Config{ListenAddress: "127.0.0.1:8080", Databases: "["},
+		},
+		{
+			name:  "invalid config: invalid auth",
+			valid: false,
+			in:    &Config{ListenAddress: "127.0.0.1:8080", AuthConfig: http.AuthConfig{Username: "user"}},
+		},
+		{
+			name:  "invalid config: invalid TLS",
+			valid: false,
+			in:    &Config{ListenAddress: "127.0.0.1:8080", AuthConfig: http.AuthConfig{Keyfile: "example.key"}},
 		},
 	}
 
@@ -411,6 +437,10 @@ func Test_newConfigFromEnv(t *testing.T) {
 				"PGBOUNCER_DSN_EXAMPLE2":   "example_dsn",
 				"PATRONI_URL":              "example_url",
 				"PATRONI_URL_EXAMPLE3":     "example_url",
+				"PGSCV_AUTH_USERNAME":      "user",
+				"PGSCV_AUTH_PASSWORD":      "pass",
+				"PGSCV_AUTH_KEYFILE":       "keyfile.key",
+				"PGSCV_AUTH_CERTFILE":      "certfile.cert",
 			},
 			want: &Config{
 				ListenAddress:     "127.0.0.1:12345",
@@ -427,6 +457,12 @@ func Test_newConfigFromEnv(t *testing.T) {
 					"EXAMPLE2":  {ServiceType: model.ServiceTypePgbouncer, Conninfo: "example_dsn"},
 					"patroni":   {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
 					"EXAMPLE3":  {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
+				},
+				AuthConfig: http.AuthConfig{
+					Username: "user",
+					Password: "pass",
+					Keyfile:  "keyfile.key",
+					Certfile: "certfile.cert",
 				},
 				Defaults: map[string]string{},
 			},

@@ -1,0 +1,6 @@
+listen_address: "127.0.0.1:8080"
+authentication:
+  username: user
+  password: supersecret
+  keyfile: example.key
+  certfile: example.cert

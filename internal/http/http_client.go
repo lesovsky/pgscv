@@ -7,9 +7,10 @@ import (
 )
 
 const (
-	StatusOK         = http.StatusOK         // 200
-	StatusBadRequest = http.StatusBadRequest // 400
-	StatusNotFound   = http.StatusNotFound   // 404
+	StatusOK           = http.StatusOK           // 200
+	StatusBadRequest   = http.StatusBadRequest   // 400
+	StatusUnauthorized = http.StatusUnauthorized // 401
+	StatusNotFound     = http.StatusNotFound     // 404
 )
 
 // Client defines local wrapper on standard http.Client.

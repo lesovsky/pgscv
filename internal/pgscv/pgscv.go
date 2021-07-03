@@ -109,7 +109,10 @@ func Start(ctx context.Context, config *Config) error {
 
 // runMetricsListener start HTTP listener accordingly to passed configuration.
 func runMetricsListener(ctx context.Context, config *Config) error {
-	srv := http.NewServer(config.ListenAddress)
+	srv := http.NewServer(http.ServerConfig{
+		Addr:       config.ListenAddress,
+		AuthConfig: config.AuthConfig,
+	})
 
 	errCh := make(chan error)
 	defer close(errCh)

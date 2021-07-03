@@ -11,9 +11,37 @@ import (
 	"time"
 )
 
+func TestAuthConfig_Validate(t *testing.T) {
+	testcases := []struct {
+		valid    bool
+		cfg      AuthConfig
+		wantAuth bool
+		wantTls  bool
+	}{
+		{valid: true, cfg: AuthConfig{}, wantAuth: false, wantTls: false},
+		{valid: true, cfg: AuthConfig{Username: "user", Password: "pass"}, wantAuth: true, wantTls: false},
+		{valid: true, cfg: AuthConfig{Keyfile: "key", Certfile: "cert"}, wantAuth: false, wantTls: true},
+		{valid: false, cfg: AuthConfig{Username: "user", Password: ""}},
+		{valid: false, cfg: AuthConfig{Username: "", Password: "pass"}},
+		{valid: false, cfg: AuthConfig{Keyfile: "key", Certfile: ""}},
+		{valid: false, cfg: AuthConfig{Keyfile: "", Certfile: "cert"}},
+	}
+
+	for _, tc := range testcases {
+		auth, tls, err := tc.cfg.Validate()
+		if tc.valid {
+			assert.NoError(t, err)
+			assert.Equal(t, tc.wantAuth, auth)
+			assert.Equal(t, tc.wantTls, tls)
+		} else {
+			assert.Error(t, err)
+		}
+	}
+}
+
 func TestServer_Serve(t *testing.T) {
 	addr := "127.0.0.1:17890"
-	srv := NewServer(addr)
+	srv := NewServer(ServerConfig{Addr: addr})
 
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -48,6 +76,35 @@ func Test_handleRoot(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Contains(t, string(body), `pgSCV / <a href="https://weaponry.io">Weaponry</a> metrics collector, for more info visit <a href="https://github.com/weaponry/pgscv">Github</a> page.`)
 	res.Flush()
+}
+
+func Test_basicAuth(t *testing.T) {
+	testcases := []struct {
+		name   string
+		user   string
+		pass   string
+		status int
+	}{
+		{name: "valid", user: "user", pass: "pass", status: StatusOK},
+		{name: "empty creds", user: "", pass: "", status: StatusUnauthorized},
+		{name: "empty pass", user: "user", pass: "", status: StatusUnauthorized},
+		{name: "empty user", user: "", pass: "pass", status: StatusUnauthorized},
+		{name: "invalid pass", user: "user", pass: "invalid", status: StatusUnauthorized},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			mux := http.NewServeMux()
+			mux.Handle("/", basicAuth(AuthConfig{Username: "user", Password: "pass"}, handleRoot()))
+
+			res := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			req.SetBasicAuth(tc.user, tc.pass)
+			mux.ServeHTTP(res, req)
+			assert.Equal(t, tc.status, res.Code)
+			res.Flush()
+		})
+	}
 }
 
 func TestNewPushRequest(t *testing.T) {
