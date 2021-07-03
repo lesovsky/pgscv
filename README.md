@@ -1,13 +1,15 @@
 # pgSCV - PostgreSQL ecosystem metrics collector.
 
 ### pgSCV
-- [collects](https://github.com/weaponry/pgscv/wiki/Collectors) a lot of stats about system, PostgreSQL, Pgbouncers, etc.
+- [collects](https://github.com/weaponry/pgscv/wiki/Collectors) a lot of stats about PostgreSQL environment.
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
 ### Features
+- **Supported services:** PostgreSQL, Pgbouncer, Patroni, metrics of operating system.  
 - **Pull mode**. pgSCV can listen on `/metrics` endpoint and serving requests from `Prometheus` or `Victoriametrics' Vmagent`.
 - **Push mode**. pgSCV can scrape its own `/metrics` endpoint and push scraped metrics to specified HTTP service.
   This feature primarily used for sending metrics to Weaponry SaaS, but not limited by this purpose.
+- **TLS and authentication**. `/metrics` endpoint could be protected with basic authentication and TLS.
 - **Collecting metrics from multiple services**. pgSCV can collect metrics from many databases instances.
 - **Services auto-discovery**. pgSCV can automatically discover Postgres and other Postgres-ecosystem services and
   start collecting metrics from them. In case of authentication, valid requisites should be specified.
