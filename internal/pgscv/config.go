@@ -220,7 +220,8 @@ func newConfigFromEnv() (*Config, error) {
 	log.Infoln("read configuration from environment")
 
 	config := &Config{
-		Defaults: map[string]string{},
+		Defaults:              map[string]string{},
+		ServicesConnsSettings: map[string]service.ConnSetting{},
 	}
 
 	for _, env := range os.Environ() {
@@ -230,10 +231,6 @@ func newConfigFromEnv() (*Config, error) {
 			!strings.HasPrefix(env, "PGBOUNCER_DSN") &&
 			!strings.HasPrefix(env, "PATRONI_URL") {
 			continue
-		}
-
-		if config.ServicesConnsSettings == nil {
-			config.ServicesConnsSettings = map[string]service.ConnSetting{}
 		}
 
 		ff := strings.SplitN(env, "=", 2)

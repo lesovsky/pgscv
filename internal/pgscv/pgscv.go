@@ -35,7 +35,7 @@ func Start(ctx context.Context, config *Config) error {
 	var wg sync.WaitGroup
 	ctx, cancel := context.WithCancel(ctx)
 
-	if config.ServicesConnsSettings == nil {
+	if config.ServicesConnsSettings == nil || len(config.ServicesConnsSettings) == 0 {
 		// run background discovery, the service repo will be fulfilled at first iteration
 		wg.Add(1)
 		go func() {
