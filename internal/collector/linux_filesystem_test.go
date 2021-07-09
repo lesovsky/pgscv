@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestFilesystemCollector_Update(t *testing.T) {
@@ -54,4 +55,28 @@ func Test_parseFilesystemStats(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, stats)
 	_ = file.Close()
+}
+
+func Test_readMountpointStat(t *testing.T) {
+	stat, err := readMountpointStat("/")
+	assert.NoError(t, err)
+	assert.Greater(t, stat.size, float64(0))
+	assert.Greater(t, stat.free, float64(0))
+	assert.Greater(t, stat.avail, float64(0))
+	assert.Greater(t, stat.files, float64(0))
+	assert.Greater(t, stat.filesfree, float64(0))
+
+	// unknown filesystem
+	stat, err = readMountpointStat("/invalid")
+	assert.Error(t, err)
+}
+
+func Test_readMountpointStatWithTimeout(t *testing.T) {
+	stat, err := readMountpointStatWithTimeout("/", time.Second)
+	assert.NoError(t, err)
+	assert.Greater(t, stat.Blocks, uint64(0))
+
+	// unknown filesystem
+	_, err = readMountpointStatWithTimeout("/invalid", time.Second)
+	assert.Error(t, err)
 }

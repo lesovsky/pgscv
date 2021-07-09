@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"context"
+	"errors"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/filter"
@@ -9,9 +9,12 @@ import (
 	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
-	"sync"
 	"syscall"
 	"time"
+)
+
+var (
+	errFilesystemTimedOut = errors.New("filesystem timed out")
 )
 
 type filesystemCollector struct {
@@ -66,7 +69,7 @@ func NewFilesystemCollector(constLabels labels, settings model.CollectorSettings
 }
 
 // Update method collects filesystem usage statistics.
-func (c *filesystemCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+func (c *filesystemCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	stats, err := getFilesystemStats()
 	if err != nil {
 		return fmt.Errorf("get filesystem stats failed: %s", err)
@@ -119,72 +122,89 @@ func parseFilesystemStats(r io.Reader) ([]filesystemStat, error) {
 		return nil, err
 	}
 
-	wg := sync.WaitGroup{}
-	statCh := make(chan filesystemStat)
-	stats := []filesystemStat{}
-
-	wg.Add(len(mounts))
+	var stats []filesystemStat
 	for _, m := range mounts {
-		mount := m
-
-		// In pessimistic cases, filesystem might stuck and requesting stats might stuck too.
-		// To avoid such situations wrap stats requests into context with timeout. One second
-		// timeout should be sufficient for machines.
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-
-		// Requesting stats.
-		go readMountpointStat(mount.mountpoint, statCh, &wg)
-
-		// Awaiting the stats response from the channel, or context cancellation by timeout.
-		select {
-		case response := <-statCh:
-			if response.err != nil {
-				// Skip filesystems if getting its stats failed. This could occur quite often,
-				// for example due to denied permissions.
-				log.Debugf("get filesystem %s stats failed: %s; skip", mount.mountpoint, response.err)
-				cancel()
-				continue
-			}
-
-			stat := filesystemStat{
-				mount:     mount,
-				size:      response.size,
-				free:      response.free,
-				avail:     response.avail,
-				files:     response.files,
-				filesfree: response.filesfree,
-			}
-			stats = append(stats, stat)
-		case <-ctx.Done():
-			log.Warnf("filesystem %s doesn't respond: %s; skip", mount.mountpoint, ctx.Err())
-			cancel()
+		stat, err := readMountpointStat(m.mountpoint)
+		if err != nil {
+			log.Warnf("read %s stats failed: %s", m.mountpoint, err)
 			continue
 		}
 
-		cancel()
+		stats = append(stats, filesystemStat{
+			mount:     m,
+			size:      stat.size,
+			free:      stat.free,
+			avail:     stat.avail,
+			files:     stat.files,
+			filesfree: stat.filesfree,
+		})
 	}
 
-	wg.Wait()
-	close(statCh)
 	return stats, nil
 }
 
-// readMountpointStat requests stats from kernel and sends stats to channel.
-func readMountpointStat(mountpoint string, ch chan filesystemStat, wg *sync.WaitGroup) {
-	defer wg.Done()
+// readMountpointStat requests stats from kernel and return filesystemStat if successful.
+func readMountpointStat(mountpoint string) (filesystemStat, error) {
+	// Reading filesystem statistics might stuck, especially this is true for network filesystems.
+	// In such case reading stats done by child goroutine with timeout and allow it to hang. When
+	// timeout exceeds outside of child, return an error and left behind the spawned goroutine (it
+	// is impossible to forcibly interrupt stuck syscall). Hope when syscall finished at all, stat
+	// is discarded and goroutine finishes normally.
 
-	var stat syscall.Statfs_t
-	if err := syscall.Statfs(mountpoint, &stat); err != nil {
-		ch <- filesystemStat{err: err}
-		return
+	timeout := 3 * time.Second // three seconds is sufficient to consider filesystem unresponsive.
+	statCh := make(chan *syscall.Statfs_t)
+	errCh := make(chan error)
+
+	// Run goroutine with reading stats. Check kind of returned error. If error related to timeout,
+	// print warning and return. Other kinds of error should be reported to parent.
+	go func() {
+		s, err := readMountpointStatWithTimeout(mountpoint, timeout)
+		if err != nil {
+			if err == errFilesystemTimedOut {
+				log.Warnf("%s: %s, skip", mountpoint, err)
+				return
+			}
+			errCh <- err
+		}
+
+		// Syscall successful - send stat to the channel.
+		statCh <- s
+	}()
+
+	// Waiting for results of spawned goroutine or time out.
+	for {
+		select {
+		case s := <-statCh:
+			return filesystemStat{
+				size:      float64(s.Blocks) * float64(s.Bsize),
+				free:      float64(s.Bfree) * float64(s.Bsize),
+				avail:     float64(s.Bavail) * float64(s.Bsize),
+				files:     float64(s.Files),
+				filesfree: float64(s.Ffree),
+			}, nil
+		case err := <-errCh:
+			return filesystemStat{err: err}, err
+		case <-time.After(timeout):
+			// Timeout expired, filesystem considered stuck, return.
+			return filesystemStat{err: errFilesystemTimedOut}, errFilesystemTimedOut
+		}
+	}
+}
+
+// readMountpointStatWithTimeout read filesystem stats, discard data if reading exceeds timeout.
+func readMountpointStatWithTimeout(mountpoint string, timeout time.Duration) (*syscall.Statfs_t, error) {
+	var buf syscall.Statfs_t
+	start := time.Now()
+
+	err := syscall.Statfs(mountpoint, &buf)
+	if err != nil {
+		return nil, err
 	}
 
-	// Syscall successful - send stat to the channel.
-	ch <- filesystemStat{
-		size:      float64(stat.Blocks) * float64(stat.Bsize),
-		free:      float64(stat.Bfree) * float64(stat.Bsize),
-		avail:     float64(stat.Bavail) * float64(stat.Bsize),
-		files:     float64(stat.Files),
-		filesfree: float64(stat.Ffree),
+	if time.Since(start) > timeout {
+		log.Warnf("%s stats stale: %s", mountpoint, time.Since(start).String())
+		return nil, errFilesystemTimedOut
 	}
+
+	return &buf, nil
 }

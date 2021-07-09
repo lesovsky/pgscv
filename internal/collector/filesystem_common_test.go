@@ -1,13 +1,10 @@
 package collector
 
 import (
-	"context"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
-	"sync"
 	"testing"
-	"time"
 )
 
 func Test_parseProcMounts(t *testing.T) {
@@ -35,31 +32,6 @@ func Test_parseProcMounts(t *testing.T) {
 	stats, err = parseProcMounts(file)
 	assert.Error(t, err)
 	assert.Nil(t, stats)
-}
-
-func Test_readMountpointStat(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	wg := sync.WaitGroup{}
-	ch := make(chan filesystemStat)
-
-	wg.Add(1)
-	go readMountpointStat("/", ch, &wg)
-
-	select {
-	case response := <-ch:
-		assert.Greater(t, response.size, float64(0))
-		assert.Greater(t, response.free, float64(0))
-		assert.Greater(t, response.avail, float64(0))
-		assert.Greater(t, response.files, float64(0))
-		assert.Greater(t, response.filesfree, float64(0))
-	case <-ctx.Done():
-		assert.Fail(t, "context cancelled: ", ctx.Err())
-	}
-
-	wg.Wait()
-	close(ch)
 }
 
 func Test_truncateDeviceName(t *testing.T) {
