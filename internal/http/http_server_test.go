@@ -148,7 +148,7 @@ func TestNewPushRequest(t *testing.T) {
 	assert.Equal(t, "pgSCV", req.Header.Get("User-Agent"))
 	assert.Equal(t, "example", req.Header.Get("X-Weaponry-Api-Key"))
 
-	re := regexp.MustCompile(`^https://example.org\?extra_label=instance%3Dexample&timestamp=[0-9]{13}$`)
+	re := regexp.MustCompile(`^https://example.org\?extra_label=instance%3Dexample$`)
 	assert.True(t, re.MatchString(req.URL.String()))
 
 	// test with invalid url

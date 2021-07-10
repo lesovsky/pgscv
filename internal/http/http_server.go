@@ -138,7 +138,6 @@ func NewPushRequest(url, apiKey, hostname string, payload []byte) (*http.Request
 	req.Header.Add("X-Weaponry-Api-Key", apiKey)
 
 	q := req.URL.Query()
-	q.Add("timestamp", fmt.Sprintf("%d", time.Now().UnixNano()/1000000))
 	q.Add("extra_label", fmt.Sprintf("instance=%s", hostname))
 	req.URL.RawQuery = q.Encode()
 
