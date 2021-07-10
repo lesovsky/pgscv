@@ -1,14 +1,12 @@
 package collector
 
 import (
-	"crypto/md5" // #nosec G501
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
-	"regexp"
 	"strconv"
 	"strings"
 )
@@ -57,7 +55,6 @@ type postgresStatementsCollector struct {
 	walRecords    typedDesc
 	walFPI        typedDesc
 	walBytes      typedDesc
-	chain         normalizationChain
 }
 
 // NewPostgresStatementsCollector returns a new Collector exposing postgres statements stats.
@@ -67,112 +64,111 @@ func NewPostgresStatementsCollector(constLabels labels, settings model.Collector
 		query: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "query_info", "Labeled info about statements has been executed.", 0},
 			prometheus.GaugeValue,
-			[]string{"user", "database", "md5", "query"}, constLabels,
+			[]string{"user", "database", "queryid", "query"}, constLabels,
 			settings.Filters,
 		),
 		calls: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "calls_total", "Total number of times statement has been executed.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		rows: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "rows_total", "Total number of rows retrieved or affected by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		times: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "time_seconds_total", "Time spent by the statement in each mode, in seconds.", .001},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5", "mode"}, constLabels,
+			[]string{"user", "database", "queryid", "mode"}, constLabels,
 			settings.Filters,
 		),
 		allTimes: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "time_seconds_all_total", "Total time spent by the statement, in seconds.", .001},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		sharedHit: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_hit_bytes_total", "Total number of bytes found in shared buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		sharedRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from shared buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		sharedDirtied: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_dirtied_bytes_total", "Total number of bytes dirtied in shared buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		sharedWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "shared_written_bytes_total", "Total number of bytes written to shared buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		localHit: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_hit_bytes_total", "Total number of bytes found in local buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		localRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_read_bytes_total", "Total number of bytes read from disk or OS page cache when reading from local buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		localDirtied: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_dirtied_bytes_total", "Total number of bytes dirtied in local buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		localWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "local_written_bytes_total", "Total number of bytes written to local buffers by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		tempRead: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "temp_read_bytes_total", "Total number of bytes read from temporary files by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		tempWritten: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "temp_written_bytes_total", "Total number of bytes written to temporary files by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		walRecords: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_records_total", "Total number of WAL records generated by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		walFPI: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_fpi_bytes_total", "Total number of WAL full-page images generated by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
 		walBytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "statements", "wal_bytes_total", "Total number of WAL bytes (not including FPI) generated by the statement.", 0},
 			prometheus.CounterValue,
-			[]string{"user", "database", "md5"}, constLabels,
+			[]string{"user", "database", "queryid"}, constLabels,
 			settings.Filters,
 		),
-		chain: newNormalizationChain(),
 	}, nil
 }
 
@@ -209,7 +205,7 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 	conn.Close()
 
 	// parse pg_stat_statements stats
-	stats := parsePostgresStatementsStats(res, c.chain, []string{"user", "database", "queryid", "query"})
+	stats := parsePostgresStatementsStats(res, []string{"user", "database", "queryid", "query"})
 
 	blockSize := float64(config.blockSize)
 
@@ -224,63 +220,63 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		// Note: pg_stat_statements.total_exec_time (and .total_time) includes blk_read_time and blk_write_time implicitly.
 		// Remember that when creating metrics.
 
-		ch <- c.query.newConstMetric(1, stat.user, stat.database, stat.md5hash, query)
+		ch <- c.query.newConstMetric(1, stat.user, stat.database, stat.queryid, query)
 
-		ch <- c.calls.newConstMetric(stat.calls, stat.user, stat.database, stat.md5hash)
-		ch <- c.rows.newConstMetric(stat.rows, stat.user, stat.database, stat.md5hash)
+		ch <- c.calls.newConstMetric(stat.calls, stat.user, stat.database, stat.queryid)
+		ch <- c.rows.newConstMetric(stat.rows, stat.user, stat.database, stat.queryid)
 
 		// total = planning + execution; execution already includes io time.
-		ch <- c.allTimes.newConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.user, stat.database, stat.md5hash)
-		ch <- c.times.newConstMetric(stat.totalPlanTime, stat.user, stat.database, stat.md5hash, "planning")
+		ch <- c.allTimes.newConstMetric(stat.totalPlanTime+stat.totalExecTime, stat.user, stat.database, stat.queryid)
+		ch <- c.times.newConstMetric(stat.totalPlanTime, stat.user, stat.database, stat.queryid, "planning")
 
 		// execution time = execution - io times.
-		ch <- c.times.newConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.user, stat.database, stat.md5hash, "executing")
+		ch <- c.times.newConstMetric(stat.totalExecTime-(stat.blkReadTime+stat.blkWriteTime), stat.user, stat.database, stat.queryid, "executing")
 
 		// avoid metrics spamming and send metrics only if they greater than zero.
 		if stat.blkReadTime > 0 {
-			ch <- c.times.newConstMetric(stat.blkReadTime, stat.user, stat.database, stat.md5hash, "ioread")
+			ch <- c.times.newConstMetric(stat.blkReadTime, stat.user, stat.database, stat.queryid, "ioread")
 		}
 		if stat.blkWriteTime > 0 {
-			ch <- c.times.newConstMetric(stat.blkWriteTime, stat.user, stat.database, stat.md5hash, "iowrite")
+			ch <- c.times.newConstMetric(stat.blkWriteTime, stat.user, stat.database, stat.queryid, "iowrite")
 		}
 		if stat.sharedBlksHit > 0 {
-			ch <- c.sharedHit.newConstMetric(stat.sharedBlksHit*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.sharedHit.newConstMetric(stat.sharedBlksHit*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.sharedBlksRead > 0 {
-			ch <- c.sharedRead.newConstMetric(stat.sharedBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.sharedRead.newConstMetric(stat.sharedBlksRead*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.sharedBlksDirtied > 0 {
-			ch <- c.sharedDirtied.newConstMetric(stat.sharedBlksDirtied*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.sharedDirtied.newConstMetric(stat.sharedBlksDirtied*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.sharedBlksWritten > 0 {
-			ch <- c.sharedWritten.newConstMetric(stat.sharedBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.sharedWritten.newConstMetric(stat.sharedBlksWritten*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.localBlksHit > 0 {
-			ch <- c.localHit.newConstMetric(stat.localBlksHit*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.localHit.newConstMetric(stat.localBlksHit*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.localBlksRead > 0 {
-			ch <- c.localRead.newConstMetric(stat.localBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.localRead.newConstMetric(stat.localBlksRead*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.localBlksDirtied > 0 {
-			ch <- c.localDirtied.newConstMetric(stat.localBlksDirtied*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.localDirtied.newConstMetric(stat.localBlksDirtied*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.localBlksWritten > 0 {
-			ch <- c.localWritten.newConstMetric(stat.localBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.localWritten.newConstMetric(stat.localBlksWritten*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.tempBlksRead > 0 {
-			ch <- c.tempRead.newConstMetric(stat.tempBlksRead*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.tempRead.newConstMetric(stat.tempBlksRead*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.tempBlksWritten > 0 {
-			ch <- c.tempWritten.newConstMetric(stat.tempBlksWritten*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.tempWritten.newConstMetric(stat.tempBlksWritten*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.walRecords > 0 {
-			ch <- c.walRecords.newConstMetric(stat.walRecords, stat.user, stat.database, stat.md5hash)
+			ch <- c.walRecords.newConstMetric(stat.walRecords, stat.user, stat.database, stat.queryid)
 		}
 		if stat.walFPI > 0 {
-			ch <- c.walFPI.newConstMetric(stat.walFPI*blockSize, stat.user, stat.database, stat.md5hash)
+			ch <- c.walFPI.newConstMetric(stat.walFPI*blockSize, stat.user, stat.database, stat.queryid)
 		}
 		if stat.walBytes > 0 {
-			ch <- c.walBytes.newConstMetric(stat.walBytes, stat.user, stat.database, stat.md5hash)
+			ch <- c.walBytes.newConstMetric(stat.walBytes, stat.user, stat.database, stat.queryid)
 		}
 	}
 
@@ -293,7 +289,6 @@ type postgresStatementStat struct {
 	user              string
 	queryid           string
 	query             string
-	md5hash           string
 	calls             float64
 	rows              float64
 	totalExecTime     float64
@@ -316,7 +311,7 @@ type postgresStatementStat struct {
 }
 
 // parsePostgresStatementsStats parses PGResult and return structs with stats values.
-func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, labelNames []string) map[string]postgresStatementStat {
+func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[string]postgresStatementStat {
 	log.Debug("parse postgres statements stats")
 
 	var stats = make(map[string]postgresStatementStat)
@@ -324,7 +319,7 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 	// process row by row - on every row construct 'statement' using database/user/queryHash trio. Next process other row's
 	// fields and collect stats for constructed 'statement'.
 	for _, row := range r.Rows {
-		var database, user, queryid, query, md5hash string
+		var database, user, queryid, query string
 
 		// collect label values
 		for i, colname := range r.Colnames {
@@ -336,17 +331,16 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 			case "queryid":
 				queryid = row[i].String
 			case "query":
-				query = c.normalize(row[i].String)
-				md5hash = fmt.Sprintf("%x", md5.Sum([]byte(query))) // #nosec G401
+				query = row[i].String
 			}
 		}
 
 		// Create a statement name consisting of trio database/user/queryHash
-		statement := strings.Join([]string{database, user, md5hash}, "/")
+		statement := strings.Join([]string{database, user, queryid}, "/")
 
 		// Put stats with labels (but with no data values yet) into stats store.
 		if _, ok := stats[statement]; !ok {
-			stats[statement] = postgresStatementStat{database: database, user: user, queryid: queryid, query: query, md5hash: md5hash}
+			stats[statement] = postgresStatementStat{database: database, user: user, queryid: queryid, query: query}
 		}
 
 		// fetch data values from columns
@@ -453,58 +447,6 @@ func parsePostgresStatementsStats(r *model.PGResult, c normalizationChain, label
 	}
 
 	return stats
-}
-
-// The goal of normalization chain is avoid regexp compilation at processing every query.
-// Instead of this normalization regexps are compiled at once when collector is created and compiled regexps are used
-// when necessary.
-
-// normalizationPair defines single normalization rule.
-type normalizationPair struct {
-	re          *regexp.Regexp
-	replacement string
-}
-
-// normalizationChain defines full chain of normalization which processes queries.
-type normalizationChain []normalizationPair
-
-// newNormalizationChain compiles normalizationChain from rules.
-func newNormalizationChain() normalizationChain {
-	patterns := [][2]string{
-		{`'.+?'`, "'?'"},          // looking for standalone text literals, like 'whatever'.
-		{`(--.*$|/\*.*?\*/)`, ""}, // looking for comment sequences, like '/* ... */ or starting from --.
-		{`[\n\r\t]+`, " "},        // looking for newline, carriage return, tabular characters.
-		{`(?i)\s+VALUES\s*\(((.\S+),\s?)+(.+?)\)`, " VALUES (?)"}, // looking for 'VALUES ($1, $2, ..., $123)' sequences.
-		{`(?i)\s+IN\s*\(((.\S+),\s?)+(.+?)\)`, " IN (?)"},         // looking for 'IN ($1, $2, ..., $123)' sequences.
-		{`\(([$\d,\s]+)\)`, "(?)"},                                // looking for standalone digits in parentheses, like '(1, 2, 3,4)'.
-		{`(?i)(^SET .+(=|TO))(.+)`, "SET ? TO ?"},                 // looking for SET commands.
-		{`_(\d|_)+`, "_?"},                                        // looking for digits starting with underscore, like '_2020' or '_2020_10'.
-		{`\$?\b\d+\b`, "?"},                                       // looking for standalone digits, like '10'.
-		{`\s{2,}`, " "},                                           // looking for repeating spaces.
-	}
-
-	var chain []normalizationPair
-
-	for _, v := range patterns {
-		re := regexp.MustCompile(v[0])
-		chain = append(chain, normalizationPair{re: re, replacement: v[1]})
-	}
-
-	return chain
-}
-
-// normalize pass query through normalization chain and returns normalized query.
-func (c normalizationChain) normalize(query string) string {
-	stmt := query
-	for _, v := range c {
-		stmt = v.re.ReplaceAllString(stmt, v.replacement)
-	}
-
-	if len(stmt) > 1000 {
-		stmt = stmt[0:1000] + "..."
-	}
-
-	return strings.TrimSpace(stmt)
 }
 
 // selectStatementsQuery returns suitable statements query depending on passed version.
