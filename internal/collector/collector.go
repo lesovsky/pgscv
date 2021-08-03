@@ -20,6 +20,7 @@ func (f Factories) RegisterSystemCollectors(disabled []string) {
 
 	funcs := map[string]func(labels, model.CollectorSettings) (Collector, error){
 		"system/pgscv":       NewPgscvServicesCollector,
+		"system/sysinfo":     NewSysInfoCollector,
 		"system/loadaverage": NewLoadAverageCollector,
 		"system/cpu":         NewCPUCollector,
 		"system/diskstats":   NewDiskstatsCollector,
