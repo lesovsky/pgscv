@@ -98,7 +98,7 @@ func Test_parsePatroniResponse(t *testing.T) {
 				Xlog:          patroniXlogInfo{Location: 67111576, ReceivedLocation: 0, ReplayedLocation: 0, ReplayedTimestamp: "", Paused: false},
 			},
 			want: &patroniInfo{
-				scope: "demo", version: 20002, running: 1, startTime: 1624864724.5653172,
+				scope: "demo", version: 20002, versionStr: "2.0.2", running: 1, startTime: 1624864724.5653172,
 				master: 1, standbyLeader: 0, replica: 0,
 				xlogLoc: 67111576, xlogRecvLoc: 0, xlogReplLoc: 0, xlogReplTs: 0, xlogPaused: 0,
 				pgversion: 100016, unlocked: 0, timeline: 1,
@@ -117,7 +117,7 @@ func Test_parsePatroniResponse(t *testing.T) {
 				Xlog:          patroniXlogInfo{Location: 0, ReceivedLocation: 67211944, ReplayedLocation: 67211944, ReplayedTimestamp: "2021-07-09 05:30:41.207477+00:00", Paused: true},
 			},
 			want: &patroniInfo{
-				scope: "demo", version: 20100, running: 1, startTime: 1625585463.056298,
+				scope: "demo", version: 20100, versionStr: "2.1.0", running: 1, startTime: 1625585463.056298,
 				master: 0, standbyLeader: 0, replica: 1,
 				xlogLoc: 0, xlogRecvLoc: 67211944, xlogReplLoc: 67211944, xlogReplTs: 1625808641.207477, xlogPaused: 1,
 				pgversion: 100016, unlocked: 1, timeline: 1,

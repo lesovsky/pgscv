@@ -48,7 +48,7 @@ func NewPatroniCommonCollector(constLabels labels, settings model.CollectorSetti
 		version: newBuiltinTypedDesc(
 			descOpts{"patroni", "", "version", "Numeric representation of Patroni version.", 0},
 			prometheus.GaugeValue,
-			varLabels, constLabels,
+			[]string{"scope", "version"}, constLabels,
 			settings.Filters,
 		),
 		pgup: newBuiltinTypedDesc(
@@ -175,7 +175,7 @@ func (c *patroniCommonCollector) Update(config Config, ch chan<- prometheus.Metr
 		return err
 	}
 
-	ch <- c.version.newConstMetric(info.version, info.scope)
+	ch <- c.version.newConstMetric(info.version, info.scope, info.versionStr)
 	ch <- c.pgup.newConstMetric(info.running, info.scope)
 	ch <- c.pgstart.newConstMetric(info.startTime, info.scope)
 
@@ -239,6 +239,7 @@ type apiPatroniResponse struct {
 type patroniInfo struct {
 	scope         string
 	version       float64
+	versionStr    string
 	running       float64
 	startTime     float64
 	master        float64
@@ -331,6 +332,7 @@ func parsePatroniResponse(resp *apiPatroniResponse) (*patroniInfo, error) {
 	return &patroniInfo{
 		scope:         resp.Patroni.Scope,
 		version:       float64(version),
+		versionStr:    resp.Patroni.Version,
 		running:       running,
 		startTime:     float64(t1.UnixNano()) / 1000000000,
 		master:        master,
