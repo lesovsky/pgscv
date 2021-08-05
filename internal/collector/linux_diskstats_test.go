@@ -51,8 +51,8 @@ func Test_parseDiskstats(t *testing.T) {
 
 func Test_getStorageProperties(t *testing.T) {
 	want := []storageDeviceProperties{
-		{device: "sda", rotational: "0", scheduler: "mq-deadline", size: 234441648},
-		{device: "sdb", rotational: "1", scheduler: "deadline", size: 3907029168},
+		{device: "sda", rotational: "0", scheduler: "mq-deadline", size: 234441648, virtual: "true"},
+		{device: "sdb", rotational: "1", scheduler: "deadline", size: 3907029168, virtual: "false", model: "TEST HARDDISK WITH LONG LONG LON"},
 	}
 
 	storages, err := getStorageProperties("testdata/sys/block/*")
@@ -106,4 +106,20 @@ func Test_getDeviceSize(t *testing.T) {
 	sz, err = getDeviceSize("testdata/proc/meminfo.golden")
 	assert.Error(t, err)
 	assert.Equal(t, int64(0), sz)
+}
+
+func Test_getDeviceModel(t *testing.T) {
+	m, err := getDeviceModel("testdata/sys/block/sdb")
+	assert.NoError(t, err)
+	assert.Equal(t, "TEST HARDDISK WITH LONG LONG LON", m)
+
+	// Read file with bad content
+	m, err = getDeviceModel("testdata/sys/block/sdz")
+	assert.Error(t, err)
+	assert.Equal(t, "", m)
+
+	// Read unknown file
+	m, err = getDeviceModel("testdata/proc/meminfo.golden")
+	assert.Error(t, err)
+	assert.Equal(t, "", m)
 }

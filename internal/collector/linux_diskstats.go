@@ -134,13 +134,13 @@ func NewDiskstatsCollector(constLabels labels, settings model.CollectorSettings)
 		storageSize: newBuiltinTypedDesc(
 			descOpts{"node", "system", "storage_size_bytes", "Total size of storage device in bytes.", diskSectorSize},
 			prometheus.GaugeValue,
-			[]string{"device", "rotational", "scheduler"}, constLabels,
+			[]string{"device", "rotational", "scheduler", "virtual", "model"}, constLabels,
 			settings.Filters,
 		),
 	}, nil
 }
 
-func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+func (c *diskstatsCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	stats, err := getDiskstats()
 	if err != nil {
 		return fmt.Errorf("get diskstats failed: %s", err)
@@ -202,7 +202,7 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 	} else {
 		for _, s := range storages {
 			ch <- c.storageInfo.newConstMetric(1, s.device, s.rotational, s.scheduler)
-			ch <- c.storageSize.newConstMetric(float64(s.size), s.device, s.rotational, s.scheduler)
+			ch <- c.storageSize.newConstMetric(float64(s.size), s.device, s.rotational, s.scheduler, s.virtual, s.model)
 		}
 	}
 
@@ -260,6 +260,8 @@ type storageDeviceProperties struct {
 	device     string
 	rotational string
 	scheduler  string
+	virtual    string
+	model      string
 	size       int64
 }
 
@@ -292,6 +294,25 @@ func getStorageProperties(path string) ([]storageDeviceProperties, error) {
 			continue
 		}
 
+		// Check 'device' symlink exists.
+		// Consider device is virtual (e.g. LVM, MDRAID, etc.). Check that 'device' symlink is present. Virtual devices
+		// don't have the symlink, it points to a device directory in /sys/devices.
+		virtual := true
+		_, err = os.Stat(devpath + "/device")
+		if err == nil {
+			virtual = false
+		}
+
+		// Read 'model' property for physical devices.
+		var deviceModel string
+		if !virtual {
+			deviceModel, err = getDeviceModel(devpath)
+			if err != nil {
+				log.Warnf("get model for %s failed: %s; skip", device, err)
+				continue
+			}
+		}
+
 		size, err := getDeviceSize(devpath)
 		if err != nil {
 			log.Warnf("get size for %s failed: %s; skip", device, err)
@@ -302,6 +323,8 @@ func getStorageProperties(path string) ([]storageDeviceProperties, error) {
 			device:     device,
 			scheduler:  scheduler,
 			rotational: rotational,
+			virtual:    strconv.FormatBool(virtual),
+			model:      deviceModel,
 			size:       size,
 		})
 	}
@@ -369,4 +392,18 @@ func getDeviceSize(devpath string) (int64, error) {
 	}
 
 	return size, nil
+}
+
+// getDeviceModel returns model of the device.
+func getDeviceModel(devpath string) (string, error) {
+	m, err := os.ReadFile(devpath + "/device/model")
+	if err != nil {
+		return "", err
+	}
+
+	if len(m) > 32 {
+		m = m[0:32]
+	}
+
+	return strings.TrimSpace(string(m)), nil
 }
