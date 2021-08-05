@@ -24,6 +24,7 @@ func TestDiskstatsCollector_Update(t *testing.T) {
 			"node_disk_io_time_seconds_total",
 			"node_disk_io_time_weighted_seconds_total",
 			"node_system_storage_info",
+			"node_system_storage_size_bytes",
 		},
 		collector:         NewDiskstatsCollector,
 		collectorSettings: model.CollectorSettings{Filters: filter.New()},
@@ -50,8 +51,8 @@ func Test_parseDiskstats(t *testing.T) {
 
 func Test_getStorageProperties(t *testing.T) {
 	want := []storageDeviceProperties{
-		{device: "sda", rotational: "0", scheduler: "mq-deadline"},
-		{device: "sdb", rotational: "1", scheduler: "deadline"},
+		{device: "sda", rotational: "0", scheduler: "mq-deadline", size: 234441648},
+		{device: "sdb", rotational: "1", scheduler: "deadline", size: 3907029168},
 	}
 
 	storages, err := getStorageProperties("testdata/sys/block/*")
@@ -89,4 +90,20 @@ func Test_getDeviceScheduler(t *testing.T) {
 	r, err = getDeviceScheduler("testdata/proc/meminfo.golden")
 	assert.Error(t, err)
 	assert.Equal(t, "", r)
+}
+
+func Test_getDeviceSize(t *testing.T) {
+	sz, err := getDeviceSize("testdata/sys/block/sda")
+	assert.NoError(t, err)
+	assert.Equal(t, int64(234441648), sz)
+
+	// Read file with bad content
+	sz, err = getDeviceSize("testdata/sys/block/sdz")
+	assert.Error(t, err)
+	assert.Equal(t, int64(0), sz)
+
+	// Read unknown file
+	sz, err = getDeviceSize("testdata/proc/meminfo.golden")
+	assert.Error(t, err)
+	assert.Equal(t, int64(0), sz)
 }

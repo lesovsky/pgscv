@@ -17,6 +17,8 @@ import (
 )
 
 const (
+	// Linux always considers sectors to be 512 bytes long independently of the devices real block size.
+	// https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/include/linux/types.h#n117
 	diskSectorSize = 512
 )
 
@@ -32,7 +34,8 @@ type diskstatsCollector struct {
 	ionow          typedDesc
 	iotime         typedDesc
 	iotimeweighted typedDesc
-	storages       typedDesc
+	storageInfo    typedDesc
+	storageSize    typedDesc
 }
 
 // NewDiskstatsCollector returns a new Collector exposing disk device stats.
@@ -121,8 +124,15 @@ func NewDiskstatsCollector(constLabels labels, settings model.CollectorSettings)
 			[]string{"device"}, constLabels,
 			settings.Filters,
 		),
-		storages: newBuiltinTypedDesc(
-			descOpts{"node", "system", "storage_info", "Labeled information about storage devices present in the system.", 0},
+		// DEPRECATED.
+		storageInfo: newBuiltinTypedDesc(
+			descOpts{"node", "system", "storage_info", "Labeled information about storage devices present in the system. DEPRECATED: consider using node_system_storage_size_bytes.", 0},
+			prometheus.GaugeValue,
+			[]string{"device", "rotational", "scheduler"}, constLabels,
+			settings.Filters,
+		),
+		storageSize: newBuiltinTypedDesc(
+			descOpts{"node", "system", "storage_size_bytes", "Total size of storage device in bytes.", diskSectorSize},
 			prometheus.GaugeValue,
 			[]string{"device", "rotational", "scheduler"}, constLabels,
 			settings.Filters,
@@ -191,7 +201,8 @@ func (c *diskstatsCollector) Update(config Config, ch chan<- prometheus.Metric) 
 		log.Warnf("get storage devices properties failed: %s; skip", err)
 	} else {
 		for _, s := range storages {
-			ch <- c.storages.newConstMetric(1, s.device, s.rotational, s.scheduler)
+			ch <- c.storageInfo.newConstMetric(1, s.device, s.rotational, s.scheduler)
+			ch <- c.storageSize.newConstMetric(float64(s.size), s.device, s.rotational, s.scheduler)
 		}
 	}
 
@@ -249,6 +260,7 @@ type storageDeviceProperties struct {
 	device     string
 	rotational string
 	scheduler  string
+	size       int64
 }
 
 // getStorageProperties reads storages properties.
@@ -280,10 +292,17 @@ func getStorageProperties(path string) ([]storageDeviceProperties, error) {
 			continue
 		}
 
+		size, err := getDeviceSize(devpath)
+		if err != nil {
+			log.Warnf("get size for %s failed: %s; skip", device, err)
+			continue
+		}
+
 		storages = append(storages, storageDeviceProperties{
 			device:     device,
 			scheduler:  scheduler,
 			rotational: rotational,
+			size:       size,
 		})
 	}
 	return storages, nil
@@ -335,4 +354,19 @@ func getDeviceScheduler(devpath string) (string, error) {
 	}
 
 	return "", fmt.Errorf("unknown scheduler: %s", line)
+}
+
+// getDeviceSize returns size of the device in sectors.
+func getDeviceSize(devpath string) (int64, error) {
+	sizeStr, err := os.ReadFile(devpath + "/size")
+	if err != nil {
+		return 0, err
+	}
+
+	size, err := strconv.ParseInt(strings.TrimSpace(string(sizeStr)), 10, 64)
+	if err != nil {
+		return 0, err
+	}
+
+	return size, nil
 }
