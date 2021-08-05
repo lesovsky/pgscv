@@ -5,12 +5,14 @@ import (
 	"github.com/jackc/pgproto3/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/weaponry/pgscv/internal/model"
+	"github.com/weaponry/pgscv/internal/store"
 	"testing"
 )
 
 func TestPgbouncerSettingsCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
+			"pgbouncer_version",
 			"pgbouncer_service_settings_info",
 			"pgbouncer_service_database_settings_info",
 			"pgbouncer_service_database_pool_size",
@@ -20,6 +22,15 @@ func TestPgbouncerSettingsCollector_Update(t *testing.T) {
 	}
 
 	pipeline(t, input)
+}
+
+func Test_queryPgbouncerVersion(t *testing.T) {
+	db := store.NewTestPgbouncer(t)
+
+	str, num, err := queryPgbouncerVersion(db)
+	assert.NoError(t, err)
+	assert.NotEqual(t, "", str)
+	assert.NotEqual(t, 0, num)
 }
 
 func Test_parsePgbouncerSettings(t *testing.T) {

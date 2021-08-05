@@ -2,6 +2,7 @@ package collector
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
@@ -9,16 +10,18 @@ import (
 	"github.com/weaponry/pgscv/internal/store"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 )
 
 const (
-	// admin console query used for retrieving settings
 	settingsQuery = "SHOW CONFIG"
+	versionQuery  = "SHOW VERSION"
 )
 
 type pgbouncerSettingsCollector struct {
+	version    typedDesc
 	settings   typedDesc
 	dbSettings typedDesc
 	poolSize   typedDesc
@@ -28,6 +31,12 @@ type pgbouncerSettingsCollector struct {
 // For details see https://www.pgbouncer.org/usage.html#show-config.
 func NewPgbouncerSettingsCollector(constLabels labels, settings model.CollectorSettings) (Collector, error) {
 	return &pgbouncerSettingsCollector{
+		version: newBuiltinTypedDesc(
+			descOpts{"pgbouncer", "", "version", "Numeric representation of Pgbouncer version.", 0},
+			prometheus.GaugeValue,
+			[]string{"version"}, constLabels,
+			settings.Filters,
+		),
 		settings: newBuiltinTypedDesc(
 			descOpts{"pgbouncer", "service", "settings_info", "Labeled information about Pgbouncer configuration settings.", 0},
 			prometheus.GaugeValue,
@@ -56,6 +65,13 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 		return err
 	}
 	defer conn.Close()
+
+	version, versionStr, err := queryPgbouncerVersion(conn)
+	if err != nil {
+		return err
+	}
+
+	ch <- c.version.newConstMetric(float64(version), versionStr)
 
 	res, err := conn.Query(settingsQuery)
 	if err != nil {
@@ -98,6 +114,25 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 	}
 
 	return nil
+}
+
+// queryPgbouncerVersion queries version info from Pgbouncer and return numeric and string version representation.
+func queryPgbouncerVersion(conn *store.DB) (int, string, error) {
+	var versionStr string
+	err := conn.Conn().QueryRow(context.Background(), versionQuery).Scan(&versionStr)
+	if err != nil {
+		return 0, "", err
+	}
+
+	re := regexp.MustCompile(`\d+\.\d+\.\d+`)
+	versionStr = re.FindString(versionStr)
+
+	version, err := semverStringToInt(versionStr)
+	if err != nil {
+		return 0, "", fmt.Errorf("parse version string '%s' failed: %s", versionStr, err)
+	}
+
+	return version, versionStr, nil
 }
 
 // parsePgbouncerSettings parses content of 'SHOW CONFIG' and return map with parsed settings.
