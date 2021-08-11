@@ -9,10 +9,30 @@ import (
 )
 
 const (
-	databaseQuery = "SELECT " +
+	databasesQuery11 = "SELECT " +
 		"coalesce(datname, 'global') AS database, " +
 		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
 		"conflicts, temp_files, temp_bytes, deadlocks, blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
+		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
+		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate) " +
+		"OR datname IS NULL"
+
+	databasesQuery12 = "SELECT " +
+		"coalesce(datname, 'global') AS database, " +
+		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
+		"conflicts, temp_files, temp_bytes, deadlocks, checksum_failures, coalesce(extract(epoch from checksum_last_failure), 0) AS last_checksum_failure_unixtime, " +
+		"blk_read_time, blk_write_time, pg_database_size(datname) as size_bytes, " +
+		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
+		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate) " +
+		"OR datname IS NULL"
+
+	databasesQueryLatest = "SELECT " +
+		"coalesce(datname, 'global') AS database, " +
+		"xact_commit, xact_rollback, blks_read, blks_hit, tup_returned, tup_fetched, tup_inserted, tup_updated, tup_deleted, " +
+		"conflicts, temp_files, temp_bytes, deadlocks, checksum_failures, coalesce(extract(epoch from checksum_last_failure), 0) AS last_checksum_failure_unixtime, " +
+		"blk_read_time, blk_write_time, " +
+		"session_time, active_time, idle_in_transaction_time, sessions, sessions_abandoned, sessions_fatal, sessions_killed, " +
+		"pg_database_size(datname) as size_bytes, " +
 		"coalesce(extract('epoch' from age(now(), stats_reset)), 0) as stats_age_seconds " +
 		"FROM pg_stat_database WHERE datname IN (SELECT datname FROM pg_database WHERE datallowconn AND NOT datistemplate) " +
 		"OR datname IS NULL"
@@ -23,19 +43,25 @@ const (
 )
 
 type postgresDatabasesCollector struct {
-	commits    typedDesc
-	rollbacks  typedDesc
-	conflicts  typedDesc
-	deadlocks  typedDesc
-	blocks     typedDesc
-	tuples     typedDesc
-	tempbytes  typedDesc
-	tempfiles  typedDesc
-	blockstime typedDesc
-	sizes      typedDesc
-	statsage   typedDesc
-	xidlimit   typedDesc
-	labelNames []string
+	commits            typedDesc
+	rollbacks          typedDesc
+	blocks             typedDesc
+	tuples             typedDesc
+	tempbytes          typedDesc
+	tempfiles          typedDesc
+	conflicts          typedDesc
+	deadlocks          typedDesc
+	csumfails          typedDesc
+	csumlastfailunixts typedDesc
+	blockstime         typedDesc
+	sessionalltime     typedDesc
+	sessiontime        typedDesc
+	sessionsall        typedDesc
+	sessions           typedDesc
+	sizes              typedDesc
+	statsage           typedDesc
+	xidlimit           typedDesc
+	labelNames         []string
 }
 
 // NewPostgresDatabasesCollector returns a new Collector exposing postgres databases stats.
@@ -53,18 +79,6 @@ func NewPostgresDatabasesCollector(constLabels labels, settings model.CollectorS
 		),
 		rollbacks: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "xact_rollbacks_total", "Total number of transactions had been rolled back.", 0},
-			prometheus.CounterValue,
-			labels, constLabels,
-			settings.Filters,
-		),
-		conflicts: newBuiltinTypedDesc(
-			descOpts{"postgres", "database", "conflicts_total", "Total number of recovery conflicts occurred.", 0},
-			prometheus.CounterValue,
-			labels, constLabels,
-			settings.Filters,
-		),
-		deadlocks: newBuiltinTypedDesc(
-			descOpts{"postgres", "database", "deadlocks_total", "Total number of deadlocks occurred.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
 			settings.Filters,
@@ -93,10 +107,58 @@ func NewPostgresDatabasesCollector(constLabels labels, settings model.CollectorS
 			labels, constLabels,
 			settings.Filters,
 		),
+		conflicts: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "conflicts_total", "Total number of recovery conflicts occurred.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		deadlocks: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "deadlocks_total", "Total number of deadlocks occurred.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		csumfails: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "checksum_failures_total", "Total number of checksum failures occurred.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		csumlastfailunixts: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "last_checksum_failure_seconds", "Time of the last checksum failure occurred, in unixtime.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
 		blockstime: newBuiltinTypedDesc(
 			descOpts{"postgres", "database", "blk_time_seconds_total", "Total time spent accessing data blocks by backends in this database in each access type, in seconds.", .001},
 			prometheus.CounterValue,
 			[]string{"database", "type"}, constLabels,
+			settings.Filters,
+		),
+		sessionalltime: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "session_time_all_seconds_total", "Total time spent by database sessions in this database in all states, in seconds", .001},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		sessiontime: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "session_time_seconds_total", "Total time spent by database sessions in this database in each state, in seconds", .001},
+			prometheus.CounterValue,
+			[]string{"database", "state"}, constLabels,
+			settings.Filters,
+		),
+		sessionsall: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "sessions_all_total", "Total number of sessions established to this database.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		sessions: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "sessions_total", "Total number of sessions established to this database and closed by each reason.", 0},
+			prometheus.CounterValue,
+			[]string{"database", "reason"}, constLabels,
 			settings.Filters,
 		),
 		sizes: newBuiltinTypedDesc(
@@ -128,7 +190,7 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	}
 	defer conn.Close()
 
-	res, err := conn.Query(databaseQuery)
+	res, err := conn.Query(selectDatabasesQuery(config.serverVersionNum))
 	if err != nil {
 		return err
 	}
@@ -145,8 +207,6 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 	for _, stat := range stats {
 		ch <- c.commits.newConstMetric(stat.xactcommit, stat.database)
 		ch <- c.rollbacks.newConstMetric(stat.xactrollback, stat.database)
-		ch <- c.conflicts.newConstMetric(stat.conflicts, stat.database)
-		ch <- c.deadlocks.newConstMetric(stat.deadlocks, stat.database)
 		ch <- c.blocks.newConstMetric(stat.blksread, stat.database, "read")
 		ch <- c.blocks.newConstMetric(stat.blkshit, stat.database, "hit")
 		ch <- c.tuples.newConstMetric(stat.tupreturned, stat.database, "returned")
@@ -157,10 +217,30 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 
 		ch <- c.tempbytes.newConstMetric(stat.tempbytes, stat.database)
 		ch <- c.tempfiles.newConstMetric(stat.tempfiles, stat.database)
+		ch <- c.conflicts.newConstMetric(stat.conflicts, stat.database)
+		ch <- c.deadlocks.newConstMetric(stat.deadlocks, stat.database)
+
 		ch <- c.blockstime.newConstMetric(stat.blkreadtime, stat.database, "read")
 		ch <- c.blockstime.newConstMetric(stat.blkwritetime, stat.database, "write")
 		ch <- c.sizes.newConstMetric(stat.sizebytes, stat.database)
 		ch <- c.statsage.newConstMetric(stat.statsage, stat.database)
+
+		if config.serverVersionNum >= PostgresV12 {
+			ch <- c.csumfails.newConstMetric(stat.csumfails, stat.database)
+			ch <- c.csumlastfailunixts.newConstMetric(stat.csumlastfailunixts, stat.database)
+		}
+
+		if config.serverVersionNum >= PostgresV14 {
+			ch <- c.sessionalltime.newConstMetric(stat.sessiontime, stat.database)
+			ch <- c.sessiontime.newConstMetric(stat.activetime, stat.database, "active")
+			ch <- c.sessiontime.newConstMetric(stat.idletxtime, stat.database, "idle_in_transaction")
+			ch <- c.sessiontime.newConstMetric(stat.sessiontime-(stat.activetime+stat.idletxtime), stat.database, "idle")
+			ch <- c.sessionsall.newConstMetric(stat.sessions, stat.database)
+			ch <- c.sessions.newConstMetric(stat.sessabandoned, stat.database, "abandoned")
+			ch <- c.sessions.newConstMetric(stat.sessfatal, stat.database, "fatal")
+			ch <- c.sessions.newConstMetric(stat.sesskilled, stat.database, "killed")
+			ch <- c.sessions.newConstMetric(stat.sessions-(stat.sessabandoned+stat.sessfatal+stat.sesskilled), stat.database, "normal")
+		}
 	}
 
 	ch <- c.xidlimit.newConstMetric(xidStats.database, "pg_database")
@@ -172,24 +252,33 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 
 // postgresDatabaseStat represents per-database stats based on pg_stat_database.
 type postgresDatabaseStat struct {
-	database     string
-	xactcommit   float64
-	xactrollback float64
-	blksread     float64
-	blkshit      float64
-	tupreturned  float64
-	tupfetched   float64
-	tupinserted  float64
-	tupupdated   float64
-	tupdeleted   float64
-	conflicts    float64
-	tempfiles    float64
-	tempbytes    float64
-	deadlocks    float64
-	blkreadtime  float64
-	blkwritetime float64
-	sizebytes    float64
-	statsage     float64
+	database           string
+	xactcommit         float64
+	xactrollback       float64
+	blksread           float64
+	blkshit            float64
+	tupreturned        float64
+	tupfetched         float64
+	tupinserted        float64
+	tupupdated         float64
+	tupdeleted         float64
+	conflicts          float64
+	tempfiles          float64
+	tempbytes          float64
+	deadlocks          float64
+	csumfails          float64
+	csumlastfailunixts float64
+	blkreadtime        float64
+	blkwritetime       float64
+	sessiontime        float64
+	activetime         float64
+	idletxtime         float64
+	sessions           float64
+	sessabandoned      float64
+	sessfatal          float64
+	sesskilled         float64
+	sizebytes          float64
+	statsage           float64
 }
 
 // parsePostgresDatabasesStats parses PGResult, extract data and return struct with stats values.
@@ -235,79 +324,67 @@ func parsePostgresDatabasesStats(r *model.PGResult, labelNames []string) map[str
 				continue
 			}
 
+			s := stats[databaseFQName]
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "xact_commit":
-				s := stats[databaseFQName]
 				s.xactcommit = v
-				stats[databaseFQName] = s
 			case "xact_rollback":
-				s := stats[databaseFQName]
 				s.xactrollback = v
-				stats[databaseFQName] = s
 			case "blks_read":
-				s := stats[databaseFQName]
 				s.blksread = v
-				stats[databaseFQName] = s
 			case "blks_hit":
-				s := stats[databaseFQName]
 				s.blkshit = v
-				stats[databaseFQName] = s
 			case "tup_returned":
-				s := stats[databaseFQName]
 				s.tupreturned = v
-				stats[databaseFQName] = s
 			case "tup_fetched":
-				s := stats[databaseFQName]
 				s.tupfetched = v
-				stats[databaseFQName] = s
 			case "tup_inserted":
-				s := stats[databaseFQName]
 				s.tupinserted = v
-				stats[databaseFQName] = s
 			case "tup_updated":
-				s := stats[databaseFQName]
 				s.tupupdated = v
-				stats[databaseFQName] = s
 			case "tup_deleted":
-				s := stats[databaseFQName]
 				s.tupdeleted = v
-				stats[databaseFQName] = s
 			case "conflicts":
-				s := stats[databaseFQName]
 				s.conflicts = v
-				stats[databaseFQName] = s
 			case "temp_files":
-				s := stats[databaseFQName]
 				s.tempfiles = v
-				stats[databaseFQName] = s
 			case "temp_bytes":
-				s := stats[databaseFQName]
 				s.tempbytes = v
-				stats[databaseFQName] = s
 			case "deadlocks":
-				s := stats[databaseFQName]
 				s.deadlocks = v
-				stats[databaseFQName] = s
+			case "checksum_failures":
+				s.csumfails = v
+			case "last_checksum_failure_unixtime":
+				s.csumlastfailunixts = v
 			case "blk_read_time":
-				s := stats[databaseFQName]
 				s.blkreadtime = v
-				stats[databaseFQName] = s
 			case "blk_write_time":
-				s := stats[databaseFQName]
 				s.blkwritetime = v
-				stats[databaseFQName] = s
+			case "session_time":
+				s.sessiontime = v
+			case "active_time":
+				s.activetime = v
+			case "idle_in_transaction_time":
+				s.idletxtime = v
+			case "sessions":
+				s.sessions = v
+			case "sessions_abandoned":
+				s.sessabandoned = v
+			case "sessions_fatal":
+				s.sessfatal = v
+			case "sessions_killed":
+				s.sesskilled = v
 			case "size_bytes":
-				s := stats[databaseFQName]
 				s.sizebytes = v
-				stats[databaseFQName] = s
 			case "stats_age_seconds":
-				s := stats[databaseFQName]
 				s.statsage = v
-				stats[databaseFQName] = s
 			default:
 				continue
 			}
+
+			// Store updated stats into local store.
+			stats[databaseFQName] = s
 		}
 	}
 
@@ -347,4 +424,16 @@ func parsePostgresXidLimitStats(r *model.PGResult) xidLimitStats {
 	}
 
 	return stats
+}
+
+// selectDatabasesQuery returns suitable databases query depending on passed version.
+func selectDatabasesQuery(version int) string {
+	switch {
+	case version < PostgresV12:
+		return databasesQuery11
+	case version < PostgresV14:
+		return databasesQuery12
+	default:
+		return databasesQueryLatest
+	}
 }
