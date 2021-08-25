@@ -6,6 +6,7 @@ import (
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
 	"github.com/weaponry/pgscv/internal/store"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -154,9 +155,31 @@ func newPostgresServiceConfig(connStr string) (postgresServiceConfig, error) {
 
 // isAddressLocal return true if passed address is local, and return false otherwise.
 func isAddressLocal(addr string) bool {
-	if strings.HasPrefix(addr, "/") || strings.HasPrefix(addr, "127.") || addr == "localhost" {
+	if addr == "" {
+		return false
+	}
+
+	if strings.HasPrefix(addr, "/") {
 		return true
 	}
+
+	if addr == "localhost" || strings.HasPrefix(addr, "127.") || addr == "::1" {
+		return true
+	}
+
+	addresses, err := net.InterfaceAddrs()
+	if err != nil {
+		// Consider error as the passed host address is not local
+		log.Warnf("check network address '%s' failed: %s; consider it as remote", addr, err)
+		return false
+	}
+
+	for _, a := range addresses {
+		if strings.HasPrefix(a.String(), addr) {
+			return true
+		}
+	}
+
 	return false
 }
 

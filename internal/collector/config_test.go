@@ -33,12 +33,15 @@ func Test_isAddressLocal(t *testing.T) {
 		addr string
 		want bool
 	}{
+		{addr: "", want: false},
 		{addr: "127.0.0.1", want: true},
 		{addr: "127.1.2.3", want: true},
+		{addr: "/", want: true},
 		{addr: "/var/run/postgresql", want: true},
 		{addr: "localhost", want: true},
-		{addr: "", want: false},
+		{addr: "example", want: false},
 		{addr: "1.2.3.4", want: false},
+		{addr: "::1", want: true},
 	}
 
 	for _, tc := range testcases {
