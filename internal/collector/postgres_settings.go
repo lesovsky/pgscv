@@ -222,6 +222,7 @@ func parsePostgresFiles(r *model.PGResult) []postgresFile {
 		fi, err := os.Stat(path)
 		if err != nil {
 			log.Warnf("stat %s failed: %s; skip", path, err)
+			continue
 		}
 
 		mode := fmt.Sprintf("%04o", fi.Mode().Perm())
