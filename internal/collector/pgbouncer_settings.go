@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"fmt"
+	"github.com/jackc/pgx/v4"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
@@ -66,12 +67,19 @@ func (c *pgbouncerSettingsCollector) Update(config Config, ch chan<- prometheus.
 	}
 	defer conn.Close()
 
+	// Pgbouncers before 1.12 return version as a NOTICE message (not as normal row) and it seems
+	// there is no way to extract version string. Query the version, if zero value is returned it
+	// means there is an old Pgbouncer is answered. Just skip collecting version metric and continue.
+
 	version, versionStr, err := queryPgbouncerVersion(conn)
 	if err != nil {
 		return err
 	}
+	if version != 0 {
+		ch <- c.version.newConstMetric(float64(version), versionStr)
+	}
 
-	ch <- c.version.newConstMetric(float64(version), versionStr)
+	// Query pgbouncer settings.
 
 	res, err := conn.Query(settingsQuery)
 	if err != nil {
@@ -121,7 +129,14 @@ func queryPgbouncerVersion(conn *store.DB) (int, string, error) {
 	var versionStr string
 	err := conn.Conn().QueryRow(context.Background(), versionQuery).Scan(&versionStr)
 	if err != nil {
-		return 0, "", err
+		// Pgbouncer before 1.12 returns version string as a NOTICE, and it seems there is no way to extract
+		// message text from the NOTICE. Return zero value and nil as error.
+		// Pgbouncer changelog: https://www.pgbouncer.org/changelog.html#pgbouncer-112x
+		if err == pgx.ErrNoRows {
+			return 0, "", nil
+		}
+
+		return 0, "", fmt.Errorf("read version string failed: %s", err)
 	}
 
 	re := regexp.MustCompile(`\d+\.\d+\.\d+`)
