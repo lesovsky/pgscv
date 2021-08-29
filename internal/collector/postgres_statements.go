@@ -362,87 +362,53 @@ func parsePostgresStatementsStats(r *model.PGResult, labelNames []string) map[st
 				continue
 			}
 
+			s := stats[statement]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "calls":
-				s := stats[statement]
 				s.calls += v
-				stats[statement] = s
 			case "rows":
-				s := stats[statement]
 				s.rows += v
-				stats[statement] = s
 			case "total_time", "total_exec_time":
-				s := stats[statement]
 				s.totalExecTime += v
-				stats[statement] = s
 			case "total_plan_time":
-				s := stats[statement]
 				s.totalPlanTime += v
-				stats[statement] = s
 			case "blk_read_time":
-				s := stats[statement]
 				s.blkReadTime += v
-				stats[statement] = s
 			case "blk_write_time":
-				s := stats[statement]
 				s.blkWriteTime += v
-				stats[statement] = s
 			case "shared_blks_hit":
-				s := stats[statement]
 				s.sharedBlksHit += v
-				stats[statement] = s
 			case "shared_blks_read":
-				s := stats[statement]
 				s.sharedBlksRead += v
-				stats[statement] = s
 			case "shared_blks_dirtied":
-				s := stats[statement]
 				s.sharedBlksDirtied += v
-				stats[statement] = s
 			case "shared_blks_written":
-				s := stats[statement]
 				s.sharedBlksWritten += v
-				stats[statement] = s
 			case "local_blks_hit":
-				s := stats[statement]
 				s.localBlksHit += v
-				stats[statement] = s
 			case "local_blks_read":
-				s := stats[statement]
 				s.localBlksRead += v
-				stats[statement] = s
 			case "local_blks_dirtied":
-				s := stats[statement]
 				s.localBlksDirtied += v
-				stats[statement] = s
 			case "local_blks_written":
-				s := stats[statement]
 				s.localBlksWritten += v
-				stats[statement] = s
 			case "temp_blks_read":
-				s := stats[statement]
 				s.tempBlksRead += v
-				stats[statement] = s
 			case "temp_blks_written":
-				s := stats[statement]
 				s.tempBlksWritten += v
-				stats[statement] = s
 			case "wal_records":
-				s := stats[statement]
 				s.walRecords += v
-				stats[statement] = s
 			case "wal_fpi":
-				s := stats[statement]
 				s.walFPI += v
-				stats[statement] = s
 			case "wal_bytes":
-				s := stats[statement]
 				s.walBytes += v
-				stats[statement] = s
 			default:
 				continue
 			}
+
+			stats[statement] = s
 		}
 	}
 

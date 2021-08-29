@@ -115,15 +115,17 @@ func parsePostgresReplicationSlotStats(r *model.PGResult, labelNames []string) m
 				continue
 			}
 
+			s := stats[slotFQName]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "since_restart_bytes":
-				s := stats[slotFQName]
 				s.retainedBytes = v
-				stats[slotFQName] = s
 			default:
 				continue
 			}
+
+			stats[slotFQName] = s
 		}
 	}
 

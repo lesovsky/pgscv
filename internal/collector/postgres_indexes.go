@@ -187,34 +187,26 @@ func parsePostgresIndexStats(r *model.PGResult, labelNames []string) map[string]
 				continue
 			}
 
+			s := stats[indexname]
+
 			switch string(colname.Name) {
 			case "idx_scan":
-				s := stats[indexname]
 				s.idxscan = v
-				stats[indexname] = s
 			case "idx_tup_read":
-				s := stats[indexname]
 				s.idxtupread = v
-				stats[indexname] = s
 			case "idx_tup_fetch":
-				s := stats[indexname]
 				s.idxtupfetch = v
-				stats[indexname] = s
 			case "idx_blks_read":
-				s := stats[indexname]
 				s.idxread = v
-				stats[indexname] = s
 			case "idx_blks_hit":
-				s := stats[indexname]
 				s.idxhit = v
-				stats[indexname] = s
 			case "size_bytes":
-				s := stats[indexname]
 				s.sizebytes = v
-				stats[indexname] = s
 			default:
 				continue
 			}
+
+			stats[indexname] = s
 		}
 	}
 

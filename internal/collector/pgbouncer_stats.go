@@ -151,39 +151,29 @@ func parsePgbouncerStatsStats(r *model.PGResult, labelNames []string) map[string
 				continue
 			}
 
+			s := stats[databaseFQName]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "total_xact_count":
-				s := stats[databaseFQName]
 				s.xacts = v
-				stats[databaseFQName] = s
 			case "total_query_count":
-				s := stats[databaseFQName]
 				s.queries = v
-				stats[databaseFQName] = s
 			case "total_received":
-				s := stats[databaseFQName]
 				s.received = v
-				stats[databaseFQName] = s
 			case "total_sent":
-				s := stats[databaseFQName]
 				s.sent = v
-				stats[databaseFQName] = s
 			case "total_xact_time":
-				s := stats[databaseFQName]
 				s.xacttime = v
-				stats[databaseFQName] = s
 			case "total_query_time":
-				s := stats[databaseFQName]
 				s.querytime = v
-				stats[databaseFQName] = s
 			case "total_wait_time":
-				s := stats[databaseFQName]
 				s.waittime = v
-				stats[databaseFQName] = s
 			default:
 				continue
 			}
+
+			stats[databaseFQName] = s
 		}
 	}
 

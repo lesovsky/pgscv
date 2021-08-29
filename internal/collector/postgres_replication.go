@@ -217,47 +217,33 @@ func parsePostgresReplicationStats(r *model.PGResult, labelNames []string) map[s
 				continue
 			}
 
+			s := stats[pid]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "pending_lag_bytes":
-				s := stats[pid]
 				s.values["pending_lag_bytes"] = v
-				stats[pid] = s
 			case "write_lag_bytes":
-				s := stats[pid]
 				s.values["write_lag_bytes"] = v
-				stats[pid] = s
 			case "flush_lag_bytes":
-				s := stats[pid]
 				s.values["flush_lag_bytes"] = v
-				stats[pid] = s
 			case "replay_lag_bytes":
-				s := stats[pid]
 				s.values["replay_lag_bytes"] = v
-				stats[pid] = s
 			case "write_lag_seconds":
-				s := stats[pid]
 				s.values["write_lag_seconds"] = v
-				stats[pid] = s
 			case "flush_lag_seconds":
-				s := stats[pid]
 				s.values["flush_lag_seconds"] = v
-				stats[pid] = s
 			case "replay_lag_seconds":
-				s := stats[pid]
 				s.values["replay_lag_seconds"] = v
-				stats[pid] = s
 			case "total_lag_bytes":
-				s := stats[pid]
 				s.values["total_lag_bytes"] = v
-				stats[pid] = s
 			case "total_lag_seconds":
-				s := stats[pid]
 				s.values["total_lag_seconds"] = v
-				stats[pid] = s
 			default:
 				continue
 			}
+
+			stats[pid] = s
 		}
 	}
 

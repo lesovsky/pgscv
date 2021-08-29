@@ -159,43 +159,31 @@ func parsePgbouncerPoolsStats(r *model.PGResult, labelNames []string) map[string
 				continue
 			}
 
+			s := stats[poolname]
+
 			// Update stats struct
 			switch string(colname.Name) {
 			case "cl_active":
-				s := stats[poolname]
 				s.clActive = v
-				stats[poolname] = s
 			case "cl_waiting":
-				s := stats[poolname]
 				s.clWaiting = v
-				stats[poolname] = s
 			case "sv_active":
-				s := stats[poolname]
 				s.svActive = v
-				stats[poolname] = s
 			case "sv_idle":
-				s := stats[poolname]
 				s.svIdle = v
-				stats[poolname] = s
 			case "sv_used":
-				s := stats[poolname]
 				s.svUsed = v
-				stats[poolname] = s
 			case "sv_tested":
-				s := stats[poolname]
 				s.svTested = v
-				stats[poolname] = s
 			case "sv_login":
-				s := stats[poolname]
 				s.svLogin = v
-				stats[poolname] = s
 			case "maxwait":
-				s := stats[poolname]
 				s.maxWait = v
-				stats[poolname] = s
 			default:
 				continue
 			}
+
+			stats[poolname] = s
 		}
 	}
 

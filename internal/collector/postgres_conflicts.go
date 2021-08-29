@@ -108,31 +108,25 @@ func parsePostgresConflictStats(r *model.PGResult, labelNames []string) map[stri
 				continue
 			}
 
+			s := stats[databaseFQName]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "confl_tablespace":
-				s := stats[databaseFQName]
 				s.tablespace = v
-				stats[databaseFQName] = s
 			case "confl_lock":
-				s := stats[databaseFQName]
 				s.lock = v
-				stats[databaseFQName] = s
 			case "confl_snapshot":
-				s := stats[databaseFQName]
 				s.snapshot = v
-				stats[databaseFQName] = s
 			case "confl_bufferpin":
-				s := stats[databaseFQName]
 				s.bufferpin = v
-				stats[databaseFQName] = s
 			case "confl_deadlock":
-				s := stats[databaseFQName]
 				s.deadlock = v
-				stats[databaseFQName] = s
 			default:
 				continue
 			}
+
+			stats[databaseFQName] = s
 		}
 	}
 

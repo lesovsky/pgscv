@@ -154,23 +154,21 @@ func parsePostgresFunctionsStats(r *model.PGResult, labelNames []string) map[str
 				continue
 			}
 
+			s := stats[functionFQName]
+
 			// Run column-specific logic
 			switch string(colname.Name) {
 			case "calls":
-				s := stats[functionFQName]
 				s.calls = v
-				stats[functionFQName] = s
 			case "total_time":
-				s := stats[functionFQName]
 				s.totaltime = v
-				stats[functionFQName] = s
 			case "self_time":
-				s := stats[functionFQName]
 				s.selftime = v
-				stats[functionFQName] = s
 			default:
 				continue
 			}
+
+			stats[functionFQName] = s
 		}
 	}
 
