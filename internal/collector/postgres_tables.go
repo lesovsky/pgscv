@@ -13,8 +13,11 @@ import (
 const (
 	userTablesQuery = "SELECT current_database() AS database, s1.schemaname AS schema, s1.relname AS table, " +
 		"seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, " +
-		"n_mod_since_analyze, extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds, " +
+		"n_mod_since_analyze," +
+		"extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds, " +
 		"extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds, " +
+		"extract('seconds' from greatest(last_vacuum, last_autovacuum)) as last_vacuum_time," +
+		"extract('seconds' from greatest(last_analyze, last_autoanalyze)) as last_analyze_time," +
 		"vacuum_count, autovacuum_count, analyze_count, autoanalyze_count, heap_blks_read, heap_blks_hit, idx_blks_read, " +
 		"idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit, pg_table_size(s1.relid) AS size_bytes " +
 		"FROM pg_stat_user_tables s1 JOIN pg_statio_user_tables s2 USING (schemaname, relname) " +
@@ -23,23 +26,25 @@ const (
 
 // postgresTablesCollector defines metric descriptors and stats store.
 type postgresTablesCollector struct {
-	seqscan          typedDesc
-	seqtupread       typedDesc
-	idxscan          typedDesc
-	idxtupfetch      typedDesc
-	tupInserted      typedDesc
-	tupUpdated       typedDesc
-	tupHotUpdated    typedDesc
-	tupDeleted       typedDesc
-	tupLive          typedDesc
-	tupDead          typedDesc
-	tupModified      typedDesc
-	maintLastVacuum  typedDesc
-	maintLastAnalyze typedDesc
-	maintenance      typedDesc
-	io               typedDesc
-	sizes            typedDesc
-	labelNames       []string
+	seqscan              typedDesc
+	seqtupread           typedDesc
+	idxscan              typedDesc
+	idxtupfetch          typedDesc
+	tupInserted          typedDesc
+	tupUpdated           typedDesc
+	tupHotUpdated        typedDesc
+	tupDeleted           typedDesc
+	tupLive              typedDesc
+	tupDead              typedDesc
+	tupModified          typedDesc
+	maintLastVacuumAge   typedDesc
+	maintLastAnalyzeAge  typedDesc
+	maintLastVacuumTime  typedDesc
+	maintLastAnalyzeTime typedDesc
+	maintenance          typedDesc
+	io                   typedDesc
+	sizes                typedDesc
+	labelNames           []string
 }
 
 // NewPostgresTablesCollector returns a new Collector exposing postgres tables stats.
@@ -117,14 +122,26 @@ func NewPostgresTablesCollector(constLabels labels, settings model.CollectorSett
 			labels, constLabels,
 			settings.Filters,
 		),
-		maintLastVacuum: newBuiltinTypedDesc(
-			descOpts{"postgres", "table", "since_last_vacuum_seconds_total", "Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds.", 0},
+		maintLastVacuumAge: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "since_last_vacuum_seconds_total", "Total time since table was vacuumed manually or automatically (not counting VACUUM FULL), in seconds. DEPRECATED.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
 			settings.Filters,
 		),
-		maintLastAnalyze: newBuiltinTypedDesc(
-			descOpts{"postgres", "table", "since_last_analyze_seconds_total", "Total time since table was analyzed manually or automatically, in seconds.", 0},
+		maintLastAnalyzeAge: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "since_last_analyze_seconds_total", "Total time since table was analyzed manually or automatically, in seconds. DEPRECATED.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		maintLastVacuumTime: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "last_vacuum_time", "Time of last vacuum or autovacuum has been done (not counting VACUUM FULL), in unixtime.", 0},
+			prometheus.CounterValue,
+			labels, constLabels,
+			settings.Filters,
+		),
+		maintLastAnalyzeTime: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "last_analyze_time", "Time of last analyze or autoanalyze has been done, in unixtime.", 0},
 			prometheus.CounterValue,
 			labels, constLabels,
 			settings.Filters,
@@ -209,11 +226,17 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 			ch <- c.tupModified.newConstMetric(stat.modified, stat.database, stat.schema, stat.table)
 
 			// maintenance stats -- avoid metrics spam produced by inactive tables, don't send metrics if counters are zero.
-			if stat.lastvacuum > 0 {
-				ch <- c.maintLastVacuum.newConstMetric(stat.lastvacuum, stat.database, stat.schema, stat.table)
+			if stat.lastvacuumAge > 0 {
+				ch <- c.maintLastVacuumAge.newConstMetric(stat.lastvacuumAge, stat.database, stat.schema, stat.table)
 			}
-			if stat.lastanalyze > 0 {
-				ch <- c.maintLastAnalyze.newConstMetric(stat.lastanalyze, stat.database, stat.schema, stat.table)
+			if stat.lastanalyzeAge > 0 {
+				ch <- c.maintLastAnalyzeAge.newConstMetric(stat.lastanalyzeAge, stat.database, stat.schema, stat.table)
+			}
+			if stat.lastvacuumTime > 0 {
+				ch <- c.maintLastVacuumTime.newConstMetric(stat.lastvacuumTime, stat.database, stat.schema, stat.table)
+			}
+			if stat.lastanalyzeTime > 0 {
+				ch <- c.maintLastAnalyzeTime.newConstMetric(stat.lastanalyzeTime, stat.database, stat.schema, stat.table)
 			}
 			if stat.vacuum > 0 {
 				ch <- c.maintenance.newConstMetric(stat.vacuum, stat.database, stat.schema, stat.table, "vacuum")
@@ -263,35 +286,37 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 
 // postgresTableStat is per-table store for metrics related to how tables are accessed.
 type postgresTableStat struct {
-	database    string
-	schema      string
-	table       string
-	seqscan     float64
-	seqtupread  float64
-	idxscan     float64
-	idxtupfetch float64
-	inserted    float64
-	updated     float64
-	deleted     float64
-	hotUpdated  float64
-	live        float64
-	dead        float64
-	modified    float64
-	lastvacuum  float64
-	lastanalyze float64
-	vacuum      float64
-	autovacuum  float64
-	analyze     float64
-	autoanalyze float64
-	heapread    float64
-	heaphit     float64
-	idxread     float64
-	idxhit      float64
-	toastread   float64
-	toasthit    float64
-	tidxread    float64
-	tidxhit     float64
-	sizebytes   float64
+	database        string
+	schema          string
+	table           string
+	seqscan         float64
+	seqtupread      float64
+	idxscan         float64
+	idxtupfetch     float64
+	inserted        float64
+	updated         float64
+	deleted         float64
+	hotUpdated      float64
+	live            float64
+	dead            float64
+	modified        float64
+	lastvacuumAge   float64
+	lastanalyzeAge  float64
+	lastvacuumTime  float64
+	lastanalyzeTime float64
+	vacuum          float64
+	autovacuum      float64
+	analyze         float64
+	autoanalyze     float64
+	heapread        float64
+	heaphit         float64
+	idxread         float64
+	idxhit          float64
+	toastread       float64
+	toasthit        float64
+	tidxread        float64
+	tidxhit         float64
+	sizebytes       float64
 }
 
 // parsePostgresTableStats parses PGResult and returns structs with stats values.
@@ -338,114 +363,70 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 				continue
 			}
 
+			s := stats[tablename]
+
 			switch string(colname.Name) {
 			case "seq_scan":
-				s := stats[tablename]
 				s.seqscan = v
-				stats[tablename] = s
 			case "seq_tup_read":
-				s := stats[tablename]
 				s.seqtupread = v
-				stats[tablename] = s
 			case "idx_scan":
-				s := stats[tablename]
 				s.idxscan = v
-				stats[tablename] = s
 			case "idx_tup_fetch":
-				s := stats[tablename]
 				s.idxtupfetch = v
-				stats[tablename] = s
 			case "n_tup_ins":
-				s := stats[tablename]
 				s.inserted = v
-				stats[tablename] = s
 			case "n_tup_upd":
-				s := stats[tablename]
 				s.updated = v
-				stats[tablename] = s
 			case "n_tup_del":
-				s := stats[tablename]
 				s.deleted = v
-				stats[tablename] = s
 			case "n_tup_hot_upd":
-				s := stats[tablename]
 				s.hotUpdated = v
-				stats[tablename] = s
 			case "n_live_tup":
-				s := stats[tablename]
 				s.live = v
-				stats[tablename] = s
 			case "n_dead_tup":
-				s := stats[tablename]
 				s.dead = v
-				stats[tablename] = s
 			case "n_mod_since_analyze":
-				s := stats[tablename]
 				s.modified = v
-				stats[tablename] = s
 			case "last_vacuum_seconds":
-				s := stats[tablename]
-				s.lastvacuum = v
-				stats[tablename] = s
+				s.lastvacuumAge = v
 			case "last_analyze_seconds":
-				s := stats[tablename]
-				s.lastanalyze = v
-				stats[tablename] = s
+				s.lastanalyzeAge = v
+			case "last_vacuum_time":
+				s.lastvacuumTime = v
+			case "last_analyze_time":
+				s.lastanalyzeTime = v
 			case "vacuum_count":
-				s := stats[tablename]
 				s.vacuum = v
-				stats[tablename] = s
 			case "autovacuum_count":
-				s := stats[tablename]
 				s.autovacuum = v
-				stats[tablename] = s
 			case "analyze_count":
-				s := stats[tablename]
 				s.analyze = v
-				stats[tablename] = s
 			case "autoanalyze_count":
-				s := stats[tablename]
 				s.autoanalyze = v
-				stats[tablename] = s
 			case "heap_blks_read":
-				s := stats[tablename]
 				s.heapread = v
-				stats[tablename] = s
 			case "heap_blks_hit":
-				s := stats[tablename]
 				s.heaphit = v
-				stats[tablename] = s
 			case "idx_blks_read":
-				s := stats[tablename]
 				s.idxread = v
-				stats[tablename] = s
 			case "idx_blks_hit":
-				s := stats[tablename]
 				s.idxhit = v
-				stats[tablename] = s
 			case "toast_blks_read":
-				s := stats[tablename]
 				s.toastread = v
-				stats[tablename] = s
 			case "toast_blks_hit":
-				s := stats[tablename]
 				s.toasthit = v
-				stats[tablename] = s
 			case "tidx_blks_read":
-				s := stats[tablename]
 				s.tidxread = v
-				stats[tablename] = s
 			case "tidx_blks_hit":
-				s := stats[tablename]
 				s.tidxhit = v
-				stats[tablename] = s
 			case "size_bytes":
-				s := stats[tablename]
 				s.sizebytes = v
-				stats[tablename] = s
 			default:
 				continue
 			}
+
+			stats[tablename] = s
 		}
 	}
 
