@@ -12,15 +12,16 @@ import (
 
 const (
 	userTablesQuery = "SELECT current_database() AS database, s1.schemaname AS schema, s1.relname AS table, " +
-		"seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, n_live_tup, n_dead_tup, " +
-		"n_mod_since_analyze," +
-		"extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) as last_vacuum_seconds, " +
-		"extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) as last_analyze_seconds, " +
-		"extract('epoch' from greatest(last_vacuum, last_autovacuum)) as last_vacuum_time," +
-		"extract('epoch' from greatest(last_analyze, last_autoanalyze)) as last_analyze_time," +
+		"seq_scan, seq_tup_read, idx_scan, idx_tup_fetch, n_tup_ins, n_tup_upd, n_tup_del, n_tup_hot_upd, " +
+		"n_live_tup, n_dead_tup, n_mod_since_analyze, " +
+		"extract('epoch' from age(now(), greatest(last_vacuum, last_autovacuum))) AS last_vacuum_seconds, " +
+		"extract('epoch' from age(now(), greatest(last_analyze, last_autoanalyze))) AS last_analyze_seconds, " +
+		"extract('epoch' from greatest(last_vacuum, last_autovacuum)) AS last_vacuum_time," +
+		"extract('epoch' from greatest(last_analyze, last_autoanalyze)) AS last_analyze_time," +
 		"vacuum_count, autovacuum_count, analyze_count, autoanalyze_count, heap_blks_read, heap_blks_hit, idx_blks_read, " +
-		"idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit, pg_table_size(s1.relid) AS size_bytes " +
-		"FROM pg_stat_user_tables s1 JOIN pg_statio_user_tables s2 USING (schemaname, relname) " +
+		"idx_blks_hit, toast_blks_read, toast_blks_hit, tidx_blks_read, tidx_blks_hit, " +
+		"pg_table_size(s1.relid) AS size_bytes, reltuples " +
+		"FROM pg_stat_user_tables s1 JOIN pg_statio_user_tables s2 USING (schemaname, relname) JOIN pg_class c ON s1.relid = c.oid " +
 		"WHERE NOT EXISTS (SELECT 1 FROM pg_locks WHERE relation = s1.relid AND mode = 'AccessExclusiveLock' AND granted)"
 )
 
@@ -44,6 +45,7 @@ type postgresTablesCollector struct {
 	maintenance          typedDesc
 	io                   typedDesc
 	sizes                typedDesc
+	reltuples            typedDesc
 	labelNames           []string
 }
 
@@ -164,6 +166,12 @@ func NewPostgresTablesCollector(constLabels labels, settings model.CollectorSett
 			labels, constLabels,
 			settings.Filters,
 		),
+		reltuples: newBuiltinTypedDesc(
+			descOpts{"postgres", "table", "tuples_total", "Number of rows in the table based on pg_class.reltuples value.", 0},
+			prometheus.GaugeValue,
+			labels, constLabels,
+			settings.Filters,
+		),
 	}, nil
 }
 
@@ -278,6 +286,7 @@ func (c *postgresTablesCollector) Update(config Config, ch chan<- prometheus.Met
 			}
 
 			ch <- c.sizes.newConstMetric(stat.sizebytes, stat.database, stat.schema, stat.table)
+			ch <- c.reltuples.newConstMetric(stat.reltuples, stat.database, stat.schema, stat.table)
 		}
 	}
 
@@ -317,6 +326,7 @@ type postgresTableStat struct {
 	tidxread        float64
 	tidxhit         float64
 	sizebytes       float64
+	reltuples       float64
 }
 
 // parsePostgresTableStats parses PGResult and returns structs with stats values.
@@ -422,6 +432,8 @@ func parsePostgresTableStats(r *model.PGResult, labelNames []string) map[string]
 				s.tidxhit = v
 			case "size_bytes":
 				s.sizebytes = v
+			case "reltuples":
+				s.reltuples = v
 			default:
 				continue
 			}

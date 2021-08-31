@@ -28,6 +28,7 @@ func TestPostgresTablesCollector_Update(t *testing.T) {
 			"postgres_table_last_analyze_time",
 			"postgres_table_maintenance_total",
 			"postgres_table_size_bytes",
+			"postgres_table_tuples_total",
 		},
 		optional: []string{
 			"postgres_table_io_blocks_total",
@@ -49,7 +50,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 			name: "normal output",
 			res: &model.PGResult{
 				Nrows: 1,
-				Ncols: 30,
+				Ncols: 32,
 				Colnames: []pgproto3.FieldDescription{
 					{Name: []byte("database")}, {Name: []byte("schema")}, {Name: []byte("table")},
 					{Name: []byte("seq_scan")}, {Name: []byte("seq_tup_read")}, {Name: []byte("idx_scan")}, {Name: []byte("idx_tup_fetch")},
@@ -59,6 +60,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 					{Name: []byte("vacuum_count")}, {Name: []byte("autovacuum_count")}, {Name: []byte("analyze_count")}, {Name: []byte("autoanalyze_count")},
 					{Name: []byte("heap_blks_read")}, {Name: []byte("heap_blks_hit")}, {Name: []byte("idx_blks_read")}, {Name: []byte("idx_blks_hit")},
 					{Name: []byte("toast_blks_read")}, {Name: []byte("toast_blks_hit")}, {Name: []byte("tidx_blks_read")}, {Name: []byte("tidx_blks_hit")},
+					{Name: []byte("size_bytes")}, {Name: []byte("reltuples")},
 				},
 				Rows: [][]sql.NullString{
 					{
@@ -70,6 +72,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 						{String: "910", Valid: true}, {String: "920", Valid: true}, {String: "930", Valid: true}, {String: "940", Valid: true},
 						{String: "4528", Valid: true}, {String: "5845", Valid: true}, {String: "458", Valid: true}, {String: "698", Valid: true},
 						{String: "125", Valid: true}, {String: "825", Valid: true}, {String: "699", Valid: true}, {String: "375", Valid: true},
+						{String: "458523", Valid: true}, {String: "50000", Valid: true},
 					},
 				},
 			},
@@ -80,6 +83,7 @@ func Test_parsePostgresTableStats(t *testing.T) {
 					inserted: 300, updated: 400, deleted: 500, hotUpdated: 150, live: 600, dead: 100, modified: 500,
 					lastvacuumAge: 700, lastanalyzeAge: 800, lastvacuumTime: 12345678, lastanalyzeTime: 87654321, vacuum: 910, autovacuum: 920, analyze: 930, autoanalyze: 940,
 					heapread: 4528, heaphit: 5845, idxread: 458, idxhit: 698, toastread: 125, toasthit: 825, tidxread: 699, tidxhit: 375,
+					sizebytes: 458523, reltuples: 50000,
 				},
 			},
 		},
