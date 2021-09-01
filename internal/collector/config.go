@@ -37,6 +37,8 @@ type postgresServiceConfig struct {
 	localService bool
 	// blockSize defines size of data block Postgres operates.
 	blockSize uint64
+	// walBlockSize defines size of WAL block Postgres operates.
+	walBlockSize uint64
 	// walSegmentSize defines size of WAL segment Postgres operates.
 	walSegmentSize uint64
 	// serverVersionNum defines version of Postgres in XXYYZZ format.
@@ -90,17 +92,29 @@ func newPostgresServiceConfig(connStr string) (postgresServiceConfig, error) {
 
 	config.blockSize = bsize
 
+	// Get Postgres WAL block size.
+	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'wal_block_size'").Scan(&setting)
+	if err != nil {
+		return config, err
+	}
+	walBlockSize, err := strconv.ParseUint(setting, 10, 64)
+	if err != nil {
+		return config, err
+	}
+
+	config.walBlockSize = walBlockSize
+
 	// Get Postgres WAL segment size.
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'wal_segment_size'").Scan(&setting)
 	if err != nil {
 		return config, err
 	}
-	segSize, err := strconv.ParseUint(setting, 10, 64)
+	walSegSize, err := strconv.ParseUint(setting, 10, 64)
 	if err != nil {
 		return config, err
 	}
 
-	config.walSegmentSize = segSize
+	config.walSegmentSize = walSegSize
 
 	// Get Postgres server version
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'server_version_num'").Scan(&setting)
