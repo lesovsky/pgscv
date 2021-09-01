@@ -11,8 +11,6 @@ import (
 func TestPostgresReplicationCollector_Update(t *testing.T) {
 	var input = pipelineInput{
 		required: []string{
-			"postgres_recovery_info",
-			"postgres_wal_written_bytes_total",
 			"postgres_replication_lag_bytes",
 			"postgres_replication_lag_all_bytes",
 			"postgres_replication_lag_seconds",
@@ -100,24 +98,6 @@ func Test_selectReplicationQuery(t *testing.T) {
 	for _, tc := range testcases {
 		t.Run("", func(t *testing.T) {
 			assert.Equal(t, tc.want, selectReplicationQuery(tc.version))
-		})
-	}
-}
-
-func Test_selectWalQuery(t *testing.T) {
-	var testcases = []struct {
-		version int
-		want    string
-	}{
-		{version: 90600, want: postgresWalQuery96},
-		{version: 90605, want: postgresWalQuery96},
-		{version: 100000, want: postgresWalQuertLatest},
-		{version: 100005, want: postgresWalQuertLatest},
-	}
-
-	for _, tc := range testcases {
-		t.Run("", func(t *testing.T) {
-			assert.Equal(t, tc.want, selectWalQuery(tc.version))
 		})
 	}
 }

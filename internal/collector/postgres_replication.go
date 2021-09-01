@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"context"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/weaponry/pgscv/internal/log"
 	"github.com/weaponry/pgscv/internal/model"
@@ -10,12 +9,6 @@ import (
 )
 
 const (
-	postgresWalQuery96 = "SELECT pg_is_in_recovery()::int AS recovery, " +
-		"(case pg_is_in_recovery() when 't' then pg_last_xlog_receive_location() else pg_current_xlog_location() end) - '0/00000000' AS wal_bytes"
-
-	postgresWalQuertLatest = "SELECT pg_is_in_recovery()::int AS recovery, " +
-		"(case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() else pg_current_wal_lsn() end) - '0/00000000' AS wal_bytes"
-
 	// Query for Postgres version 9.6 and older.
 	postgresReplicationQuery96 = "SELECT pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename AS user, application_name, state, " +
 		"pg_current_xlog_location() - sent_location AS pending_lag_bytes, " +
@@ -42,8 +35,6 @@ const (
 
 type postgresReplicationCollector struct {
 	labelNames      []string
-	recovery        typedDesc
-	wal             typedDesc
 	lagbytes        typedDesc
 	lagseconds      typedDesc
 	lagtotalbytes   typedDesc
@@ -57,18 +48,6 @@ func NewPostgresReplicationCollector(constLabels labels, settings model.Collecto
 
 	return &postgresReplicationCollector{
 		labelNames: labelNames,
-		recovery: newBuiltinTypedDesc(
-			descOpts{"postgres", "recovery", "info", "Current recovery state, 0 - not in recovery; 1 - in recovery.", 0},
-			prometheus.GaugeValue,
-			nil, constLabels,
-			settings.Filters,
-		),
-		wal: newBuiltinTypedDesc(
-			descOpts{"postgres", "wal", "written_bytes_total", "Total amount of WAL written (or received in case of standby), in bytes.", 0},
-			prometheus.CounterValue,
-			nil, constLabels,
-			settings.Filters,
-		),
 		lagbytes: newBuiltinTypedDesc(
 			descOpts{"postgres", "replication", "lag_bytes", "Number of bytes standby is behind than primary in each WAL processing phase.", 0},
 			prometheus.GaugeValue,
@@ -103,17 +82,6 @@ func (c *postgresReplicationCollector) Update(config Config, ch chan<- prometheu
 		return err
 	}
 	defer conn.Close()
-
-	// Get recovery state.
-	var recovery int
-	var walBytes int64
-	err = conn.Conn().QueryRow(context.TODO(), selectWalQuery(config.serverVersionNum)).Scan(&recovery, &walBytes)
-	if err != nil {
-		log.Warnf("get recovery state failed: %s; skip", err)
-	} else {
-		ch <- c.recovery.newConstMetric(float64(recovery))
-		ch <- c.wal.newConstMetric(float64(walBytes))
-	}
 
 	// Get replication stats.
 	res, err := conn.Query(selectReplicationQuery(config.serverVersionNum))
@@ -257,15 +225,5 @@ func selectReplicationQuery(version int) string {
 		return postgresReplicationQuery96
 	default:
 		return postgresReplicationQueryLatest
-	}
-}
-
-// selectWalQuery returns suitable wal state query depending on passed version.
-func selectWalQuery(version int) string {
-	switch {
-	case version < PostgresV10:
-		return postgresWalQuery96
-	default:
-		return postgresWalQuertLatest
 	}
 }
