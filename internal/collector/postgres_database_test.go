@@ -29,7 +29,7 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 		// TODO: wait until Postgres 14 has been released, update Postgres version on pgscv-testing docker image
 		//   and move these metrics to 'required' slice.
 		optional: []string{
-			"postgres_database_session_time_all_seconds_total",
+			"postgres_database_session_time_seconds_all_total",
 			"postgres_database_session_time_seconds_total",
 			"postgres_database_sessions_all_total",
 			"postgres_database_sessions_total",

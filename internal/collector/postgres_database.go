@@ -138,7 +138,7 @@ func NewPostgresDatabasesCollector(constLabels labels, settings model.CollectorS
 			settings.Filters,
 		),
 		sessionalltime: newBuiltinTypedDesc(
-			descOpts{"postgres", "database", "session_time_all_seconds_total", "Total time spent by database sessions in this database in all states, in seconds", .001},
+			descOpts{"postgres", "database", "session_time_seconds_all_total", "Total time spent by database sessions in this database in all states, in seconds", .001},
 			prometheus.CounterValue,
 			labels, constLabels,
 			settings.Filters,
