@@ -10,29 +10,29 @@ import (
 
 const (
 	postgresWalQuery96 = "SELECT pg_is_in_recovery()::int AS recovery, " +
-		"(case pg_is_in_recovery() when 't' then pg_last_xlog_receive_location() else pg_current_xlog_location() end) - '0/00000000' AS wal_bytes"
+		"(case pg_is_in_recovery() when 't' then pg_last_xlog_receive_location() else pg_current_xlog_location() end) - '0/00000000' AS wal_written"
 
 	postgresWalQuery13 = "SELECT pg_is_in_recovery()::int AS recovery, " +
-		"(case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() else pg_current_wal_lsn() end) - '0/00000000' AS wal_bytes"
+		"(case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() else pg_current_wal_lsn() end) - '0/00000000' AS wal_written"
 
 	postgresWalQueryLatest = "SELECT pg_is_in_recovery()::int AS recovery, wal_records, wal_fpi, " +
-		"(case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() - '0/00000000' else wal_bytes end) AS wal_bytes, " +
-		"wal_buffers_full, wal_write, wal_sync, wal_write_time, wal_sync_time, " +
-		"extract('epoch' from stats_reset) as reset_time " +
+		"(case pg_is_in_recovery() when 't' then pg_last_wal_receive_lsn() - '0/00000000' else pg_current_wal_lsn() - '0/00000000' end) AS wal_written, " +
+		"wal_bytes, wal_buffers_full, wal_write, wal_sync, wal_write_time, wal_sync_time, extract('epoch' from stats_reset) as reset_time " +
 		"FROM pg_stat_wal"
 )
 
 type postgresWalCollector struct {
-	recovery        typedDesc
-	records         typedDesc
-	writtenAllBytes typedDesc
-	writtenBytes    typedDesc
-	buffersFull     typedDesc
-	writes          typedDesc
-	syncs           typedDesc
-	secondsAll      typedDesc
-	seconds         typedDesc
-	resetUnix       typedDesc
+	recovery     typedDesc
+	records      typedDesc
+	fpi          typedDesc
+	bytes        typedDesc
+	writtenBytes typedDesc // based on pg_current_wal_lsn()
+	buffersFull  typedDesc
+	writes       typedDesc
+	syncs        typedDesc
+	secondsAll   typedDesc
+	seconds      typedDesc
+	resetUnix    typedDesc
 }
 
 // NewPostgresWalCollector returns a new Collector exposing postgres WAL stats.
@@ -46,21 +46,27 @@ func NewPostgresWalCollector(constLabels labels, settings model.CollectorSetting
 			settings.Filters,
 		),
 		records: newBuiltinTypedDesc(
-			descOpts{"postgres", "wal", "written_records_total", "Total amount of WAL records written (zero in case of standby).", 0},
+			descOpts{"postgres", "wal", "records_total", "Total number of WAL records generated (zero in case of standby).", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
 			settings.Filters,
 		),
-		writtenAllBytes: newBuiltinTypedDesc(
-			descOpts{"postgres", "wal", "written_bytes_all_total", "Total amount of WAL written (or received in case of standby), in bytes.", 0},
+		fpi: newBuiltinTypedDesc(
+			descOpts{"postgres", "wal", "fpi_total", "Total number of WAL full page images generated (zero in case of standby).", 0},
+			prometheus.CounterValue,
+			nil, constLabels,
+			settings.Filters,
+		),
+		bytes: newBuiltinTypedDesc(
+			descOpts{"postgres", "wal", "bytes_total", "Total amount of WAL generated (zero in case of standby) since last stats reset, in bytes.", 0},
 			prometheus.CounterValue,
 			nil, constLabels,
 			settings.Filters,
 		),
 		writtenBytes: newBuiltinTypedDesc(
-			descOpts{"postgres", "wal", "written_bytes_total", "Total amount of WAL written by each type of WAL (zero in case of standby), in bytes.", 0},
+			descOpts{"postgres", "wal", "written_bytes_total", "Total amount of WAL written (or received in case of standby) since cluster init, in bytes.", 0},
 			prometheus.CounterValue,
-			[]string{"wal"}, constLabels,
+			nil, constLabels,
 			settings.Filters,
 		),
 		buffersFull: newBuiltinTypedDesc(
@@ -125,9 +131,11 @@ func (c *postgresWalCollector) Update(config Config, ch chan<- prometheus.Metric
 		case "wal_records":
 			ch <- c.records.newConstMetric(v)
 		case "wal_fpi":
-			ch <- c.writtenBytes.newConstMetric(v*float64(config.walBlockSize), "fpi")
+			ch <- c.fpi.newConstMetric(v)
 		case "wal_bytes":
-			ch <- c.writtenAllBytes.newConstMetric(v)
+			ch <- c.bytes.newConstMetric(v)
+		case "wal_written":
+			ch <- c.writtenBytes.newConstMetric(v)
 		case "wal_buffers_full":
 			ch <- c.buffersFull.newConstMetric(v)
 		case "wal_write":
