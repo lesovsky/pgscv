@@ -236,7 +236,7 @@ func readLastSendTS(from string) int64 {
 // writeLastSendTS writes passed last timestamp value and write it to file.
 func writeLastSendTS(v int64, to string) {
 	data := []byte(fmt.Sprintf("%d", v))
-	err := os.WriteFile(to, data, 0644) // #nosec G306 // TODO: fix this
+	err := os.WriteFile(to, data, 0600)
 	if err != nil {
 		log.Warnf("write last send timestamp failed: %s; skip", err)
 	}
