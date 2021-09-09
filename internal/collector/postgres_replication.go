@@ -10,7 +10,7 @@ import (
 
 const (
 	// Query for Postgres version 9.6 and older.
-	postgresReplicationQuery96 = "SELECT pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename AS user, application_name, state, " +
+	postgresReplicationQuery96 = "SELECT pid, coalesce(host(client_addr), '127.0.0.1') AS client_addr, usename AS user, application_name, state, " +
 		"pg_current_xlog_location() - sent_location AS pending_lag_bytes, " +
 		"sent_location - write_location AS write_lag_bytes, " +
 		"write_location - flush_location AS flush_lag_bytes, " +
@@ -20,7 +20,7 @@ const (
 		"FROM pg_stat_replication"
 
 	// Query for Postgres versions from 10 and newer.
-	postgresReplicationQueryLatest = "SELECT pid, coalesce(client_addr, '127.0.0.1') AS client_addr, usename AS user, application_name, state, " +
+	postgresReplicationQueryLatest = "SELECT pid, coalesce(host(client_addr), '127.0.0.1') AS client_addr, usename AS user, application_name, state, " +
 		"pg_current_wal_lsn() - sent_lsn AS pending_lag_bytes, " +
 		"sent_lsn - write_lsn AS write_lag_bytes, " +
 		"write_lsn - flush_lsn AS flush_lag_bytes, " +
