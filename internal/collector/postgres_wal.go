@@ -155,11 +155,6 @@ func (c *postgresWalCollector) Update(config Config, ch chan<- prometheus.Metric
 		}
 	}
 
-	// Collect WAL bytes of regular (non-FPI) records
-	if fpi, ok := stats["wal_fpi"]; ok {
-		ch <- c.writtenBytes.newConstMetric(stats["wal_bytes"]-(fpi*float64(config.walBlockSize)), "regular")
-	}
-
 	return nil
 }
 
