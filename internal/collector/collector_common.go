@@ -88,7 +88,7 @@ func (d *typedDesc) newConstMetric(value float64, labelValues ...string) prometh
 	}
 
 	if len(d.labelNames) != len(labelValues) {
-		log.Errorf("number of labels and collected label values does not match, want %d, got %d", len(d.labelNames), len(labelValues))
+		log.Errorf("number of labels and collected label values does not match, want: %v; got %v; metric description: %s; skip metric", d.labelNames, labelValues, d.desc.String())
 		return nil
 	}
 
