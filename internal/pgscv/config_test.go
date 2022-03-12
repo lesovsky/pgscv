@@ -27,16 +27,6 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid: pull/push example",
-			valid: true,
-			file:  "testdata/pgscv-push-example.yaml",
-			want: &Config{
-				APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
-				SendMetricsURL: "http://127.0.0.1:9091",
-				Defaults:       map[string]string{},
-			},
-		},
-		{
 			name:  "valid: with defaults",
 			valid: true,
 			file:  "testdata/pgscv-defaults-example.yaml",
@@ -155,21 +145,6 @@ func TestConfig_Validate(t *testing.T) {
 			name:  "valid config for PULL Mode",
 			valid: true,
 			in:    &Config{ListenAddress: "127.0.0.1:8080"},
-		},
-		{
-			name:  "valid config for PUSH Mode",
-			valid: true,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
-		},
-		{
-			name:  "invalid config for PUSH Mode: no api key present",
-			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091"},
-		},
-		{
-			name:  "invalid config for PUSH Mode: empty api key",
-			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: ""},
 		},
 		{
 			name:  "valid config with specified services",
@@ -415,10 +390,7 @@ func Test_newConfigFromEnv(t *testing.T) {
 			valid: true, // Completely valid variables
 			envvars: map[string]string{
 				"PGSCV_LISTEN_ADDRESS":     "127.0.0.1:12345",
-				"PGSCV_AUTOUPDATE":         "1",
 				"PGSCV_NO_TRACK_MODE":      "yes",
-				"PGSCV_SEND_METRICS_URL":   "127.0.0.1:54321",
-				"PGSCV_API_KEY":            "example",
 				"PGSCV_DATABASES":          "exampledb",
 				"PGSCV_DISABLE_COLLECTORS": "example/1,example/2, example/3",
 				"POSTGRES_DSN":             "example_dsn",
@@ -435,8 +407,6 @@ func Test_newConfigFromEnv(t *testing.T) {
 			want: &Config{
 				ListenAddress:     "127.0.0.1:12345",
 				NoTrackMode:       true,
-				SendMetricsURL:    "127.0.0.1:54321",
-				APIKey:            "example",
 				Databases:         "exampledb",
 				DisableCollectors: []string{"example/1", "example/2", "example/3"},
 				ServicesConnsSettings: map[string]service.ConnSetting{

@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
 const (
@@ -21,17 +20,12 @@ const (
 	defaultPostgresDbname    = "postgres"
 	defaultPgbouncerUsername = "pgscv"
 	defaultPgbouncerDbname   = "pgbouncer"
-
-	defaultSendMetricsInterval = 60 * time.Second
 )
 
 // Config defines application's configuration.
 type Config struct {
-	NoTrackMode           bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
-	ListenAddress         string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
-	SendMetricsURL        string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
-	SendMetricsInterval   time.Duration            // Metric send interval
-	APIKey                string                   `yaml:"api_key"`            // API key for accessing to Weaponry
+	NoTrackMode           bool                     `yaml:"no_track_mode"`      // controls tracking sensitive information (query texts, etc)
+	ListenAddress         string                   `yaml:"listen_address"`     // Network address and port where the application should listen on
 	ServicesConnsSettings service.ConnsSettings    `yaml:"services"`           // All connections settings for exact services
 	Defaults              map[string]string        `yaml:"defaults"`           // Defaults
 	DisableCollectors     []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
@@ -65,13 +59,6 @@ func NewConfig(configFilePath string) (*Config, error) {
 
 // Validate checks configuration for stupid values and set defaults
 func (c *Config) Validate() error {
-	c.SendMetricsInterval = defaultSendMetricsInterval
-
-	// API key is necessary when Metric Service is specified
-	if c.SendMetricsURL != "" && c.APIKey == "" {
-		return fmt.Errorf("API key should be specified")
-	}
-
 	if c.ListenAddress == "" {
 		c.ListenAddress = defaultListenAddress
 	}
@@ -276,10 +263,6 @@ func newConfigFromEnv() (*Config, error) {
 			default:
 				config.NoTrackMode = false
 			}
-		case "PGSCV_SEND_METRICS_URL":
-			config.SendMetricsURL = value
-		case "PGSCV_API_KEY":
-			config.APIKey = value
 		case "PGSCV_DATABASES":
 			config.Databases = value
 		case "PGSCV_DISABLE_COLLECTORS":
