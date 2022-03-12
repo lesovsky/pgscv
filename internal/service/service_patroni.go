@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-// discoverPatroni analyze process properties to guess it is a Patroni process otr not.
+// discoverPatroni analyze process properties to guess it is a Patroni process or not.
 // Note: it unable to discover through environment variables, only config file.
 func discoverPatroni(pid int32, cmdline string, cwd string) (Service, bool, error) {
 	log.Debugf("auto-discovery [patroni]: analyzing process with pid %d", pid)

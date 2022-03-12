@@ -3,6 +3,9 @@ package pgscv
 import (
 	"context"
 	"github.com/lesovsky/pgscv/internal/http"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/service"
+	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/stretchr/testify/assert"
 	"io"
 	"sync"
@@ -17,6 +20,9 @@ func TestStart(t *testing.T) {
 	// Create app config.
 	config := &Config{
 		ListenAddress: "127.0.0.1:5002",
+		ServicesConnsSettings: map[string]service.ConnSetting{
+			"postgres:5432": {ServiceType: model.ServiceTypePostgresql, Conninfo: store.TestPostgresConnStr},
+		},
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -40,7 +46,7 @@ func Test_runMetricsListener(t *testing.T) {
 		wg.Done()
 	}()
 
-	// Sleep little bit hoping it will be enough for running listener goroutine.
+	// Sleep a little hoping it will be enough for running listener goroutine.
 	time.Sleep(500 * time.Millisecond)
 
 	// Make request to '/' and assert response.

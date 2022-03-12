@@ -2,6 +2,7 @@ package pgscv
 
 import (
 	"context"
+	"errors"
 	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/lesovsky/pgscv/internal/service"
@@ -23,27 +24,21 @@ func Start(ctx context.Context, config *Config) error {
 		CollectorsSettings: config.CollectorsSettings,
 	}
 
-	var wg sync.WaitGroup
-	ctx, cancel := context.WithCancel(ctx)
-
-	if config.ServicesConnsSettings == nil || len(config.ServicesConnsSettings) == 0 {
-		// run background discovery, the service repo will be fulfilled at first iteration
-		wg.Add(1)
-		go func() {
-			serviceRepo.StartBackgroundDiscovery(ctx, serviceConfig)
-			wg.Done()
-		}()
-	} else {
-		// fulfill service repo using passed services
-		serviceRepo.AddServicesFromConfig(serviceConfig)
-
-		// setup exporters for all services
-		err := serviceRepo.SetupServices(serviceConfig)
-		if err != nil {
-			cancel()
-			return err
-		}
+	if len(config.ServicesConnsSettings) == 0 {
+		return errors.New("no services defined")
 	}
+
+	// fulfill service repo using passed services
+	serviceRepo.AddServicesFromConfig(serviceConfig)
+
+	// setup exporters for all services
+	err := serviceRepo.SetupServices(serviceConfig)
+	if err != nil {
+		return err
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	var wg sync.WaitGroup
 
 	errCh := make(chan error)
 	defer close(errCh)
@@ -65,10 +60,10 @@ func Start(ctx context.Context, config *Config) error {
 			cancel()
 			wg.Wait()
 			return nil
-		case err := <-errCh:
+		case e := <-errCh:
 			cancel()
 			wg.Wait()
-			return err
+			return e
 		}
 	}
 }

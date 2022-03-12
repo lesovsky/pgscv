@@ -1,7 +1,6 @@
 package service
 
 import (
-	"context"
 	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/lesovsky/pgscv/internal/model"
@@ -9,7 +8,6 @@ import (
 	"github.com/shirou/gopsutil/process"
 	"github.com/stretchr/testify/assert"
 	"testing"
-	"time"
 )
 
 func TestRepository_addService(t *testing.T) {
@@ -115,31 +113,6 @@ func TestRepository_addServicesFromConfig(t *testing.T) {
 		assert.Equal(t, tc.expected, r.totalServices())
 	}
 }
-
-func TestRepository_startBackgroundDiscovery(t *testing.T) {
-	r := NewRepository()
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-	r.startBackgroundDiscovery(ctx, Config{})
-	assert.NotEqual(t, 0, r.totalServices())
-
-	// During discovery collectors are registered for found services,
-	// They should be unregistered to avoid register failures in concurrent tests.
-	for _, id := range r.GetServiceIDs() {
-		s := r.GetService(id)
-		prometheus.Unregister(s.Collector)
-	}
-}
-
-//func TestRepository_lookupServices(t *testing.T) {
-//	if uid := os.Geteuid(); uid != 0 {
-//		t.Skipf("root privileges required, skip")
-//	}
-//
-//	r := NewRepository()
-//	assert.NoError(t, r.lookupServices(Config{}))
-//	assert.NotEqual(t, 0, r.totalServices())
-//}
 
 func TestRepository_setupServices(t *testing.T) {
 	testCases := []struct {
