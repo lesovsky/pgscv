@@ -3,9 +3,9 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/packaging/bootstrap"
-	"github.com/weaponry/pgscv/internal/pgscv"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/packaging/bootstrap"
+	"github.com/lesovsky/pgscv/internal/pgscv"
 	"gopkg.in/alecthomas/kingpin.v2"
 	"os"
 	"os/signal"

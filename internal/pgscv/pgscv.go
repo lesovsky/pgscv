@@ -3,10 +3,10 @@ package pgscv
 import (
 	"context"
 	"fmt"
-	"github.com/weaponry/pgscv/internal/http"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/packaging/autoupdate"
-	"github.com/weaponry/pgscv/internal/service"
+	"github.com/lesovsky/pgscv/internal/http"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/packaging/autoupdate"
+	"github.com/lesovsky/pgscv/internal/service"
 	"io"
 	"math"
 	"math/rand"
@@ -218,7 +218,7 @@ func runSendMetricsLoop(ctx context.Context, config *Config, instanceRepo *servi
 
 // readLastSendTS read last send timestamp from file and return its value.
 func readLastSendTS(from string) int64 {
-	content, err := os.ReadFile(from)
+	content, err := os.ReadFile(from) // #nosec G304
 	if err != nil {
 		log.Warnf("%s; last send timestamp will be reinitialized", err)
 		return 0

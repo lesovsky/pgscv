@@ -23,7 +23,7 @@ changelog:
 
 nfpms:
   - vendor: pgscv
-    homepage: https://github.com/weaponry/pgscv
+    homepage: https://github.com/lesovsky/pgscv
     maintainer: Weaponry
     description: pgSCV is a multi-purpose monitoring agent and metrics exporter
     license: BSD-3

@@ -1,10 +1,10 @@
 package collector
 
 import (
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
 	"strconv"
 )
 

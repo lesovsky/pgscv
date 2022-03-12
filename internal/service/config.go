@@ -2,7 +2,7 @@ package service
 
 import (
 	"fmt"
-	"github.com/weaponry/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/model"
 	"strings"
 )
 

@@ -1,7 +1,7 @@
 # pgSCV - PostgreSQL ecosystem metrics collector.
 
 ### pgSCV
-- [collects](https://github.com/weaponry/pgscv/wiki/Collectors) a lot of stats about PostgreSQL environment.
+- [collects](https://github.com/lesovsky/pgscv/wiki/Collectors) a lot of stats about PostgreSQL environment.
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
 ### Features
@@ -27,39 +27,39 @@
 - can run on Linux only; can connect to remote services running on other OS/PaaS.
 - requisites for connecting to the services, such as login and password.
 - database user should have privileges for executing stats functions and reading views.
-  For more details see [security considerations](https://github.com/weaponry/pgscv/wiki/Security-considerations).
+  For more details see [security considerations](https://github.com/lesovsky/pgscv/wiki/Security-considerations).
 
 ### Quick start
-Download the archive from [releases](https://github.com/weaponry/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
+Download the archive from [releases](https://github.com/lesovsky/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-wget https://github.com/weaponry/pgscv/releases/download/v0.6.0/pgscv_0.6.0_linux_amd64.tar.gz
+wget https://github.com/lesovsky/pgscv/releases/download/v0.6.0/pgscv_0.6.0_linux_amd64.tar.gz
 tar xvzf pgscv_0.6.0_linux_amd64.tar.gz
 sudo -u postgres ./pgscv 
 ```
 
 or using Docker, use `DATABASE_DSN` for setting up a connection to Postgres:
 ```
-docker pull weaponry/pgscv:latest
-docker run -ti -e PGSCV_LISTEN_ADDRESS=0.0.0.0:9890 -e PGSCV_DISABLE_COLLECTORS="system" -e DATABASE_DSN="postgresql://postgres@dbhost/postgres" -p 9890:9890 weaponry/pgscv:latest
+docker pull lesovsky/pgscv:latest
+docker run -ti -e PGSCV_LISTEN_ADDRESS=0.0.0.0:9890 -e PGSCV_DISABLE_COLLECTORS="system" -e DATABASE_DSN="postgresql://postgres@dbhost/postgres" -p 9890:9890 lesovsky/pgscv:latest
 ```
 
 When pgSCV has been started it is ready to accept HTTP requests at `http://127.0.0.1:9890/metrics`.
 
 ### Complete setup
 pgSCV complete setup is possible in two ways:
-1. For **non-Weaponry** users. Setup as a standalone service, which accepts metrics scrape requests only. Checkout complete setup [guide](https://github.com/weaponry/pgscv/wiki/Setup-for-regular-users).
-2. For **Weaponry** users. Setup as an agent of Weaponry SaaS, which receives metrics to Weaponry service. Checkout complete setup [guide](https://github.com/weaponry/pgscv/wiki/Setup-for-Weaponry-users). Listening for scrape requests also work.
+1. For **non-Weaponry** users. Setup as a standalone service, which accepts metrics scrape requests only. Checkout complete setup [guide](https://github.com/lesovsky/pgscv/wiki/Setup-for-regular-users).
+2. For **Weaponry** users. Setup as an agent of Weaponry SaaS, which receives metrics to Weaponry service. Checkout complete setup [guide](https://github.com/lesovsky/pgscv/wiki/Setup-for-Weaponry-users). Listening for scrape requests also work.
 
 ### Documentation
-For further documentation see [wiki](https://github.com/weaponry/pgscv/wiki).
+For further documentation see [wiki](https://github.com/lesovsky/pgscv/wiki).
 
 ### Support and feedback
-If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/weaponry/pgscv/issues)
+If you need help using pgSCV feel free to open discussion or create an [issue](https://github.com/lesovsky/pgscv/issues)
 
 ### Development and contribution
 To help development you are encouraged to:
-- provide [suggestion/feedback](https://github.com/weaponry/pgscv/discussions) or [issue](https://github.com/weaponry/pgscv/issues)
+- provide [suggestion/feedback](https://github.com/lesovsky/pgscv/discussions) or [issue](https://github.com/lesovsky/pgscv/issues)
 - pull requests for new features
 - star the project
 

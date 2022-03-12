@@ -2,11 +2,11 @@ package collector
 
 import (
 	"context"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/nxadm/tail"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
 	"io"
 	"regexp"
 	"strings"

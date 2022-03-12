@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/weaponry/pgscv/internal/log"
 	"io"
 	"net/http"
 	"time"
@@ -96,7 +96,7 @@ func handleRoot() http.Handler {
 	const htmlTemplate = `<html>
 <head><title>pgSCV / Weaponry metrics collector</title></head>
 <body>
-pgSCV / <a href="https://weaponry.io">Weaponry</a> metrics collector, for more info visit <a href="https://github.com/weaponry/pgscv">Github</a> page.
+pgSCV / PostgreSQL metrics collector, for more info visit <a href="https://github.com/lesovsky/pgscv">Github</a> page.
 <p><a href="/metrics">Metrics</a></p>
 </body>
 </html>

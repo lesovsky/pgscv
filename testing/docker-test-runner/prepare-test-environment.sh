@@ -4,29 +4,34 @@ MAIN_DATADIR=/var/lib/postgresql/data/main
 STDB_DATADIR=/var/lib/postgresql/data/standby
 
 # init postgres
-su - postgres -c "/usr/lib/postgresql/13/bin/initdb -k -E UTF8 --locale=en_US.UTF-8 -D ${MAIN_DATADIR}"
+su - postgres -c "/usr/lib/postgresql/14/bin/initdb -k -E UTF8 --locale=en_US.UTF-8 -D ${MAIN_DATADIR}"
 
 # add extra config parameters
-echo "ssl = on" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "logging_collector = on" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "log_directory = '/var/log/postgresql'" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "track_io_timing = on" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "track_functions = all" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "shared_preload_libraries = 'pg_stat_statements'" >> ${MAIN_DATADIR}/postgresql.auto.conf
-echo "host all  pgscv 127.0.0.1/32 trust" >> ${MAIN_DATADIR}/pg_hba.conf
+cat >> ${MAIN_DATADIR}/postgresql.auto.conf <<EOF
+ssl = on
+ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
+ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'
+logging_collector = on
+log_directory = '/var/log/postgresql'
+track_io_timing = on
+track_functions = all
+shared_preload_libraries = 'pg_stat_statements'
+EOF
+
+echo "host all pgscv 127.0.0.1/32 trust" >> ${MAIN_DATADIR}/pg_hba.conf
 
 # run main postgres
-su - postgres -c "/usr/lib/postgresql/13/bin/pg_ctl -w -t 30 -l /var/run/postgresql/startup-main.log -D ${MAIN_DATADIR} start"
+su - postgres -c "/usr/lib/postgresql/14/bin/pg_ctl -w -t 30 -l /var/run/postgresql/startup-main.log -D ${MAIN_DATADIR} start"
 su - postgres -c "psql -c \"SELECT pg_create_physical_replication_slot('standby_test_slot')\""
 
 # run standby postgres
 su - postgres -c "pg_basebackup -P -R -X stream -c fast -h 127.0.0.1 -p 5432 -U postgres -D ${STDB_DATADIR}"
-echo "port = 5433" >> ${STDB_DATADIR}/postgresql.auto.conf
-echo "primary_slot_name = 'standby_test_slot'" >> ${STDB_DATADIR}/postgresql.auto.conf
-echo "log_filename = 'postgresql-standby.log'" >> ${STDB_DATADIR}/postgresql.auto.conf
-su - postgres -c "/usr/lib/postgresql/13/bin/pg_ctl -w -t 30 -l /var/run/postgresql/startup-standby.log -D ${STDB_DATADIR} start"
+cat >> ${STDB_DATADIR}/postgresql.auto.conf <<EOF
+port = 5433
+primary_slot_name = 'standby_test_slot'
+log_filename = 'postgresql-standby.log'
+EOF
+su - postgres -c "/usr/lib/postgresql/14/bin/pg_ctl -w -t 30 -l /var/run/postgresql/startup-standby.log -D ${STDB_DATADIR} start"
 
 # add fixtures, tiny workload
 su - postgres -c 'psql -f /usr/local/testing/fixtures.sql'

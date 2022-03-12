@@ -3,10 +3,10 @@ package collector
 import (
 	"bufio"
 	"fmt"
+	"github.com/lesovsky/pgscv/internal/filter"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"regexp"

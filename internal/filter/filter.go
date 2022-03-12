@@ -1,7 +1,7 @@
 package filter
 
 import (
-	"github.com/weaponry/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/log"
 	"regexp"
 )
 

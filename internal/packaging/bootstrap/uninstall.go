@@ -2,7 +2,7 @@ package bootstrap
 
 import (
 	"fmt"
-	"github.com/weaponry/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/log"
 	"os"
 	"os/exec"
 	"path/filepath"

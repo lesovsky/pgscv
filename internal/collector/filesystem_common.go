@@ -3,7 +3,7 @@ package collector
 import (
 	"bufio"
 	"fmt"
-	"github.com/weaponry/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/log"
 	"io"
 	"os"
 	"strings"

@@ -3,9 +3,9 @@ package collector
 import (
 	"context"
 	"github.com/jackc/pgx/v4"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/store"
 	"net"
 	"regexp"
 	"strconv"

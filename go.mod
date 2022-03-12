@@ -1,4 +1,4 @@
-module github.com/weaponry/pgscv
+module github.com/lesovsky/pgscv
 
 go 1.17
 

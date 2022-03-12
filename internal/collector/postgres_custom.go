@@ -1,8 +1,8 @@
 package collector
 
 import (
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/model"
 )
 
 type postgresCustomCollector struct {
