@@ -27,9 +27,6 @@ const (
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryPath            string                   // full path of the program, required for auto-update procedure
-	BinaryVersion         string                   // version of the program, required for auto-update procedure
-	AutoUpdate            string                   `yaml:"autoupdate"`       // controls auto-update procedure
 	NoTrackMode           bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
 	ListenAddress         string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
 	SendMetricsURL        string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
@@ -84,14 +81,6 @@ func (c *Config) Validate() error {
 	} else {
 		log.Infoln("no-track disabled, for details check the documentation about 'no_track_mode' option.")
 	}
-
-	// Process auto-update setting.
-	v, err := toggleAutoupdate(c.AutoUpdate)
-	if err != nil {
-		return err
-	}
-
-	c.AutoUpdate = v
 
 	// setup defaults
 	if c.Defaults == nil {
@@ -280,8 +269,6 @@ func newConfigFromEnv() (*Config, error) {
 		switch key {
 		case "PGSCV_LISTEN_ADDRESS":
 			config.ListenAddress = value
-		case "PGSCV_AUTOUPDATE":
-			config.AutoUpdate = value
 		case "PGSCV_NO_TRACK_MODE":
 			switch value {
 			case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1", "on":

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/lesovsky/pgscv/internal/log"
-	"github.com/lesovsky/pgscv/internal/packaging/autoupdate"
 	"github.com/lesovsky/pgscv/internal/service"
 	"io"
 	"math"
@@ -52,20 +51,6 @@ func Start(ctx context.Context, config *Config) error {
 			cancel()
 			return err
 		}
-	}
-
-	// Start auto-update loop if it is enabled.
-	if config.AutoUpdate != "off" {
-		wg.Add(1)
-		go func() {
-			ac := &autoupdate.Config{
-				BinaryPath:    config.BinaryPath,
-				BinaryVersion: config.BinaryVersion,
-				UpdatePolicy:  config.AutoUpdate,
-			}
-			autoupdate.StartAutoupdateLoop(ctx, ac)
-			wg.Done()
-		}()
 	}
 
 	errCh := make(chan error)

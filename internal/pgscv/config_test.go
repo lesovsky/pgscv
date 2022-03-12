@@ -180,16 +180,6 @@ func TestConfig_Validate(t *testing.T) {
 			}},
 		},
 		{
-			name:  "valid with enabled auto-update",
-			valid: true,
-			in:    &Config{AutoUpdate: "stable"},
-		},
-		{
-			name:  "invalid with wrong auto-update value",
-			valid: false,
-			in:    &Config{AutoUpdate: "invalid"},
-		},
-		{
 			name:  "invalid config with specified services: empty service type",
 			valid: false,
 			in: &Config{ListenAddress: "127.0.0.1:8080", ServicesConnsSettings: service.ConnsSettings{
@@ -444,7 +434,6 @@ func Test_newConfigFromEnv(t *testing.T) {
 			},
 			want: &Config{
 				ListenAddress:     "127.0.0.1:12345",
-				AutoUpdate:        "1",
 				NoTrackMode:       true,
 				SendMetricsURL:    "127.0.0.1:54321",
 				APIKey:            "example",
