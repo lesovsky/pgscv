@@ -5,13 +5,10 @@
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
 ### Features
-- **Supported services:** PostgreSQL, Pgbouncer and metrics of operating system.  
+- **Supported services:** support collecting metrics of PostgreSQL and Pgbouncer.
+- **OS metrics:** support collecting metrics of operating system.
 - **TLS and authentication**. `/metrics` endpoint could be protected with basic authentication and TLS.
 - **Collecting metrics from multiple services**. pgSCV can collect metrics from many databases instances.
-- **Services auto-discovery**. pgSCV can automatically discover Postgres and other Postgres-ecosystem services and
-  start collecting metrics from them. In case of authentication, valid requisites should be specified.
-- **Remote services support**. pgSCV is recommended to start on the same systems where monitored services are running.
-  But this is not strict and pgSCV could connect and collect metrics from remote services.
 - **User-defined metrics**. pgSCV could be configured in a way to collect metrics defined by user.
 - **Collectors management**. Collectors could be disabled if necessary.
 - **Collectors filters**. Collectors could be adjusted to skip collecting metrics based on labels values, like
@@ -41,9 +38,7 @@ docker run -ti -e PGSCV_LISTEN_ADDRESS=0.0.0.0:9890 -e PGSCV_DISABLE_COLLECTORS=
 When pgSCV has been started it is ready to accept HTTP requests at `http://127.0.0.1:9890/metrics`.
 
 ### Complete setup
-pgSCV complete setup is possible in two ways:
-1. For **non-Weaponry** users. Setup as a standalone service, which accepts metrics scrape requests only. Checkout complete setup [guide](https://github.com/lesovsky/pgscv/wiki/Setup-for-regular-users).
-2. For **Weaponry** users. Setup as an agent of Weaponry SaaS, which receives metrics to Weaponry service. Checkout complete setup [guide](https://github.com/lesovsky/pgscv/wiki/Setup-for-Weaponry-users). Listening for scrape requests also work.
+Checkout complete setup [guide](https://github.com/lesovsky/pgscv/wiki/Setup-for-regular-users).
 
 ### Documentation
 For further documentation see [wiki](https://github.com/lesovsky/pgscv/wiki).
