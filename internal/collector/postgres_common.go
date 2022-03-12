@@ -2,9 +2,9 @@ package collector
 
 import (
 	"context"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/store"
 	"strconv"
 	"strings"
 )

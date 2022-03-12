@@ -2,8 +2,8 @@ package service
 
 import (
 	"fmt"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
 	"gopkg.in/yaml.v2"
 	"net"
 	"os"

@@ -1,8 +1,8 @@
 package autoupdate
 
 import (
+	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/http"
 	"os"
 	"testing"
 )

@@ -3,9 +3,9 @@ package collector
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/lesovsky/pgscv/internal/http"
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/http"
-	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"strconv"
 	"strings"

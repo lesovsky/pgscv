@@ -1,4 +1,4 @@
-DOCKER_ACCOUNT = weaponry
+DOCKER_ACCOUNT = lesovsky
 APPNAME = pgscv
 
 TAG=$(shell git describe --tags --abbrev=0)

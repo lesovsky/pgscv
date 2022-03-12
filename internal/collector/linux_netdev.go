@@ -3,10 +3,10 @@ package collector
 import (
 	"bufio"
 	"fmt"
+	"github.com/lesovsky/pgscv/internal/filter"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"strconv"
@@ -58,7 +58,7 @@ func NewNetdevCollector(constLabels labels, settings model.CollectorSettings) (C
 }
 
 // Update method collects network interfaces statistics
-func (c *netdevCollector) Update(config Config, ch chan<- prometheus.Metric) error {
+func (c *netdevCollector) Update(_ Config, ch chan<- prometheus.Metric) error {
 	stats, err := getNetdevStats()
 	if err != nil {
 		return fmt.Errorf("get /proc/net/dev stats failed: %s", err)

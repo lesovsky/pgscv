@@ -1,8 +1,8 @@
 package collector
 
 import (
+	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/store"
 	"testing"
 )
 

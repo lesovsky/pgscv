@@ -1,7 +1,7 @@
 package collector
 
 import (
-	"github.com/weaponry/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/model"
 	"testing"
 )
 

@@ -1,11 +1,11 @@
-# weaponry/pgscv-test-runner
-# __release_tag__ postrges 13.3 was released 2021-08-12
+# lesovsky/pgscv-test-runner
+# __release_tag__ postrges 14.2 was released 2022-02-10
 # __release_tag__ golang 1.17 was released 2021-08-16
 # __release_tag__ golangci-lint v1.42.1 was released 2021-09-07
 # __release_tag__ gosec v2.8.1 was released 2021-06-17
-FROM postgres:13.3
+FROM postgres:14.2
 
-LABEL version="0.0.7"
+LABEL version="0.0.8"
 
 # install dependencies
 RUN apt-get update && \
@@ -25,4 +25,4 @@ RUN apt-get update && \
 COPY prepare-test-environment.sh /usr/local/bin/
 COPY fixtures.sql /usr/local/testing/
 
-CMD ["echo", "I'm weaponry pgscv test runner 0.0.7"]
+CMD ["echo", "I'm pgscv test runner 0.0.8"]

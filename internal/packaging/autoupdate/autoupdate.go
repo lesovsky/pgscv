@@ -8,8 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
-	"github.com/weaponry/pgscv/internal/http"
-	"github.com/weaponry/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/http"
+	"github.com/lesovsky/pgscv/internal/log"
 	"golang.org/x/sys/unix"
 	"io"
 	"math/rand"
@@ -176,7 +176,7 @@ func (api *githubAPI) request(url string) ([]byte, error) {
 
 // getLatestRelease returns string with pgSCV latest release on Github.
 func (api *githubAPI) getLatestRelease() (string, error) {
-	buf, err := api.request("/weaponry/pgscv/releases/latest")
+	buf, err := api.request("/lesovsky/pgscv/releases/latest")
 	if err != nil {
 		return "", err
 	}
@@ -197,7 +197,7 @@ func (api *githubAPI) getLatestRelease() (string, error) {
 
 // getLatestReleaseDownloadURL returns asset's download URL of the latest release.
 func (api *githubAPI) getLatestReleaseDownloadURL(tag string) (string, string, error) {
-	url := fmt.Sprintf("/weaponry/pgscv/releases/tags/%s", tag)
+	url := fmt.Sprintf("/lesovsky/pgscv/releases/tags/%s", tag)
 
 	buf, err := api.request(url)
 	if err != nil {
@@ -342,7 +342,7 @@ func extractDistribution(distFilePath string, destDir string) (string, error) {
 
 		switch header.Typeflag {
 		case tar.TypeReg:
-			outFile, err := os.Create(dirname + "/" + header.Name)
+			outFile, err := os.Create(dirname + "/" + header.Name) // #nosec G304
 			if err != nil {
 				return "", err
 			}
@@ -373,7 +373,7 @@ func updateBinary(sourceFile string, destFile string) error {
 		return fmt.Errorf("invalid input: source '%s', destination '%s'", sourceFile, destFile)
 	}
 
-	in, err := os.ReadFile(sourceFile)
+	in, err := os.ReadFile(sourceFile) // #nosec G304
 	if err != nil {
 		return fmt.Errorf("read source file failed: %s", err)
 	}
@@ -450,7 +450,7 @@ func downloadFile(url, file string) error {
 		return fmt.Errorf("download failed, %d", resp.StatusCode)
 	}
 
-	out, err := os.Create(file)
+	out, err := os.Create(file) // #nosec G304
 	if err != nil {
 		return err
 	}

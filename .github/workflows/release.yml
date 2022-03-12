@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: weaponry/pgscv-test-runner:0.0.7
+    container: lesovsky/pgscv-test-runner:0.0.8
     steps:
       - name: Checkout code
         uses: actions/checkout@v2

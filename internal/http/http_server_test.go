@@ -108,7 +108,7 @@ func Test_handleRoot(t *testing.T) {
 
 	body, err := io.ReadAll(res.Body)
 	assert.NoError(t, err)
-	assert.Contains(t, string(body), `pgSCV / <a href="https://weaponry.io">Weaponry</a> metrics collector, for more info visit <a href="https://github.com/weaponry/pgscv">Github</a> page.`)
+	assert.Contains(t, string(body), `pgSCV / PostgreSQL metrics collector, for more info visit <a href="https://github.com/lesovsky/pgscv">Github</a> page.`)
 	res.Flush()
 }
 

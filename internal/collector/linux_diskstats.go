@@ -4,10 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"github.com/lesovsky/pgscv/internal/filter"
+	"github.com/lesovsky/pgscv/internal/log"
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/weaponry/pgscv/internal/filter"
-	"github.com/weaponry/pgscv/internal/log"
-	"github.com/weaponry/pgscv/internal/model"
 	"io"
 	"os"
 	"path/filepath"
@@ -381,7 +381,7 @@ func getDeviceScheduler(devpath string) (string, error) {
 
 // getDeviceSize returns size of the device in sectors.
 func getDeviceSize(devpath string) (int64, error) {
-	sizeStr, err := os.ReadFile(devpath + "/size")
+	sizeStr, err := os.ReadFile(devpath + "/size") // #nosec G304
 	if err != nil {
 		return 0, err
 	}
@@ -396,7 +396,7 @@ func getDeviceSize(devpath string) (int64, error) {
 
 // getDeviceModel returns model of the device.
 func getDeviceModel(devpath string) (string, error) {
-	m, err := os.ReadFile(devpath + "/device/model")
+	m, err := os.ReadFile(devpath + "/device/model") // #nosec G304
 	if err != nil {
 		return "", err
 	}

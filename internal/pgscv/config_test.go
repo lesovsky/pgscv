@@ -1,11 +1,11 @@
 package pgscv
 
 import (
+	"github.com/lesovsky/pgscv/internal/filter"
+	"github.com/lesovsky/pgscv/internal/http"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/service"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/filter"
-	"github.com/weaponry/pgscv/internal/http"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/service"
 	"os"
 	"testing"
 )

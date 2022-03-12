@@ -1,8 +1,8 @@
 package service
 
 import (
+	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/model"
 	"os"
 	"testing"
 )

@@ -1,6 +1,6 @@
 package service
 
-import "github.com/weaponry/pgscv/internal/model"
+import "github.com/lesovsky/pgscv/internal/model"
 
 // TestSystemService returns system service for testing purposes
 func TestSystemService() Service {

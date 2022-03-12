@@ -3,9 +3,9 @@ package collector
 import (
 	"database/sql"
 	"github.com/jackc/pgproto3/v2"
+	"github.com/lesovsky/pgscv/internal/model"
+	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/stretchr/testify/assert"
-	"github.com/weaponry/pgscv/internal/model"
-	"github.com/weaponry/pgscv/internal/store"
 	"testing"
 )
 
