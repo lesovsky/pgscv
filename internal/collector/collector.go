@@ -106,29 +106,6 @@ func (f Factories) RegisterPgbouncerCollectors(disabled []string) {
 	}
 }
 
-// RegisterPatroniCollectors unions all patroni-related collectors and registers them in single place.
-func (f Factories) RegisterPatroniCollectors(disabled []string) {
-	if stringsContains(disabled, "pgbouncer") {
-		log.Debugln("disable all patroni collectors")
-		return
-	}
-
-	funcs := map[string]func(labels, model.CollectorSettings) (Collector, error){
-		"patroni/pgscv":  NewPgscvServicesCollector,
-		"patroni/common": NewPatroniCommonCollector,
-	}
-
-	for name, fn := range funcs {
-		if stringsContains(disabled, name) {
-			log.Debugln("disable ", name)
-			continue
-		}
-
-		log.Debugln("enable ", name)
-		f.register(name, fn)
-	}
-}
-
 // register is the generic routine which register any kind of collectors.
 func (f Factories) register(collector string, factory func(labels, model.CollectorSettings) (Collector, error)) {
 	f[collector] = factory

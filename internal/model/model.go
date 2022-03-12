@@ -14,8 +14,6 @@ const (
 	ServiceTypePostgresql = "postgres"
 	// ServiceTypePgbouncer defines label string for Pgbouncer services.
 	ServiceTypePgbouncer = "pgbouncer"
-	// ServiceTypePatroni defines label string for Patroni services.
-	ServiceTypePatroni = "patroni"
 )
 
 // PGResult is the iterable store that contains query result (data and metadata) returned from Postgres

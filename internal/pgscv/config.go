@@ -243,16 +243,6 @@ func newConfigFromEnv() (*Config, error) {
 			config.ServicesConnsSettings[id] = cs
 		}
 
-		// Parse PATRONI_URL.
-		if strings.HasPrefix(key, "PATRONI_URL") {
-			id, cs, err := service.ParsePatroniURLEnv(key, value)
-			if err != nil {
-				return nil, err
-			}
-
-			config.ServicesConnsSettings[id] = cs
-		}
-
 		switch key {
 		case "PGSCV_LISTEN_ADDRESS":
 			config.ListenAddress = value

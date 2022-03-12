@@ -62,7 +62,7 @@ type Config struct {
 	CollectorsSettings model.CollectorsSettings
 }
 
-// Exporter is an interface for prometheus.Collector.
+// Collector is an interface for prometheus.Collector.
 type Collector interface {
 	Describe(chan<- *prometheus.Desc)
 	Collect(chan<- prometheus.Metric)
@@ -234,14 +234,7 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 		repo.addService(s)
 
 		log.Infof("registered new service [%s]", s.ServiceID)
-
-		var msg string
-		if s.ConnSettings.ServiceType == model.ServiceTypePatroni {
-			msg = fmt.Sprintf("service [%s] available through: %s", s.ServiceID, s.ConnSettings.BaseURL)
-		} else {
-			msg = fmt.Sprintf("service [%s] available through: %s@%s:%d/%s", s.ServiceID, pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
-		}
-		log.Debugln(msg)
+		log.Debugf("service [%s] available through: %s@%s:%d/%s", s.ServiceID, pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
 	}
 }
 
@@ -268,9 +261,6 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterPostgresCollectors(config.DisabledCollectors)
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors(config.DisabledCollectors)
-			case model.ServiceTypePatroni:
-				factories.RegisterPatroniCollectors(config.DisabledCollectors)
-				collectorConfig.BaseURL = service.ConnSettings.BaseURL
 			default:
 				continue
 			}
@@ -308,8 +298,6 @@ func (repo *Repository) healthcheckServices() {
 		switch service.ConnSettings.ServiceType {
 		case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
 			err = attemptConnect(service.ConnSettings.Conninfo)
-		case model.ServiceTypePatroni:
-			err = attemptRequest(service.ConnSettings.BaseURL)
 		default:
 			continue
 		}

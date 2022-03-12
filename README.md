@@ -5,7 +5,7 @@
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
 ### Features
-- **Supported services:** PostgreSQL, Pgbouncer, Patroni, metrics of operating system.  
+- **Supported services:** PostgreSQL, Pgbouncer and metrics of operating system.  
 - **TLS and authentication**. `/metrics` endpoint could be protected with basic authentication and TLS.
 - **Collecting metrics from multiple services**. pgSCV can collect metrics from many databases instances.
 - **Services auto-discovery**. pgSCV can automatically discover Postgres and other Postgres-ecosystem services and
@@ -27,8 +27,8 @@
 Download the archive from [releases](https://github.com/lesovsky/pgscv/releases). Unpack the archive. Start pgSCV under `postgres` user.
 
 ```shell
-wget https://github.com/lesovsky/pgscv/releases/download/v0.6.0/pgscv_0.6.0_linux_amd64.tar.gz
-tar xvzf pgscv_0.6.0_linux_amd64.tar.gz
+wget https://github.com/lesovsky/pgscv/releases/download/v0.7.5/pgscv_0.7.5_linux_amd64.tar.gz
+tar xvzf pgscv_0.7.5_linux_amd64.tar.gz
 sudo -u postgres ./pgscv 
 ```
 
