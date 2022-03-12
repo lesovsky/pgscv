@@ -3,7 +3,6 @@ package service
 import (
 	"bufio"
 	"bytes"
-	"context"
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/lesovsky/pgscv/internal/collector"
@@ -63,7 +62,7 @@ type Config struct {
 	CollectorsSettings model.CollectorsSettings
 }
 
-// Exporter is an interface for prometheus.Collector.
+// Collector is an interface for prometheus.Collector.
 type Collector interface {
 	Describe(chan<- *prometheus.Desc)
 	Collect(chan<- prometheus.Metric)
@@ -119,11 +118,6 @@ func (repo *Repository) AddServicesFromConfig(config Config) {
 // SetupServices is a public wrapper on SetupServices method.
 func (repo *Repository) SetupServices(config Config) error {
 	return repo.setupServices(config)
-}
-
-// StartBackgroundDiscovery is a public wrapper on StartBackgroundDiscovery method.
-func (repo *Repository) StartBackgroundDiscovery(ctx context.Context, config Config) {
-	repo.startBackgroundDiscovery(ctx, config)
 }
 
 /* Private methods of Repository */
@@ -240,103 +234,8 @@ func (repo *Repository) addServicesFromConfig(config Config) {
 		repo.addService(s)
 
 		log.Infof("registered new service [%s]", s.ServiceID)
-
-		var msg string
-		if s.ConnSettings.ServiceType == model.ServiceTypePatroni {
-			msg = fmt.Sprintf("service [%s] available through: %s", s.ServiceID, s.ConnSettings.BaseURL)
-		} else {
-			msg = fmt.Sprintf("service [%s] available through: %s@%s:%d/%s", s.ServiceID, pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
-		}
-		log.Debugln(msg)
+		log.Debugf("service [%s] available through: %s@%s:%d/%s", s.ServiceID, pgconfig.User, pgconfig.Host, pgconfig.Port, pgconfig.Database)
 	}
-}
-
-// startBackgroundDiscovery looking for services and add them to the repo.
-func (repo *Repository) startBackgroundDiscovery(ctx context.Context, config Config) {
-	log.Debug("starting background auto-discovery loop")
-
-	// add pseudo-service for system metrics
-	repo.addService(Service{ServiceID: "system:0", ConnSettings: ConnSetting{ServiceType: model.ServiceTypeSystem}})
-	log.Infoln("auto-discovery: service added [system:0]")
-
-	for {
-		if err := repo.lookupServices(config); err != nil {
-			log.Warnf("auto-discovery: services lookup failed: %s; skip", err)
-			continue
-		}
-		if err := repo.setupServices(config); err != nil {
-			log.Warnf("auto-discovery: services setup failed: %s; skip", err)
-			continue
-		}
-
-		// Perform health check for services with remote endpoints (e.g. Postgres or Pgbouncer). Services which continuously
-		// don't respond are removed from the repo (but if they appear later they will be discovered again).
-		repo.healthcheckServices()
-
-		// Sleep until timeout or exit if context canceled.
-		select {
-		case <-time.After(60 * time.Second):
-			continue
-		case <-ctx.Done():
-			log.Info("exit signaled, stop auto-discovery")
-			return
-		}
-	}
-}
-
-// lookupServices scans PIDs and looking for required services
-func (repo *Repository) lookupServices(config Config) error {
-	log.Debug("auto-discovery: looking up for new services...")
-
-	pids, err := process.Pids()
-	if err != nil {
-		return err
-	}
-
-	// walk through the pid list and looking for the processes with appropriate names
-	for _, pid := range pids {
-
-		// Check process, and get its properties.
-		name, cwd, cmdline, skip := checkProcessProperties(pid)
-		if skip {
-			continue
-		}
-
-		var service Service
-		var err error
-
-		switch {
-		case name == "postgres":
-			service, err = discoverPostgres(pid, cwd, config)
-		case name == "pgbouncer":
-			service, err = discoverPgbouncer(pid, cmdline, config)
-		case strings.HasPrefix(name, "python"):
-			service, skip, err = discoverPatroni(pid, cmdline, cwd)
-		default:
-			continue
-		}
-
-		if err != nil {
-			log.Warnf("auto-discovery [%s]: discovery failed: %s; skip", name, err)
-			continue
-		}
-
-		if skip {
-			continue
-		}
-
-		// Check service is not present in the repo.
-		if s := repo.getService(service.ServiceID); s.ServiceID == service.ServiceID {
-			log.Debugf("auto-discovery [%s]: service [%s] already in the repository, skip", name, s.ServiceID)
-			continue
-		}
-
-		// Add postgresql service to the repo.
-		repo.addService(service)
-
-		log.Infof("auto-discovery [%s]: service added [%s]", name, service.ServiceID)
-	}
-	return nil
 }
 
 // setupServices attaches metrics exporters to the services in the repo.
@@ -362,9 +261,6 @@ func (repo *Repository) setupServices(config Config) error {
 				factories.RegisterPostgresCollectors(config.DisabledCollectors)
 			case model.ServiceTypePgbouncer:
 				factories.RegisterPgbouncerCollectors(config.DisabledCollectors)
-			case model.ServiceTypePatroni:
-				factories.RegisterPatroniCollectors(config.DisabledCollectors)
-				collectorConfig.BaseURL = service.ConnSettings.BaseURL
 			default:
 				continue
 			}
@@ -402,8 +298,6 @@ func (repo *Repository) healthcheckServices() {
 		switch service.ConnSettings.ServiceType {
 		case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
 			err = attemptConnect(service.ConnSettings.Conninfo)
-		case model.ServiceTypePatroni:
-			err = attemptRequest(service.ConnSettings.BaseURL)
 		default:
 			continue
 		}
@@ -427,49 +321,6 @@ func (repo *Repository) healthcheckServices() {
 	}
 
 	log.Debug("services healthcheck finished")
-}
-
-// discoverPostgres reads postmaster.pid stored in data directory.
-// Using postmaster.pid data construct "conninfo" string and test it through making a connection.
-func discoverPostgres(pid int32, cwd string, config Config) (Service, error) {
-	log.Debugf("auto-discovery [postgres]: analyzing process with pid %d", pid)
-
-	var err error
-
-	// Postgres always use data directory as current working directory.
-	// Use it for find postmaster.pid.
-	connParams, err := newPostgresConnectionParams(cwd + "/postmaster.pid")
-	if err != nil {
-		return Service{}, err
-	}
-
-	// Construct the connection string using the data from postmaster.pid and user-defined defaults.
-	// Depending on configured Postgres there can be UNIX-based or TCP-based connection string
-	var connString string
-	for _, v := range []bool{true, false} {
-		connString = newPostgresConnectionString(connParams, config.ConnDefaults, v)
-		err = attemptConnect(connString)
-		if err != nil {
-			connString = ""
-			continue
-		}
-
-		// no need to continue because connection with created connString was successful
-		break
-	}
-
-	if connString == "" || err != nil {
-		return Service{}, err
-	}
-
-	s := Service{
-		ServiceID:    model.ServiceTypePostgresql + ":" + strconv.Itoa(connParams.listenPort),
-		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePostgresql, Conninfo: connString},
-		Collector:    nil,
-	}
-
-	log.Debugf("auto-discovery [postgres]: service has been found, pid %d, available through %s", pid, connString)
-	return s, nil
 }
 
 // newPostgresConnectionParams reads connection parameters from postmaster.pid
@@ -556,39 +407,6 @@ func newPostgresConnectionString(connParams connectionParams, defaults map[strin
 	}
 
 	return connString
-}
-
-// discoverPgbouncer check passed process is it a Pgbouncer process or not.
-func discoverPgbouncer(pid int32, cmdline string, config Config) (Service, error) {
-	log.Debugf("auto-discovery [pgbouncer]: analyzing process with pid %d", pid)
-
-	if len(cmdline) == 0 {
-		return Service{}, fmt.Errorf("pgbouncer cmdline is empty")
-	}
-
-	// extract config file location from cmdline
-	configFilePath := parsePgbouncerCmdline(cmdline)
-
-	// parse ini file
-	connParams, err := parsePgbouncerIniFile(configFilePath)
-	if err != nil {
-		return Service{}, err
-	}
-
-	connString := newPgbouncerConnectionString(connParams, config.ConnDefaults)
-
-	if err := attemptConnect(connString); err != nil {
-		return Service{}, err
-	}
-
-	s := Service{
-		ServiceID:    model.ServiceTypePgbouncer + ":" + strconv.Itoa(connParams.listenPort),
-		ConnSettings: ConnSetting{ServiceType: model.ServiceTypePgbouncer, Conninfo: connString},
-		Collector:    nil,
-	}
-
-	log.Debugf("auto-discovery: pgbouncer service has been found, pid %d, available through %s:%d", pid, connParams.listenAddr, connParams.listenPort)
-	return s, nil
 }
 
 // parsePgbouncerIniFile reads pgbouncer's config ini file and returns connection parameters required for constructing connection string.

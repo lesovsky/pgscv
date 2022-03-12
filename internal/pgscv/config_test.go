@@ -27,16 +27,6 @@ func TestNewConfig(t *testing.T) {
 			},
 		},
 		{
-			name:  "valid: pull/push example",
-			valid: true,
-			file:  "testdata/pgscv-push-example.yaml",
-			want: &Config{
-				APIKey:         "TEST1234TEST-TEST-1234-TEST1234",
-				SendMetricsURL: "http://127.0.0.1:9091",
-				Defaults:       map[string]string{},
-			},
-		},
-		{
 			name:  "valid: with defaults",
 			valid: true,
 			file:  "testdata/pgscv-defaults-example.yaml",
@@ -157,37 +147,12 @@ func TestConfig_Validate(t *testing.T) {
 			in:    &Config{ListenAddress: "127.0.0.1:8080"},
 		},
 		{
-			name:  "valid config for PUSH Mode",
-			valid: true,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: "TEST1234TEST-TEST-1234-TEST1234"},
-		},
-		{
-			name:  "invalid config for PUSH Mode: no api key present",
-			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091"},
-		},
-		{
-			name:  "invalid config for PUSH Mode: empty api key",
-			valid: false,
-			in:    &Config{SendMetricsURL: "http://127.0.0.1:9091", APIKey: ""},
-		},
-		{
 			name:  "valid config with specified services",
 			valid: true,
 			in: &Config{ListenAddress: "127.0.0.1:8080", ServicesConnsSettings: service.ConnsSettings{
 				"postgres:5432":  {ServiceType: model.ServiceTypePostgresql, Conninfo: "host=127.0.0.1 dbname=pgscv_fixtures user=pgscv"},
 				"pgbouncer:6432": {ServiceType: model.ServiceTypePgbouncer, Conninfo: "host=127.0.0.1 port=6432 dbname=pgbouncer user=pgscv"},
 			}},
-		},
-		{
-			name:  "valid with enabled auto-update",
-			valid: true,
-			in:    &Config{AutoUpdate: "stable"},
-		},
-		{
-			name:  "invalid with wrong auto-update value",
-			valid: false,
-			in:    &Config{AutoUpdate: "invalid"},
 		},
 		{
 			name:  "invalid config with specified services: empty service type",
@@ -425,18 +390,13 @@ func Test_newConfigFromEnv(t *testing.T) {
 			valid: true, // Completely valid variables
 			envvars: map[string]string{
 				"PGSCV_LISTEN_ADDRESS":     "127.0.0.1:12345",
-				"PGSCV_AUTOUPDATE":         "1",
 				"PGSCV_NO_TRACK_MODE":      "yes",
-				"PGSCV_SEND_METRICS_URL":   "127.0.0.1:54321",
-				"PGSCV_API_KEY":            "example",
 				"PGSCV_DATABASES":          "exampledb",
 				"PGSCV_DISABLE_COLLECTORS": "example/1,example/2, example/3",
 				"POSTGRES_DSN":             "example_dsn",
 				"POSTGRES_DSN_EXAMPLE1":    "example_dsn",
 				"PGBOUNCER_DSN":            "example_dsn",
 				"PGBOUNCER_DSN_EXAMPLE2":   "example_dsn",
-				"PATRONI_URL":              "example_url",
-				"PATRONI_URL_EXAMPLE3":     "example_url",
 				"PGSCV_AUTH_USERNAME":      "user",
 				"PGSCV_AUTH_PASSWORD":      "pass",
 				"PGSCV_AUTH_KEYFILE":       "keyfile.key",
@@ -444,10 +404,7 @@ func Test_newConfigFromEnv(t *testing.T) {
 			},
 			want: &Config{
 				ListenAddress:     "127.0.0.1:12345",
-				AutoUpdate:        "1",
 				NoTrackMode:       true,
-				SendMetricsURL:    "127.0.0.1:54321",
-				APIKey:            "example",
 				Databases:         "exampledb",
 				DisableCollectors: []string{"example/1", "example/2", "example/3"},
 				ServicesConnsSettings: map[string]service.ConnSetting{
@@ -455,8 +412,6 @@ func Test_newConfigFromEnv(t *testing.T) {
 					"EXAMPLE1":  {ServiceType: model.ServiceTypePostgresql, Conninfo: "example_dsn"},
 					"pgbouncer": {ServiceType: model.ServiceTypePgbouncer, Conninfo: "example_dsn"},
 					"EXAMPLE2":  {ServiceType: model.ServiceTypePgbouncer, Conninfo: "example_dsn"},
-					"patroni":   {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
-					"EXAMPLE3":  {ServiceType: model.ServiceTypePatroni, BaseURL: "example_url"},
 				},
 				AuthConfig: http.AuthConfig{
 					Username: "user",
@@ -474,10 +429,6 @@ func Test_newConfigFromEnv(t *testing.T) {
 		{
 			valid:   false, // Invalid pgbouncer DSN key
 			envvars: map[string]string{"PGBOUNCER_DSN_": "example_dsn"},
-		},
-		{
-			valid:   false, // Invalid patroni URL key
-			envvars: map[string]string{"PATRONI_URL_": "example_dsn"},
 		},
 	}
 

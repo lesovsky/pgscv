@@ -12,7 +12,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"time"
 )
 
 const (
@@ -21,20 +20,12 @@ const (
 	defaultPostgresDbname    = "postgres"
 	defaultPgbouncerUsername = "pgscv"
 	defaultPgbouncerDbname   = "pgbouncer"
-
-	defaultSendMetricsInterval = 60 * time.Second
 )
 
 // Config defines application's configuration.
 type Config struct {
-	BinaryPath            string                   // full path of the program, required for auto-update procedure
-	BinaryVersion         string                   // version of the program, required for auto-update procedure
-	AutoUpdate            string                   `yaml:"autoupdate"`       // controls auto-update procedure
-	NoTrackMode           bool                     `yaml:"no_track_mode"`    // controls tracking sensitive information (query texts, etc)
-	ListenAddress         string                   `yaml:"listen_address"`   // Network address and port where the application should listen on
-	SendMetricsURL        string                   `yaml:"send_metrics_url"` // URL of Weaponry service metric gateway
-	SendMetricsInterval   time.Duration            // Metric send interval
-	APIKey                string                   `yaml:"api_key"`            // API key for accessing to Weaponry
+	NoTrackMode           bool                     `yaml:"no_track_mode"`      // controls tracking sensitive information (query texts, etc)
+	ListenAddress         string                   `yaml:"listen_address"`     // Network address and port where the application should listen on
 	ServicesConnsSettings service.ConnsSettings    `yaml:"services"`           // All connections settings for exact services
 	Defaults              map[string]string        `yaml:"defaults"`           // Defaults
 	DisableCollectors     []string                 `yaml:"disable_collectors"` // List of collectors which should be disabled. DEPRECATED in favor collectors settings
@@ -68,13 +59,6 @@ func NewConfig(configFilePath string) (*Config, error) {
 
 // Validate checks configuration for stupid values and set defaults
 func (c *Config) Validate() error {
-	c.SendMetricsInterval = defaultSendMetricsInterval
-
-	// API key is necessary when Metric Service is specified
-	if c.SendMetricsURL != "" && c.APIKey == "" {
-		return fmt.Errorf("API key should be specified")
-	}
-
 	if c.ListenAddress == "" {
 		c.ListenAddress = defaultListenAddress
 	}
@@ -84,14 +68,6 @@ func (c *Config) Validate() error {
 	} else {
 		log.Infoln("no-track disabled, for details check the documentation about 'no_track_mode' option.")
 	}
-
-	// Process auto-update setting.
-	v, err := toggleAutoupdate(c.AutoUpdate)
-	if err != nil {
-		return err
-	}
-
-	c.AutoUpdate = v
 
 	// setup defaults
 	if c.Defaults == nil {
@@ -267,21 +243,9 @@ func newConfigFromEnv() (*Config, error) {
 			config.ServicesConnsSettings[id] = cs
 		}
 
-		// Parse PATRONI_URL.
-		if strings.HasPrefix(key, "PATRONI_URL") {
-			id, cs, err := service.ParsePatroniURLEnv(key, value)
-			if err != nil {
-				return nil, err
-			}
-
-			config.ServicesConnsSettings[id] = cs
-		}
-
 		switch key {
 		case "PGSCV_LISTEN_ADDRESS":
 			config.ListenAddress = value
-		case "PGSCV_AUTOUPDATE":
-			config.AutoUpdate = value
 		case "PGSCV_NO_TRACK_MODE":
 			switch value {
 			case "y", "yes", "Yes", "YES", "t", "true", "True", "TRUE", "1", "on":
@@ -289,10 +253,6 @@ func newConfigFromEnv() (*Config, error) {
 			default:
 				config.NoTrackMode = false
 			}
-		case "PGSCV_SEND_METRICS_URL":
-			config.SendMetricsURL = value
-		case "PGSCV_API_KEY":
-			config.APIKey = value
 		case "PGSCV_DATABASES":
 			config.Databases = value
 		case "PGSCV_DISABLE_COLLECTORS":
