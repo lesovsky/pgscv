@@ -4,6 +4,13 @@
 - [collects](https://github.com/lesovsky/pgscv/wiki/Collectors) a lot of stats about PostgreSQL environment.
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
+**IMPORTANT NOTES**
+pgSCV moved from 'weaponry' to 'lesovsky' GitHub account. From version 0.8.0 all features required for Weaponry will be removed:
+- auto-discovery (all Postgres, Pgbouncer services have to be defined explicitly, by configuration file or environment variables)
+- bootstrap, uninstall and auto-update
+- push metrics to remote service
+- Patroni support (because it has this feature built-in)
+
 ### Features
 - **Supported services:** support collecting metrics of PostgreSQL and Pgbouncer.
 - **OS metrics:** support collecting metrics of operating system.
