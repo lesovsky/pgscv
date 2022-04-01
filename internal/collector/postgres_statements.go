@@ -196,13 +196,13 @@ func (c *postgresStatementsCollector) Update(config Config, ch chan<- prometheus
 		return err
 	}
 
+	defer conn.Close()
+
 	// get pg_stat_statements stats
 	res, err := conn.Query(selectStatementsQuery(config.serverVersionNum, config.pgStatStatementsSchema))
 	if err != nil {
 		return err
 	}
-
-	conn.Close()
 
 	// parse pg_stat_statements stats
 	stats := parsePostgresStatementsStats(res, []string{"user", "database", "queryid", "query"})

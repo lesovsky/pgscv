@@ -198,6 +198,7 @@ func discoverPgStatStatements(connStr string) (bool, string, string, error) {
 	var setting string
 	err = conn.Conn().QueryRow(context.Background(), "SELECT setting FROM pg_settings WHERE name = 'shared_preload_libraries'").Scan(&setting)
 	if err != nil {
+		conn.Close()
 		return false, "", "", err
 	}
 
@@ -238,10 +239,11 @@ func discoverPgStatStatements(connStr string) (bool, string, string, error) {
 
 		// If pg_stat_statements found, update source and return connection.
 		if schema := extensionInstalledSchema(conn, "pg_stat_statements"); schema != "" {
+			conn.Close()
 			return true, conn.Conn().Config().Database, schema, nil
 		}
 
-		// Otherwise close connection and go to next database in the list.
+		// Otherwise, close connection and go to next database in the list.
 		conn.Close()
 	}
 
