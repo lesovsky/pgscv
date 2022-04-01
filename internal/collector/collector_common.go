@@ -267,11 +267,9 @@ func updateFromMultipleDatabases(config Config, descSets []typedDescSet, ch chan
 			err = updateSingleDescSet(conn, s, ch, true)
 			if err != nil {
 				log.Errorf("collect failed: %s; skip", err)
-				conn.Close()
-				continue
 			}
 
-			// Close connection.
+			// Close connection and go next database.
 			conn.Close()
 		}
 	}
