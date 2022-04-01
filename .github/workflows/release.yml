@@ -8,7 +8,7 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    container: lesovsky/pgscv-test-runner:0.0.8
+    container: lesovsky/pgscv-test-runner:0.0.9
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -43,7 +43,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@v2
         with:
-          go-version: 1.17
+          go-version: 1.18
       - uses: goreleaser/goreleaser-action@v2
         with:
           version: latest
