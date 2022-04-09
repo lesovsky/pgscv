@@ -14,6 +14,7 @@ const (
 	PostgresV95 = 90500
 	PostgresV96 = 90600
 	PostgresV10 = 100000
+	PostgresV11 = 110000
 	PostgresV12 = 120000
 	PostgresV13 = 130000
 	PostgresV14 = 140000
