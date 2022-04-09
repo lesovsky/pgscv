@@ -219,7 +219,11 @@ func Test_selectActivityQuery(t *testing.T) {
 	}{
 		{version: PostgresV95, want: postgresActivityQuery95},
 		{version: PostgresV96, want: postgresActivityQuery96},
-		{version: PostgresV10, want: postgresActivityQueryLatest},
+		{version: PostgresV10, want: postgresActivityQuery13},
+		{version: PostgresV11, want: postgresActivityQuery13},
+		{version: PostgresV12, want: postgresActivityQuery13},
+		{version: PostgresV13, want: postgresActivityQuery13},
+		{version: PostgresV14, want: postgresActivityQueryLatest},
 	}
 
 	for _, tc := range testcases {
