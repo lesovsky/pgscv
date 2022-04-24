@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/lesovsky/pgscv/internal/collector"
-	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/lesovsky/pgscv/internal/store"
@@ -19,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 )
 
 const (
@@ -514,29 +512,6 @@ func attemptConnect(connString string) error {
 
 	db.Close()
 	log.Debug("test connection success")
-
-	return nil
-}
-
-// attemptRequest tries to make a real HTTP request using passed URL string.
-func attemptRequest(baseurl string) error {
-	url := baseurl + "/health"
-	log.Debugln("making test http request: ", url)
-
-	var client = http.NewClient(http.ClientConfig{Timeout: time.Second})
-
-	if strings.HasPrefix(url, "https://") {
-		client.EnableTLSInsecure()
-	}
-
-	resp, err := client.Get(url) // #nosec G107
-	if err != nil {
-		return err
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("bad response: %s", resp.Status)
-	}
 
 	return nil
 }
