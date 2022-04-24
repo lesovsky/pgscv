@@ -1,32 +1,14 @@
 package service
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
 	"github.com/jackc/pgx/v4"
 	"github.com/lesovsky/pgscv/internal/collector"
 	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/lesovsky/pgscv/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/shirou/gopsutil/process"
-	"io"
-	"os"
-	"path/filepath"
 	"regexp"
-	"strconv"
-	"strings"
 	"sync"
-)
-
-const (
-	defaultHost              = "127.0.0.1"
-	defaultPgbouncerPort     = 6432
-	defaultPostgresUsername  = "pgscv"
-	defaultPostgresDbname    = "postgres"
-	defaultPgbouncerUsername = "pgscv"
-	defaultPgbouncerDbname   = "pgbouncer"
 )
 
 // Service struct describes service - the target from which should be collected metrics.
@@ -42,9 +24,6 @@ type Service struct {
 	// Prometheus-based metrics collector associated with the service. Each 'service' has its own dedicated collector instance
 	// which implements a service-specific set of metric collectors.
 	Collector Collector
-	// TotalErrors represents total number of times where service's health checks failed. When errors limit is reached service
-	// removed from the repo.
-	TotalErrors int
 }
 
 // Config defines service's configuration.
@@ -66,18 +45,6 @@ type Collector interface {
 	Collect(chan<- prometheus.Metric)
 }
 
-// connectionParams is the set of parameters that may be required when constructing connection string.
-// For example, this struct describes the postmaster.pid representation https://www.postgresql.org/docs/current/storage-file-layout.html
-type connectionParams struct {
-	pid               int    // process id
-	datadirPath       string // instance data directory path
-	startTs           int64  // postmaster start timestamp
-	unixSocketDirPath string // UNIX-domain socket directory path
-	listenAddr        string // first valid listen_address (IP address or *, or empty if not listening on TCP)
-	listenPort        int    // port number
-	// ... other stuff we're not interested in
-}
-
 // Repository is the repository with services.
 type Repository struct {
 	sync.RWMutex                    // protect concurrent access
@@ -92,21 +59,6 @@ func NewRepository() *Repository {
 }
 
 /* Public wrapper-methods of Repository */
-
-// GetService is a public wrapper on getService method.
-func (repo *Repository) GetService(id string) Service {
-	return repo.getService(id)
-}
-
-// TotalServices is a public wrapper on TotalServices method.
-func (repo *Repository) TotalServices() int {
-	return repo.totalServices()
-}
-
-// GetServiceIDs is a public wrapper on GetServiceIDs method.
-func (repo *Repository) GetServiceIDs() []string {
-	return repo.getServiceIDs()
-}
 
 // AddServicesFromConfig is a public wrapper on AddServicesFromConfig method.
 func (repo *Repository) AddServicesFromConfig(config Config) {
@@ -133,39 +85,6 @@ func (repo *Repository) getService(id string) Service {
 	s := repo.Services[id]
 	repo.RUnlock()
 	return s
-}
-
-// markServiceFailed increments total number of health check errors.
-func (repo *Repository) markServiceFailed(id string) {
-	repo.Lock()
-	s := repo.Services[id]
-	s.TotalErrors++
-	repo.Services[id] = s
-	repo.Unlock()
-}
-
-// getServiceStatus returns total number of errors (failed health checks).
-func (repo *Repository) getServiceStatus(id string) int {
-	repo.RLock()
-	n := repo.Services[id].TotalErrors
-	repo.RUnlock()
-	return n
-}
-
-// markServiceHealthy resets health check errors counter to zero.
-func (repo *Repository) markServiceHealthy(id string) {
-	repo.Lock()
-	s := repo.Services[id]
-	s.TotalErrors = 0
-	repo.Services[id] = s
-	repo.Unlock()
-}
-
-// removeService removes service from the repo.
-func (repo *Repository) removeService(id string) {
-	repo.Lock()
-	delete(repo.Services, id)
-	repo.Unlock()
 }
 
 // totalServices returns the number of services registered in the repo.
@@ -279,309 +198,4 @@ func (repo *Repository) setupServices(config Config) error {
 	}
 
 	return nil
-}
-
-// healthcheckServices performs services health checks and remove those who don't respond too long
-func (repo *Repository) healthcheckServices() {
-	log.Debug("services healthcheck started")
-
-	// Remove service after 10 failed health checks.
-	var errorThreshold = 10
-
-	for _, id := range repo.getServiceIDs() {
-		service := repo.getService(id)
-		totalErrors := repo.getServiceStatus(id)
-		var err error
-
-		switch service.ConnSettings.ServiceType {
-		case model.ServiceTypePostgresql, model.ServiceTypePgbouncer:
-			err = attemptConnect(service.ConnSettings.Conninfo)
-		default:
-			continue
-		}
-
-		// Process errors if any.
-		if err != nil {
-			totalErrors++
-			if totalErrors < errorThreshold {
-				repo.markServiceFailed(id)
-				log.Warnf("service [%s] failed: tries remain %d/%d", id, totalErrors, errorThreshold)
-			} else {
-				// Unregister collector and remove the service.
-				if repo.Services[id].Collector != nil {
-					prometheus.Unregister(repo.Services[id].Collector)
-				}
-
-				repo.removeService(id)
-				log.Errorf("service [%s] removed: too many failures %d/%d", id, totalErrors, errorThreshold)
-			}
-		}
-	}
-
-	log.Debug("services healthcheck finished")
-}
-
-// newPostgresConnectionParams reads connection parameters from postmaster.pid
-func newPostgresConnectionParams(pidFilePath string) (connectionParams, error) {
-	p := connectionParams{}
-	content, err := os.ReadFile(filepath.Clean(pidFilePath))
-	if err != nil {
-		return p, err
-	}
-
-	reader := bufio.NewReader(bytes.NewBuffer(content))
-	for i := 0; ; i++ {
-		line, _, err := reader.ReadLine()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return p, err
-		}
-		switch i {
-		case 0:
-			p.pid, err = strconv.Atoi(string(line))
-			if err != nil {
-				return p, err
-			}
-		case 1:
-			p.datadirPath = string(line)
-		case 2:
-			p.startTs, err = strconv.ParseInt(string(line), 10, 64)
-			if err != nil {
-				return p, err
-			}
-		case 3:
-			p.listenPort, err = strconv.Atoi(string(line))
-			if err != nil {
-				return p, err
-			}
-		case 4:
-			p.unixSocketDirPath = string(line)
-		case 5:
-			if string(line) == "*" {
-				p.listenAddr = defaultHost
-			} else {
-				p.listenAddr = string(line)
-			}
-		}
-	}
-	return p, nil
-}
-
-// newPostgresConnectionString creates special connection string for connecting to Postgres using passed connection parameters.
-func newPostgresConnectionString(connParams connectionParams, defaults map[string]string, unix bool) string {
-	var password, connString string
-	var username = defaultPostgresUsername
-	var dbname = defaultPostgresDbname
-
-	if _, ok := defaults["postgres_username"]; ok {
-		username = defaults["postgres_username"]
-	}
-
-	if _, ok := defaults["postgres_dbname"]; ok {
-		dbname = defaults["postgres_dbname"]
-	}
-
-	if _, ok := defaults["postgres_password"]; ok {
-		password = defaults["postgres_password"]
-	}
-
-	connString = "application_name=pgscv"
-
-	if unix && connParams.unixSocketDirPath != "" {
-		connString = fmt.Sprintf("%s host=%s", connString, connParams.unixSocketDirPath)
-	} else if !unix && connParams.listenAddr != "" {
-		connString = fmt.Sprintf("%s host=%s", connString, connParams.listenAddr)
-	}
-
-	if connParams.listenPort > 0 {
-		connString = fmt.Sprintf("%s port=%d", connString, connParams.listenPort)
-	}
-
-	connString = fmt.Sprintf("%s user=%s dbname=%s", connString, username, dbname)
-
-	if password != "" {
-		connString = fmt.Sprintf("%s password=%s", connString, password)
-	}
-
-	return connString
-}
-
-// parsePgbouncerIniFile reads pgbouncer's config ini file and returns connection parameters required for constructing connection string.
-func parsePgbouncerIniFile(iniFilePath string) (connectionParams, error) {
-	// read the content of inifile
-	file, err := os.Open(filepath.Clean(iniFilePath))
-	if err != nil {
-		return connectionParams{}, err
-	}
-	defer func() { _ = file.Close() }()
-
-	var paramName, paramValue string
-	var connParams connectionParams
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		if err := scanner.Err(); err != nil {
-			log.Warnln("an error occurred during scan: ", err)
-			continue
-		}
-		line := scanner.Text()
-
-		// skip comments and empty lines
-		if strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") || len(line) == 0 {
-			continue
-		}
-
-		line = strings.Replace(line, " ", "", -1)
-		vals := strings.Split(line, "=")
-		if len(vals) != 2 {
-			// if parameter is not set it means default valus is used, can skip that line
-			continue
-		}
-
-		// looking for listen address and port settings, use them as connection settings
-		paramName, paramValue = vals[0], vals[1]
-		switch paramName {
-		case "listen_addr":
-			connParams.listenAddr = strings.Split(paramValue, ",")[0] // take first address
-			if connParams.listenAddr == "*" {
-				connParams.listenAddr = defaultHost
-			}
-		case "listen_port":
-			connParams.listenPort, err = strconv.Atoi(paramValue)
-			if err != nil {
-				return connectionParams{}, err
-			}
-		case "unix_socket_dir":
-			connParams.unixSocketDirPath = paramValue
-		}
-	}
-
-	// set defaults in case of empty values, for more details see pgbouncer.ini reference https://www.pgbouncer.org/config.html
-	if connParams.unixSocketDirPath == "" {
-		connParams.unixSocketDirPath = "/tmp"
-	}
-	if connParams.listenPort == 0 {
-		connParams.listenPort = defaultPgbouncerPort
-	}
-
-	return connParams, nil
-}
-
-// newPgbouncerConnectionString creates special connection string for connecting to Pgbouncer using passed connection parameters.
-func newPgbouncerConnectionString(connParams connectionParams, defaults map[string]string) string {
-	var password, connString string
-	var username = defaultPgbouncerUsername
-
-	if _, ok := defaults["pgbouncer_username"]; ok {
-		username = defaults["pgbouncer_username"]
-	}
-
-	if _, ok := defaults["pgbouncer_password"]; ok {
-		password = defaults["pgbouncer_password"]
-	}
-
-	connString = "application_name=pgscv"
-
-	if connParams.listenAddr != "" {
-		connString = fmt.Sprintf("%s host=%s", connString, connParams.listenAddr)
-	} else if connParams.unixSocketDirPath != "" {
-		connString = fmt.Sprintf("%s host=%s", connString, connParams.unixSocketDirPath)
-	}
-
-	if connParams.listenPort > 0 {
-		connString = fmt.Sprintf("%s port=%d", connString, connParams.listenPort)
-	}
-
-	connString = fmt.Sprintf("%s user=%s dbname=%s", connString, username, defaultPgbouncerDbname)
-
-	if password != "" {
-		connString = fmt.Sprintf("%s password=%s", connString, password)
-	}
-
-	return connString
-}
-
-// attemptConnect tries to make a real connection using passed connection string.
-func attemptConnect(connString string) error {
-	log.Debugln("making test connection: ", connString)
-	db, err := store.New(connString)
-	if err != nil {
-		return err
-	}
-
-	db.Close()
-	log.Debug("test connection success")
-
-	return nil
-}
-
-// parsePgbouncerCmdline parses pgbouncer's cmdline and extract config file location.
-func parsePgbouncerCmdline(cmdline string) string {
-	parts := strings.Fields(cmdline)
-
-	// For extracting config file from cmdline we should skip first argument (pgbouncer executable) and skip all arguments
-	// which starting with '-' symbol. See test function for examples.
-
-	for _, s := range parts[1:] {
-		if !strings.HasPrefix(s, "-") {
-			return s
-		}
-	}
-	return ""
-}
-
-// checkProcessProperties check process properties and returns necessary properties if process valid.
-func checkProcessProperties(pid int32) (string, string, string, bool) {
-	proc, err := process.NewProcess(pid)
-	if err != nil {
-		log.Debugf("auto-discovery: create process object for pid %d failed: %s; skip", pid, err)
-		return "", "", "", true
-	}
-
-	ppid, err := proc.Ppid()
-	if err != nil {
-		log.Debugf("auto-discovery: get parent pid for pid %d failed: %s; skip", pid, err)
-		return "", "", "", true
-	}
-
-	// Skip processes which are not children of init.
-	if ppid != 1 {
-		return "", "", "", true
-	}
-
-	name, err := proc.Name()
-	if err != nil {
-		log.Debugf("auto-discovery: read name for pid %d failed: %s; skip", pid, err)
-		return "", "", "", true
-	}
-
-	// Skip processes which are not Postgres, Pgbouncer or Python.
-	if name != "postgres" && name != "pgbouncer" && !strings.HasPrefix(name, "python") {
-		return "", "", "", true
-	}
-
-	cwd, err := proc.Cwd()
-	if err != nil {
-		log.Infof("auto-discovery: read cwd for pid %d failed: %s; skip", pid, err)
-		return "", "", "", true
-	}
-
-	cmdline, err := proc.Cmdline()
-	if err != nil {
-		log.Infof("auto-discovery: read cmdline for pid %d failed: %s; skip", pid, err)
-		return "", "", "", true
-	}
-
-	return name, cwd, cmdline, false
-}
-
-// stringsContains returns true if array of strings contains specific string
-func stringsContains(ss []string, s string) bool {
-	for _, val := range ss {
-		if val == s {
-			return true
-		}
-	}
-	return false
 }
