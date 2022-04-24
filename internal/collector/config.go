@@ -19,8 +19,6 @@ type Config struct {
 	ServiceType string
 	// ConnString defines a connection string used to connecting to the service
 	ConnString string
-	// BaseURL defines a URL string for connecting to HTTP service
-	BaseURL string
 	// NoTrackMode controls collector to gather and send sensitive information, such as queries texts.
 	NoTrackMode bool
 	// postgresServiceConfig defines collector's options specific for Postgres service

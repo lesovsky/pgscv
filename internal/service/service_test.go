@@ -1,7 +1,6 @@
 package service
 
 import (
-	"github.com/lesovsky/pgscv/internal/http"
 	"github.com/lesovsky/pgscv/internal/log"
 	"github.com/lesovsky/pgscv/internal/model"
 	"github.com/prometheus/client_golang/prometheus"
@@ -438,17 +437,6 @@ func Test_newPgbouncerConnectionString(t *testing.T) {
 func Test_attemptConnect(t *testing.T) {
 	assert.NoError(t, attemptConnect("host=127.0.0.1 port=5432 user=pgscv dbname=pgscv_fixtures"))
 	assert.Error(t, attemptConnect("host=127.0.0.1 port=12345 user=invalid dbname=invalid"))
-}
-
-func Test_attemptRequest(t *testing.T) {
-	ts1 := http.TestServer(t, http.StatusOK, "")
-	defer ts1.Close()
-	ts2 := http.TestServer(t, http.StatusBadRequest, "")
-	defer ts2.Close()
-
-	assert.NoError(t, attemptRequest(ts1.URL))
-	assert.Error(t, attemptRequest(ts2.URL))
-	assert.Error(t, attemptRequest("http://127.0.0.1:30080"))
 }
 
 func Test_parsePgbouncerCmdline(t *testing.T) {
