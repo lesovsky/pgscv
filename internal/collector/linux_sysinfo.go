@@ -114,6 +114,11 @@ func parseOsRelease(r io.Reader) (string, string, error) {
 	var name, version string
 
 	for scanner.Scan() {
+		// Skip empty lines
+		if scanner.Text() == "" {
+			continue
+		}
+
 		parts := strings.SplitN(scanner.Text(), "=", 2)
 
 		if len(parts) != 2 {
