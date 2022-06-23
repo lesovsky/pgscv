@@ -2,6 +2,7 @@ NAME="Ubuntu"
 VERSION="20.04.2 LTS (Focal Fossa)"
 ID=ubuntu
 ID_LIKE=debian
+
 PRETTY_NAME="Ubuntu 20.04.2 LTS"
 VERSION_ID="20.04"
 HOME_URL="https://www.ubuntu.com/"
