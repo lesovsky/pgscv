@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"os"
 	"path/filepath"
@@ -8,6 +9,14 @@ import (
 )
 
 func TestMeminfoCollector_Update(t *testing.T) {
+	meminfo, err := os.ReadFile("/proc/meminfo")
+	assert.NoError(t, err)
+	fmt.Println(string(meminfo))
+
+	vmstat, err := os.ReadFile("/proc/vmstat")
+	assert.NoError(t, err)
+	fmt.Println(string(vmstat))
+
 	var input = pipelineInput{
 		required: []string{
 			"node_memory_MemTotal", "node_memory_MemFree", "node_memory_MemAvailable", "node_memory_MemUsed",
@@ -32,6 +41,7 @@ func TestMeminfoCollector_Update(t *testing.T) {
 			"node_memory_WritebackTmp", "node_memory_NFS_Unstable", "node_memory_DirectMap2M", "node_memory_Hugetlb",
 			"node_memory_CmaTotal", "node_memory_Mlocked", "node_memory_ShmemPmdMapped", "node_memory_SUnreclaim",
 			"node_memory_KernelStack", "node_memory_VmallocChunk", "node_memory_Percpu", "node_memory_HardwareCorrupted",
+			"node_memory_CmaFree", "node_memory_CmaTotal",
 			// vmstat
 			"node_vmstat_nr_free_pages", "node_vmstat_nr_zone_inactive_anon", "node_vmstat_nr_zone_active_anon",
 			"node_vmstat_nr_zone_inactive_file", "node_vmstat_nr_zone_active_file", "node_vmstat_nr_zone_unevictable",
@@ -83,8 +93,8 @@ func TestMeminfoCollector_Update(t *testing.T) {
 			"node_vmstat_pgsteal_anon", "node_vmstat_pgsteal_file", "node_vmstat_pgscan_file", "node_vmstat_pgscan_anon",
 			"node_vmstat_thp_file_fallback_charge", "node_vmstat_nr_foll_pin_released", "node_vmstat_thp_file_fallback",
 			"node_vmstat_thp_fault_fallback_charge", "node_vmstat_nr_swapcached", "node_vmstat_direct_map_level2_splits",
-			"node_vmstat_direct_map_level3_splits", "node_memory_CmaFree", "node_memory_CmaTotal", "node_vmstat_workingset_refault",
-			"node_vmstat_workingset_activate", "node_vmstat_workingset_restore",
+			"node_vmstat_direct_map_level3_splits", "node_vmstat_workingset_refault", "node_vmstat_workingset_activate",
+			"node_vmstat_workingset_restore", "node_vmstat_pgdemote_kswapd", "node_vmstat_pgdemote_direct",
 		},
 		collector: NewMeminfoCollector,
 	}
