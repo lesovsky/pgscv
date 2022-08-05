@@ -83,7 +83,8 @@ func TestMeminfoCollector_Update(t *testing.T) {
 			"node_vmstat_pgsteal_anon", "node_vmstat_pgsteal_file", "node_vmstat_pgscan_file", "node_vmstat_pgscan_anon",
 			"node_vmstat_thp_file_fallback_charge", "node_vmstat_nr_foll_pin_released", "node_vmstat_thp_file_fallback",
 			"node_vmstat_thp_fault_fallback_charge", "node_vmstat_nr_swapcached", "node_vmstat_direct_map_level2_splits",
-			"node_vmstat_direct_map_level3_splits",
+			"node_vmstat_direct_map_level3_splits", "node_memory_CmaFree", "node_memory_CmaTotal", "node_vmstat_workingset_refault",
+			"node_vmstat_workingset_activate", "node_vmstat_workingset_restore",
 		},
 		collector: NewMeminfoCollector,
 	}
