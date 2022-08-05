@@ -46,7 +46,11 @@ type postgresDatabasesCollector struct {
 	commits            typedDesc
 	rollbacks          typedDesc
 	blocks             typedDesc
-	tuples             typedDesc
+	tuplesReturned     typedDesc
+	tuplesFetched      typedDesc
+	tuplesInserted     typedDesc
+	tuplesUpdated      typedDesc
+	tuplesDeleted      typedDesc
 	tempbytes          typedDesc
 	tempfiles          typedDesc
 	conflicts          typedDesc
@@ -89,10 +93,34 @@ func NewPostgresDatabasesCollector(constLabels labels, settings model.CollectorS
 			[]string{"database", "access"}, constLabels,
 			settings.Filters,
 		),
-		tuples: newBuiltinTypedDesc(
-			descOpts{"postgres", "database", "tuples_total", "Total number of rows processed by each type of operation.", 0},
+		tuplesReturned: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "tuples_returned_total", "Total number of rows returned per each database.", 0},
 			prometheus.CounterValue,
-			[]string{"database", "tuples"}, constLabels,
+			[]string{"database"}, constLabels,
+			settings.Filters,
+		),
+		tuplesFetched: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "tuples_fetched_total", "Total number of rows fetched per each database.", 0},
+			prometheus.CounterValue,
+			[]string{"database"}, constLabels,
+			settings.Filters,
+		),
+		tuplesInserted: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "tuples_inserted_total", "Total number of rows inserted per each database.", 0},
+			prometheus.CounterValue,
+			[]string{"database"}, constLabels,
+			settings.Filters,
+		),
+		tuplesUpdated: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "tuples_updated_total", "Total number of rows updated per each database.", 0},
+			prometheus.CounterValue,
+			[]string{"database"}, constLabels,
+			settings.Filters,
+		),
+		tuplesDeleted: newBuiltinTypedDesc(
+			descOpts{"postgres", "database", "tuples_deleted_total", "Total number of rows deleted per each database.", 0},
+			prometheus.CounterValue,
+			[]string{"database"}, constLabels,
 			settings.Filters,
 		),
 		tempbytes: newBuiltinTypedDesc(
@@ -209,11 +237,11 @@ func (c *postgresDatabasesCollector) Update(config Config, ch chan<- prometheus.
 		ch <- c.rollbacks.newConstMetric(stat.xactrollback, stat.database)
 		ch <- c.blocks.newConstMetric(stat.blksread, stat.database, "read")
 		ch <- c.blocks.newConstMetric(stat.blkshit, stat.database, "hit")
-		ch <- c.tuples.newConstMetric(stat.tupreturned, stat.database, "returned")
-		ch <- c.tuples.newConstMetric(stat.tupfetched, stat.database, "fetched")
-		ch <- c.tuples.newConstMetric(stat.tupinserted, stat.database, "inserted")
-		ch <- c.tuples.newConstMetric(stat.tupupdated, stat.database, "updated")
-		ch <- c.tuples.newConstMetric(stat.tupdeleted, stat.database, "deleted")
+		ch <- c.tuplesReturned.newConstMetric(stat.tupreturned, stat.database)
+		ch <- c.tuplesFetched.newConstMetric(stat.tupfetched, stat.database)
+		ch <- c.tuplesInserted.newConstMetric(stat.tupinserted, stat.database)
+		ch <- c.tuplesUpdated.newConstMetric(stat.tupupdated, stat.database)
+		ch <- c.tuplesDeleted.newConstMetric(stat.tupdeleted, stat.database)
 
 		ch <- c.tempbytes.newConstMetric(stat.tempbytes, stat.database)
 		ch <- c.tempfiles.newConstMetric(stat.tempfiles, stat.database)

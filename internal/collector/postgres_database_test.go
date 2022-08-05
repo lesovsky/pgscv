@@ -14,7 +14,11 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 			"postgres_database_xact_commits_total",
 			"postgres_database_xact_rollbacks_total",
 			"postgres_database_blocks_total",
-			"postgres_database_tuples_total",
+			"postgres_database_tuples_returned_total",
+			"postgres_database_tuples_fetched_total",
+			"postgres_database_tuples_inserted_total",
+			"postgres_database_tuples_updated_total",
+			"postgres_database_tuples_deleted_total",
 			"postgres_database_temp_bytes_total",
 			"postgres_database_temp_files_total",
 			"postgres_database_conflicts_total",
@@ -25,10 +29,6 @@ func TestPostgresDatabasesCollector_Update(t *testing.T) {
 			"postgres_database_size_bytes",
 			"postgres_database_stats_age_seconds_total",
 			"postgres_xacts_left_before_wraparound",
-		},
-		// TODO: wait until Postgres 14 has been released, update Postgres version on pgscv-testing docker image
-		//   and move these metrics to 'required' slice.
-		optional: []string{
 			"postgres_database_session_time_seconds_all_total",
 			"postgres_database_session_time_seconds_total",
 			"postgres_database_sessions_all_total",
