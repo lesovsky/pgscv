@@ -1,4 +1,6 @@
 # pgSCV - PostgreSQL ecosystem metrics collector.
+versions
+ we had an issues to start unit with beta versions, so we used 0_7_5
 
 ### pgSCV
 - [collects](https://github.com/lesovsky/pgscv/wiki/Collectors) a lot of stats about PostgreSQL environment.
