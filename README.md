@@ -5,7 +5,8 @@
 - exposes metrics through the HTTP `/metrics` endpoint in [Prometheus metrics exposition format](https://prometheus.io/docs/concepts/data_model/).
 
 **IMPORTANT NOTES**
-pgSCV moved from 'weaponry' to 'lesovsky' GitHub account. From version 0.8.0 all features required for Weaponry will be removed:
+1. pgSCV is archived and is not maintained. Check out the another fork [CHERTS/pgscv](https://github.com/CHERTS/pgscv). 
+2. pgSCV moved from 'weaponry' to 'lesovsky' GitHub account. From version 0.8.0 all features required for Weaponry will be removed:
 - auto-discovery (all Postgres, Pgbouncer services have to be defined explicitly, by configuration file or environment variables)
 - bootstrap, uninstall and auto-update
 - push metrics to remote service
